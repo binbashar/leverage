@@ -31,9 +31,9 @@ def build(module,args):
     args = parser.parse_args(args)
 
     # Run task and all it's dependancies.
-    _run_from_task_name(module,args.task)
+    _run_from_task_names(module,args.task)
     
-def _run_from_task_name(module,task_name):
+def _run_from_task_names(module,task_names):
     """
     @type module: module
     @type task_name: string
@@ -42,11 +42,28 @@ def _run_from_task_name(module,task_name):
 
     # Create logger.
     logger = _get_logger(module)
-    
-    task = getattr(module,task_name)
-    _run(module,logger,task,set([]))
-    
-def _run(module,logger,task,completed_tasks):
+
+    completed_tasks = set([])
+    for task_name in task_names:
+        task = _get_task(module,task_name)
+        _run(module, logger, task, completed_tasks, True)
+
+def _get_task(module, name):
+    # Get all tasks.
+    tasks = _get_tasks(module)
+    if hasattr(module, name):
+        return getattr(module, name)
+    matching_tasks = filter(lambda task: task.__name__.startswith(name), tasks)
+    if not matching_tasks:
+        raise Exception("task should be one of " +
+                        ', '.join([task.__name__ for task in tasks]))
+    if len(matching_tasks) == 1:
+        return matching_tasks[0]
+    raise Exception("Conflicting matches %s for task %s " % (
+        ', '.join([task.__name__ for task in matching_tasks]), name
+    ))
+
+def _run(module, logger, task, completed_tasks, from_command_line = False):
     """
     @type module: module
     @type logging: Logger
@@ -62,7 +79,7 @@ def _run(module,logger,task,completed_tasks):
         completed_tasks = _run(module,logger,dependancy,completed_tasks)
 
     # Perform current task, if need to.
-    if task not in completed_tasks:
+    if from_command_line or task not in completed_tasks:
 
         if task.is_ignorable():
         
@@ -96,9 +113,6 @@ def _create_parser(module):
     # Get all tasks.
     tasks = _get_tasks(module)
     
-    # Get task names.
-    task_names = [task.__name__ for task in tasks]
-    
     # Build epilog to describe the tasks.
     epilog = "tasks:"
     name_width = _get_max_name_length(module)+4
@@ -113,7 +127,7 @@ def _create_parser(module):
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("task",help="perform specified task and all it's dependancies",choices=task_names,metavar="task")
+    parser.add_argument("task",help="perform specified task and all it's dependancies",metavar="task", nargs = '+')
     
     return parser
 
