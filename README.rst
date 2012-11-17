@@ -89,6 +89,22 @@ Dependancies between tasks are taken care of too.
     Packaging android app...
     [ example.py - Completed task "android" ]
 
+Partial task names are enough to execute the task, as long as the partial name is not ambigious. You can specify multiple tasks o run in the commandline. Again the dependencies are taken taken care of.
+
+::
+    $ python example.py cle ht cl 
+    [ example.py - Starting task "clean" ]
+    Cleaning build directory...
+    [ example.py - Completed task "clean" ]
+    [ example.py - Starting task "html" ]
+    Generating HTML...
+    [ example.py - Completed task "html" ]
+    [ example.py - Starting task "clean" ]
+    Cleaning build directory...
+    [ example.py - Completed task "clean" ]
+
+The 'html' task dependency 'clean' is run only once. But clean can be explicitly run again later.
+
 Installation
 ============
 
