@@ -92,6 +92,7 @@ Dependancies between tasks are taken care of too.
 Partial task names are enough to execute the task, as long as the partial name is not ambigious. You can specify multiple tasks o run in the commandline. Again the dependencies are taken taken care of.
 
 ::
+
     $ python example.py cle ht cl 
     [ example.py - Starting task "clean" ]
     Cleaning build directory...
