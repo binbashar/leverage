@@ -12,10 +12,11 @@ import logging
 import sys
 import traceback
 import os
+import re
 
 _CREDIT_LINE = "Powered by microbuild - A Lightweight Python Build Tool."
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
-    
+_TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 def build(module,args):
     """
     Build the specified module with specified arguments.
@@ -45,25 +46,51 @@ def _run_from_task_names(module,task_names):
 
     completed_tasks = set([])
     for task_name in task_names:
-        task = _get_task(module,task_name)
-        _run(module, logger, task, completed_tasks, True)
+        task, args, kwargs= _get_task(module,task_name)
+        _run(module, logger, task, completed_tasks, True, args, kwargs)
 
 def _get_task(module, name):
     # Get all tasks.
+    match = _TASK_PATTERN.match(name)
+    if not match:
+        raise Exception("Invalid task argument %s" % name)
+    task_name, _, args_str = match.groups()
     tasks = _get_tasks(module)
-    if hasattr(module, name):
-        return getattr(module, name)
-    matching_tasks = filter(lambda task: task.__name__.startswith(name), tasks)
+    args, kwargs= _parse_args(args_str)
+    if hasattr(module, task_name):
+        return getattr(module, task_name), args, kwargs
+    matching_tasks = filter(lambda task: task.__name__.startswith(task_name), tasks)
+        
     if not matching_tasks:
         raise Exception("task should be one of " +
                         ', '.join([task.__name__ for task in tasks]))
     if len(matching_tasks) == 1:
-        return matching_tasks[0]
+        return matching_tasks[0], args, kwargs
     raise Exception("Conflicting matches %s for task %s " % (
-        ', '.join([task.__name__ for task in matching_tasks]), name
+        ', '.join([task.__name__ for task in matching_tasks]), task_name
     ))
 
-def _run(module, logger, task, completed_tasks, from_command_line = False):
+def _parse_args(args_str):
+    args = []
+    kwargs = {}
+    if not args_str:
+        return args, kwargs
+    arg_parts = args_str.split(",")
+
+    for i, part in enumerate(arg_parts):
+        if "=" in part:
+            key, value = [_str.strip() for _str in part.split("=")]
+            if key in kwargs:
+                raise Exception("duplicate keyword argument %s" % part)
+            kwargs[key] = value
+        else:
+            if len(kwargs) > 0:
+                raise Exception("Non keyword arg %s cannot follows a keyword arg %s"
+                                % (part, arg_parts[i - 1]))
+            args.append(part.strip())
+    return args, kwargs
+    
+def _run(module, logger, task, completed_tasks, from_command_line = False, args = None, kwargs = None):
     """
     @type module: module
     @type logging: Logger
@@ -91,7 +118,7 @@ def _run(module, logger, task, completed_tasks, from_command_line = False):
 
             try:
                 # Run task.
-                task()
+                task(*(args or []),**(kwargs or {}))
             except:
                 logger.critical("Error in task \"%s\"" % task.__name__)
                 traceback.print_exc()
@@ -183,12 +210,11 @@ class _TaskDecorator(object):
         # Capture dependancies.
         self.dependancies = decorator_args
         
-    def __call__(self,func):
+    def __call__(self, func):
         """
         @type func: function
         @param func: Function being decorated.
         """
-    
         return Task(func,self.dependancies)
         
 # Abbreviate for convenience.
@@ -216,7 +242,7 @@ class Task(object):
         self.__module__ = func.__module__
         self.dependancies = dependancies
         
-    def __call__(self): self.func.__call__()
+    def __call__(self,*args,**kwargs): self.func.__call__(*args,**kwargs)
     
     @classmethod
     def is_task(cls,obj):
