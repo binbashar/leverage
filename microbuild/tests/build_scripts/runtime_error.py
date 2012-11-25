@@ -6,39 +6,18 @@ import sys
 from ... import microbuild
 
 @microbuild.task()
-def clean():
-    """Clean build directory."""
-
-    print "clean"
-
-@microbuild.task(clean)
-def html():
-    """Generate HTML."""
-    
-    print "html"
-
-@microbuild.task(clean)
 def images():
     """Prepare images. Raises IOError."""
-
+    global ran_images
+    ran_images = True
     raise IOError
 
-@microbuild.task(clean,html,images)
+@microbuild.task(images)
 def android():
     """Package Android app."""
-
+    global ran_android
     print "android"
-
-@microbuild.task(clean,html,images)
-def ios():
-    """Package iOS app."""
-
-    print "ios"
-    
-def some_utility_method():
-    """Some utility method."""
-
-    print "some utility method"
+    ran_android = True
     
 if __name__ == "__main__":
     microbuild.build(sys.modules[__name__],sys.argv[1:])

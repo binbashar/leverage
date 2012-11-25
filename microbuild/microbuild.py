@@ -17,6 +17,7 @@ import re
 _CREDIT_LINE = "Powered by microbuild - A Lightweight Python Build Tool."
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
+#"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
 def build(module,args):
     """
     Build the specified module with specified arguments.
@@ -121,9 +122,8 @@ def _run(module, logger, task, completed_tasks, from_command_line = False, args 
                 task(*(args or []),**(kwargs or {}))
             except:
                 logger.critical("Error in task \"%s\"" % task.__name__)
-                traceback.print_exc()
-                logger.critical("Build aborted")
-                sys.exit()
+                logger.critical("Aborting build")
+                raise
             
             logger.info("Completed task \"%s\"" % task.__name__)
         
@@ -157,68 +157,24 @@ def _create_parser(module):
     parser.add_argument("task",help="perform specified task and all it's dependancies",metavar="task", nargs = '+')
     
     return parser
-
-class TaskDecorationException(Exception):
-    """
-    Throw when task decoration is used incorrectly.
-    """
-    pass
-
-class _TaskDecorator(object):
-    
-    def __init__(self,*decorator_args):
-        """
-        Performs validation on use of @task annotation and captures dependancies.
-        
-        This constructor is called immediately after decorated function is defined.
-        
-        To simply implementation of __call__ use of @task() when there a task
-        has no dependancies instead of @task is enfored.
-        
-        This is neccessary because the use case for __call__ is very different depending
-        on whether @task or @task() is used.
-        
-        See http://www.artima.com/weblogs/viewpost.jsp?thread=240845 for more information.
-        
-        @type decorator_args: tuple
-        @param decorator_args: Three cases depending on which form of @task is used.
-            - @task then expect (function)
-            - @task() then expect ()
-            - @task(task1,...,taskN) then expect (task1,...,taskN)
-        @throws TaskDecorationException
-        """
-        
-        # Validate arguments.
-        # Need to check that either @task() or @task(task1,...,taskN) has been used.
-        # If @task or @task(arg1,...,argN) where some arg is not a task then the build script
-        # is poorly formed.
-        
-        # Iterate over by index so we can provide error messages appropriate to the
-        # likely form of misuse.
-        decorator_args = list(decorator_args)
-        for i in range(0,len(decorator_args)):
-            if not Task.is_task(decorator_args[i]):
-                if inspect.isfunction(decorator_args[i]):
-                    # Throw error specific to the most likely form of misuse.
-                    if i == 0:
-                        raise TaskDecorationException("Replace use of @task with @task().")
-                    else:
-                        raise TaskDecorationException("%s is not a task. Each dependancy should be a task." % decorator_args[i])
-                else:
-                    raise TaskDecorationException("%s is not a task." % decorator_args[i])
-        
-        # Capture dependancies.
-        self.dependancies = decorator_args
-        
-    def __call__(self, func):
-        """
-        @type func: function
-        @param func: Function being decorated.
-        """
-        return Task(func,self.dependancies)
         
 # Abbreviate for convenience.
-task = _TaskDecorator
+#task = _TaskDecorator
+def task(*dependencies):
+    for i, dependency in enumerate(dependencies):
+        if not Task.is_task(dependency):
+                if inspect.isfunction(dependency):
+                    # Throw error specific to the most likely form of misuse.
+                    if i == 0:
+                        raise Exception("Replace use of @task with @task().")
+                    else:
+                        raise Exception("%s is not a task. Each dependancy should be a task." % dependency)
+                else:
+                    raise Exception("%s is not a task." % dependency)
+
+    def decorator(fn):
+        return Task(fn, dependencies)
+    return decorator
 
 def ignore(obj):
     """
@@ -242,7 +198,8 @@ class Task(object):
         self.__module__ = func.__module__
         self.dependancies = dependancies
         
-    def __call__(self,*args,**kwargs): self.func.__call__(*args,**kwargs)
+    def __call__(self,*args,**kwargs):
+        self.func.__call__(*args,**kwargs)
     
     @classmethod
     def is_task(cls,obj):
