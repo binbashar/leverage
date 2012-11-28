@@ -1,6 +1,6 @@
-from ... import microbuild
+from ... import _microbuild
 
-# Uses @microbuild.task form instead of @microbuild.task() form.
-@microbuild.task
+# Uses @_microbuild.task form instead of @_microbuild.task() form.
+@_microbuild.task
 def clean():
     pass

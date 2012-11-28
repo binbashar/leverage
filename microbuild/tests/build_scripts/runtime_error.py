@@ -3,16 +3,16 @@ Build script with a runtime error.
 """
 
 import sys
-from ... import microbuild
+from ... import _microbuild
 
-@microbuild.task()
+@_microbuild.task()
 def images():
     """Prepare images. Raises IOError."""
     global ran_images
     ran_images = True
     raise IOError
 
-@microbuild.task(images)
+@_microbuild.task(images)
 def android():
     """Package Android app."""
     global ran_android
@@ -20,4 +20,4 @@ def android():
     ran_android = True
     
 if __name__ == "__main__":
-    microbuild.build(sys.modules[__name__],sys.argv[1:])
+    _microbuild.build(sys.modules[__name__],sys.argv[1:])
