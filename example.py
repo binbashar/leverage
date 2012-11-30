@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-from microbuild import task,ignore,build
+from pynt import task,ignore,build
 
 @task()
 def clean():

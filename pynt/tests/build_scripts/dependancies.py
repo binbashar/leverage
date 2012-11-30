@@ -1,33 +1,31 @@
-#!/usr/bin/python
-
 import sys
-from ... import _microbuild
+from ... import _pynt
 
-@_microbuild.task()
+@_pynt.task()
 def clean():
     """Clean build directory."""
 
     print "clean"
 
-@_microbuild.task()
+@_pynt.task(clean)
 def html():
     """Generate HTML."""
     
     print "html"
 
-@_microbuild.task()
+@_pynt.task(clean)
 def images():
     """Prepare images."""
 
     print "images"
 
-@_microbuild.task()
+@_pynt.task(clean,html,images)
 def android():
     """Package Android app."""
 
     print "android"
 
-@_microbuild.task()
+@_pynt.task(clean,html,images)
 def ios():
     """Package iOS app."""
 
@@ -39,4 +37,4 @@ def some_utility_method():
     print "some utility method"
     
 if __name__ == "__main__":
-    _microbuild.build(sys.modules[__name__],sys.argv[1:])
+    _pynt.build(sys.modules[__name__],sys.argv[1:])

@@ -1,10 +1,10 @@
-from ... import _microbuild
+from ... import _pynt
 
-@_microbuild.task()
+@_pynt.task()
 def clean():
     pass
     
 # Referring to clean by name rather than reference.
-@_microbuild.task(1234)
+@_pynt.task(1234)
 def html():
     pass
