@@ -1,44 +1,45 @@
 #!/usr/bin/python
 
-import unittest
-
+import pytest
+import re
 from .. import _pynt
 
-class TestBuildSimple(unittest.TestCase):
+class TestBuildSimple:
         
     def test_get_tasks(self):
         import build_scripts.simple
         ts = _pynt._get_tasks(build_scripts.simple)
         print ts
-        self.assertEqual(len(ts),5)
+        assert len(ts) == 5
         
-class TestBuildWithDependancies(unittest.TestCase):
+class TestBuildWithDependancies:
         
     def test_get_tasks(self):
         import build_scripts.dependancies
         ts = _pynt._get_tasks(build_scripts.dependancies)
         print ts
-        self.assertEqual(len(ts),5)
+        assert len(ts) == 5
         
-class TestDecorationValidation(unittest.TestCase):
+class TestDecorationValidation:
 
     def test_task_without_braces(self):
-        with self.assertRaisesRegexp(Exception,
-                                     'Replace use of @task with @task().'):
+        with pytest.raises(Exception) as exc:
             import build_scripts.annotation_misuse_1
+        assert 'Replace use of @task with @task().' in exc.value.message
 
     def test_dependency_not_a_task(self):
-        with self.assertRaisesRegexp(Exception,
-                                     'function html.* is not a task.'):
+        with pytest.raises(Exception) as exc:
             import build_scripts.annotation_misuse_2
+        assert re.findall('function html.* is not a task.', exc.value.message)
 
     def test_dependency_not_a_function(self):
-        with self.assertRaisesRegexp(Exception, '1234 is not a task.'):
+        with pytest.raises(Exception) as exc:
             import build_scripts.annotation_misuse_3
+        assert '1234 is not a task.' in exc.value.message
 
 
         
-class TestIgnore(unittest.TestCase):
+class TestIgnore:
 
     def test_ignore_before(self):
         import build_scripts.ignore_before
@@ -48,63 +49,63 @@ class TestIgnore(unittest.TestCase):
         import build_scripts.ignore_after
         _pynt.build(build_scripts.ignore_after,["android"])
         
-class TestRuntimeError(unittest.TestCase):
+class TestRuntimeError:
 
     def test_stop_on_exception(self):
         import build_scripts.runtime_error as re
-        with self.assertRaises(IOError):
+        with pytest.raises(IOError):
             _pynt.build(re,["android"])
-        self.assertTrue(re.ran_images)
-        self.assertFalse(hasattr(re, 'ran_android'))
+        assert re.ran_images
+        assert not hasattr(re, 'ran_android')
         
     def test_exception_on_invalid_task_name(self):
         import build_scripts.build_with_params
-        with self.assertRaisesRegexp(Exception,
-                                     'task should be one of append_to_file, clean' +
-                                     ', copy_file, echo, html, start_server, tests'):
+        with pytest.raises(Exception) as exc:
             _pynt.build(build_scripts.build_with_params,["doesnt_exist"])
+            
+            assert 'task should be one of append_to_file, clean' \
+                ', copy_file, echo, html, start_server, tests' in exc.value.message
 
 
-class TestPartialTaskNames(unittest.TestCase):
-    def setUp(self):
+class TestPartialTaskNames:
+    def setup_method(self,method):
         import build_scripts.build_with_params
         self._mod = build_scripts.build_with_params
         self._mod.tasks_run = []
         
     def test_with_partial_name(self):
         _pynt.build(self._mod, ["cl"])
-        self.assertEqual(['clean[/tmp]'], self._mod.tasks_run)
+        assert ['clean[/tmp]'] ==  self._mod.tasks_run
         
     def test_with_partial_name_and_dependencies(self):
         _pynt.build(self._mod, ["htm"])
-        self.assertEqual(['clean[/tmp]','html'], self._mod.tasks_run)
+        assert ['clean[/tmp]','html'] ==  self._mod.tasks_run
 
     def test_exception_on_conflicting_partial_names(self):
-        with self.assertRaisesRegexp(Exception,
-                                     'Conflicting matches clean, copy_file for task c'):
+        with pytest.raises(Exception) as exc:
             _pynt.build(self._mod, ["c"])
+        assert 'Conflicting matches clean, copy_file for task c' in exc.value.message
 
 
 
-class TestMultipleTasks(unittest.TestCase):
-    def setUp(self):
+class TestMultipleTasks:
+    def setup_method(self,method):
         import build_scripts.build_with_params
         self._mod = build_scripts.build_with_params
         self._mod.tasks_run = []
 
     def test_dependency_is_run_only_once_unless_explicitly_invoked_again(self):
         _pynt.build(self._mod, ["clean", "html", 'tests', "clean"])
-        self.assertEqual(['clean[/tmp]', "html", "tests[]", "clean[/tmp]"],
-                         self._mod.tasks_run)
+        assert ['clean[/tmp]', "html", "tests[]", "clean[/tmp]"] == self._mod.tasks_run
         
     def test_multiple_partial_names(self):
         _pynt.build(self._mod, ["cl", "htm"])
-        self.assertEqual(['clean[/tmp]', "html"], self._mod.tasks_run)
+        assert ['clean[/tmp]', "html"] ==  self._mod.tasks_run
 
 
 
-class TesttaskArguments(unittest.TestCase):
-    def setUp(self):
+class TesttaskArguments:
+    def setup_method(self,method):
         import build_scripts.build_with_params
         self._mod = build_scripts.build_with_params
         self._mod.tasks_run = []
@@ -114,56 +115,56 @@ class TesttaskArguments(unittest.TestCase):
                                      'append_to_file[/foo/bar,ABCDEF]',
                                      "copy_file[/foo/bar,/foo/blah,False]",
                                      'start_server[8080]'])
-        self.assertEqual(["clean[~/project/foo]",  'append_to_file[/foo/bar,ABCDEF]',
-                          "copy_file[/foo/bar,/foo/blah,False]", 'start_server[8080,True]'],
-                         self._mod.tasks_run)
+        assert ["clean[~/project/foo]",  'append_to_file[/foo/bar,ABCDEF]', 
+                "copy_file[/foo/bar,/foo/blah,False]", 'start_server[8080,True]'
+            ] == self._mod.tasks_run
         
     def test_invoking_varargs_task(self):
         _pynt.build(self._mod, ['tests[test1,test2,test3]'])
-        self.assertEqual(['tests[test1,test2,test3]'], 
-                          self._mod.tasks_run)
+        assert ['tests[test1,test2,test3]'] == self._mod.tasks_run
 
     def test_partial_name_with_args(self):
         _pynt.build(self._mod, ['co[foo,bar]','star'])
-        self.assertEqual(['clean[/tmp]','copy_file[foo,bar,True]', 'start_server[80,True]'],
-                         self._mod.tasks_run)
+        assert ['clean[/tmp]','copy_file[foo,bar,True]', 'start_server[80,True]'
+            ] == self._mod.tasks_run
 
 
     def test_passing_keyword_args(self):
         _pynt.build(self._mod, ['co[to=bar,from_=foo]','star[80,debug=False]', 'echo[foo=bar,blah=123]'])
-        self.assertEqual(['clean[/tmp]','copy_file[foo,bar,True]', 'start_server[80,False]', 
-                      'echo[blah=123,foo=bar]'], self._mod.tasks_run)
+        assert ['clean[/tmp]','copy_file[foo,bar,True]', 'start_server[80,False]', 
+                      'echo[blah=123,foo=bar]'] == self._mod.tasks_run
 
 
     def test_passing_varargs_and_keyword_args(self):
         _pynt.build(self._mod, ['echo[1,2,3,some_str,foo=xyz,bar=123.3,111=333]'])
-        self.assertEqual(['echo[1,2,3,some_str,111=333,foo=xyz,bar=123.3]'], self._mod.tasks_run)
+        assert ['echo[1,2,3,some_str,111=333,foo=xyz,bar=123.3]'] ==  self._mod.tasks_run
 
     def test_validate_keyword_arguments_always_after_args(self):
-        with self.assertRaisesRegexp(Exception,
-                                     "Non keyword arg foo cannot follows" +
-                                     " a keyword arg bar=123.3"):
+        with pytest.raises(Exception) as exc:
             _pynt.build(self._mod, ['echo[bar=123.3,foo]'])
-        with self.assertRaisesRegexp(Exception,
-                                     "Non keyword arg /foo1 cannot follows" +
-                                     " a keyword arg from_=/foo"):
+        assert "Non keyword arg foo cannot follows" \
+            " a keyword arg bar=123.3" in exc.value.message
+        
+        with pytest.raises(Exception) as exc:
             _pynt.build(self._mod, ['copy[from_=/foo,/foo1]'])
+
+        assert "Non keyword arg /foo1 cannot follows" \
+            " a keyword arg from_=/foo" in exc.value.message
 
 
             
     def test_invalid_number_of_args(self):
-        with self.assertRaisesRegexp(TypeError, 'takes exactly 2 arguments'):
+        with pytest.raises(TypeError) as exc: 
              _pynt.build(self._mod, ['append[1,2,3]'])
+        assert 'takes exactly 2 arguments' in exc.value.message
 
              
     def test_invalid_names_for_kwargs(self):
-        with self.assertRaisesRegexp(TypeError,
-                                     "got an unexpected keyword argument '1'"): 
+        with pytest.raises(TypeError) as exc: 
             _pynt.build(self._mod, ['copy[1=2,to=bar]'])
-        with self.assertRaisesRegexp(TypeError,
-                                     "got an unexpected keyword argument 'bar123'"): 
+        assert "got an unexpected keyword argument '1'" in exc.value.message
+        
+        with pytest.raises(TypeError) as exc: 
             _pynt.build(self._mod, ['copy[bar123=2]'])
+        assert "got an unexpected keyword argument 'bar123'" in exc.value.message
 
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
