@@ -173,7 +173,7 @@ Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github
 ## Contributing
 
 
-If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](pytest.org) to run the tests::
+If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](pytest.org) to run the tests
 ```bash
 $ ./build.py t
 ```
