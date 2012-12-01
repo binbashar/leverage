@@ -1,11 +1,9 @@
-===========================================
-pynt - Lightweight Python Build Tool.
-===========================================
+# pynt - Lightweight Python Build Tool.
+
 
 Raghunandan Rao
 
-Features
-========
+## Features
 
 * Really quick to learn.
 * Build tasks are just python funtions.
@@ -13,8 +11,8 @@ Features
 * Automatically generates a command line interface.
 * Rake style param passing to tasks
 
-Installation
-============
+## Installation
+
 
 You can install pynt from the Python Package Index (PyPI) or from source.
 
@@ -26,8 +24,8 @@ Using easy_install::
 
     $ easy_install pynt
 
-Example
-=======
+## Example
+
 
 The build script is written in pure Python and pynt takes care of managing
 any dependancies between tasks and generating a command line interface.
@@ -170,13 +168,13 @@ pynt can also accept keyword arguments.
     [ example.py - Completed task "echo" ]
 
 
-Contributors
-============
+## Contributors
 
-[Calum J. Eadie](www.calumjeadie.com) - This project is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild).
 
-Contributing
-============
+[Calum J. Eadie](https://github.com/CalumJEadie) - This project is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild).
+
+## Contributing
+
 
 If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](pytest.org) to run the tests::
 
@@ -184,7 +182,6 @@ If you want to make changes the repo is at https://github.com/rags/pynt. You wil
 It will be great if you can raise a [pull request](https://help.github.com/articles/using-pull-requests) once you are done.
 
     
-License
-=======
+## License
 
 pynt is licensed under a [MIT license](http://opensource.org/licenses/MIT)
