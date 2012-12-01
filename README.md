@@ -103,31 +103,31 @@ tasks:
     images      Prepare images.
 ```
           
-Dependancies between tasks are taken care of too.
+pynt takes care of dependencies between tasks. In the following case start_server depends on clean, html and image generation (image task is ignored).
 
 ```bash
-$ ./example.py android
+$ ./example.py start_server
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
 [ example.py - Starting task "html" ]
-Generating HTML...
+Generating HTML in directory "."
 [ example.py - Completed task "html" ]
 [ example.py - Ignoring task "images" ]
-[ example.py - Starting task "android" ]
-Packaging android app...
-[ example.py - Completed task "android" ]
+[ example.py - Starting task "start_server" ]
+Starting server at localhost:80
+[ example.py - Completed task "start_server" ]
 ```
 
 The first few characters of the task name is enough to execute the task, as long as the partial name is unambigious. You can specify multiple tasks to run in the commandline. Again the dependencies are taken taken care of.
 
 ```bash
-$ ./example.py cle ht cl 
+$ ./example.py cle ht cl
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
 [ example.py - Starting task "html" ]
-Generating HTML...
+Generating HTML in directory "."
 [ example.py - Completed task "html" ]
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
