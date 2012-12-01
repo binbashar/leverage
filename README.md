@@ -86,7 +86,6 @@ if __name__ == '__main__':
 The command line interface and help is automatically generated. Task descriptions
 are extracted from function docstrings.
 
-::
     
     $ ./example.py -h
     usage: example.py [-h] task
@@ -105,7 +104,6 @@ are extracted from function docstrings.
           
 Dependancies between tasks are taken care of too.
 
-::
  
     $ ./example.py android
     [ example.py - Starting task "clean" ]
@@ -121,7 +119,6 @@ Dependancies between tasks are taken care of too.
 
 The first few characters of the task name is enough to execute the task, as long as the partial name is unambigious. You can specify multiple tasks to run in the commandline. Again the dependencies are taken taken care of.
 
-::
 
     $ ./example.py cle ht cl 
     [ example.py - Starting task "clean" ]
@@ -138,7 +135,6 @@ The 'html' task dependency 'clean' is run only once. But clean can be explicitly
 
 pynt tasks can accept parameters from commandline.
 
-::
 
     $ ./example.py "copy_file[/path/to/foo, path_to_bar]"
     [ example.py - Starting task "clean" ]
@@ -150,7 +146,6 @@ pynt tasks can accept parameters from commandline.
 
 pynt can also accept keyword arguments.
 
-::
 
     $ ./example.py start[port=8888]
     [ example.py - Starting task "clean" ]
