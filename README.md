@@ -1,8 +1,5 @@
 # pynt - Lightweight Python Build Tool.
-
-
-Raghunandan Rao
-
+**[Raghunandan Rao](https://github.com/rags)**
 ## Features
 
 * Really quick to learn.
@@ -171,7 +168,7 @@ $ ./example.py echo[hello,world,foo=bar,blah=123]
 ## Contributors
 
 
-[Calum J. Eadie](https://github.com/CalumJEadie) - This project is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild).
+Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
 
 ## Contributing
 
