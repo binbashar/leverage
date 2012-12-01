@@ -13,10 +13,23 @@ Features
 * Automatically generates a command line interface.
 * Rake style param passing to tasks
 
+Installation
+============
+
+You can install pynt from the Python Package Index (PyPI) or from source.
+
+Using pip::
+
+    $ pip install pynt
+
+Using easy_install::
+
+    $ easy_install pynt
+
 Example
 =======
 
-The build script is written in pure Python and microbuild takes care of managing
+The build script is written in pure Python and pynt takes care of managing
 any dependancies between tasks and generating a command line interface.
 
 Tasks are just regular Python functions marked with the ``@task()`` decorator. Dependancies
@@ -26,6 +39,7 @@ After defining all tasks ``build(sys.modules[__name__],sys.argv[1:])`` is called
 run the build.
 
 ::
+
     #!/usr/bin/python
     
     import sys
@@ -155,22 +169,22 @@ pynt can also accept keyword arguments.
     {'blah': '123', 'foo': 'bar'}
     [ example.py - Completed task "echo" ]
 
-Installation
+
+Contributors
 ============
 
-You can install microbuild from the Python Package Index (PyPI) or from source.
+[Calum J. Eadie](www.calumjeadie.com) - This project is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild).
 
-Using pip::
+Contributing
+============
 
-    $ pip install pynt
+If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](pytest.org) to run the tests::
 
-Using easy_install::
+    $ ./build.py t
+It will be great if you can raise a [pull request](https://help.github.com/articles/using-pull-requests) once you are done.
 
-    $ easy_install pynt
     
 License
 =======
 
-microbuild is licensed under a MIT license. See `LICENSE.txt`_.
-
-.. _LICENSE.txt: https://github.com/CalumJEadie/microbuild/blob/master/LICENSE.txt
+pynt is licensed under a [MIT license](http://opensource.org/licenses/MIT)
