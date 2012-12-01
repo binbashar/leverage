@@ -36,49 +36,52 @@ are specified with ``@task()`` too. Tasks can be ignored with the ``@ignore`` de
 After defining all tasks ``build(sys.modules[__name__],sys.argv[1:])`` is called to
 run the build.
 
-::
 
-    #!/usr/bin/python
+```python
+
+#!/usr/bin/python
+
+import sys
+from pynt import task,ignore,build
+
+@task()
+def clean():
+    '''Clean build directory.'''
+    print 'Cleaning build directory...'
+
+@task(clean)
+def html(target='.'):
+    '''Generate HTML.'''
+    print 'Generating HTML in directory "%s"' %  target
+
+@ignore
+@task(clean)
+def images():
+    '''Prepare images.'''
+    print 'Preparing images...'
+
+@task(html,images)
+def start_server(server='localhost', port = '80'):
+    '''Start the server'''
+    print 'Starting server at %s:%s' % (server, port)
+
+@task(start_server) #Depends on task with all optional params
+def stop_server():
+    print 'Stopping server....'
+
+@task()
+def copy_file(src, dest):
+    print 'Copying from %s to %s' % (src, dest)
+
+@task()
+def echo(*args,**kwargs):
+    print args
+    print kwargs
     
-    import sys
-    from pynt import task,ignore,build
-    
-    @task()
-    def clean():
-        '''Clean build directory.'''
-        print 'Cleaning build directory...'
-    
-    @task(clean)
-    def html(target='.'):
-        '''Generate HTML.'''
-        print 'Generating HTML in directory "%s"' %  target
-    
-    @ignore
-    @task(clean)
-    def images():
-        '''Prepare images.'''
-        print 'Preparing images...'
-    
-    @task(html,images)
-    def start_server(server='localhost', port = '80'):
-        '''Start the server'''
-        print 'Starting server at %s:%s' % (server, port)
-    
-    @task(start_server) #Depends on task with all optional params
-    def stop_server():
-        print 'Stopping server....'
-    
-    @task()
-    def copy_file(src, dest):
-        print 'Copying from %s to %s' % (src, dest)
-    
-    @task()
-    def echo(*args,**kwargs):
-        print args
-        print kwargs
-        
-    if __name__ == '__main__':
-        build(sys.modules[__name__],sys.argv[1:])
+if __name__ == '__main__':
+    build(sys.modules[__name__],sys.argv[1:])
+
+```
 
 The command line interface and help is automatically generated. Task descriptions
 are extracted from function docstrings.
