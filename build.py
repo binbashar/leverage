@@ -12,14 +12,11 @@ def apidoc():
     subprocess.call(["epydoc","--config","epydoc.config"])
     
 @pynt.task()
-def test():
+def test(*args):
     """
     Run unit tests.
     """
-    subprocess.call(["python","-m","pynt.tests.test_pynt"])
-    #subprocess.call(["python","-m","pynt.tests.build_scripts.dependancies","-h"])
-    #subprocess.call(["python","-m","pynt.tests.build_scripts.dependancies","android"])
-    #subprocess.call(["python","-m","pynt.tests.build_scripts.runtime_error","android"])
+    subprocess.call(["py.test"] + list(args))
     
 if __name__ == "__main__":
     pynt.build(sys.modules[__name__],sys.argv[1:])

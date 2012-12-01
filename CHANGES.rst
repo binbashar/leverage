@@ -1,5 +1,21 @@
-Changes
+Changes 
 =======
+
+0.5.0 - 01/12/2012
+------------------
+
+* Ability to pass params to tasks.
+* Major rewrite and flattening the package hierarchy.
+
+0.4.0 - 17/11/2012
+------------------
+
+* Support for running multiple tasks from commandline.
+* Ability to run tasks by typing in just the first few unambigious charecters.
+
+
+Changes before forking from microbuild
+======================================
 
 0.3.0 - 18/09/2012
 ------------------

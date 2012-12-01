@@ -1,20 +1,19 @@
 """
 Lightweight Python Build Tool
+
 """
 
-__author__ = "Calum J. Eadie"
+__authors__ = ['Raghunandan Rao', "Calum J. Eadie"]
 __license__ = "MIT License"
-__contact__ = "https://github.com/CalumJEadie/microbuild"
+__contact__ = "https://github.com/rags/pynt"
 
 import inspect
 import argparse
 import logging
-import sys
-import traceback
 import os
 import re
 
-_CREDIT_LINE = "Powered by microbuild - A Lightweight Python Build Tool."
+_CREDIT_LINE = "Powered by pynt - A Lightweight Python Build Tool."
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 #"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
