@@ -1,5 +1,7 @@
 # pynt - Lightweight Python Build Tool.
-**[Raghunandan Rao](https://github.com/rags)**
+
+[**Raghunandan Rao**](https://github.com/rags)
+
 ## Features
 
 * Really quick to learn.
@@ -13,14 +15,18 @@
 
 You can install pynt from the Python Package Index (PyPI) or from source.
 
-Using pip::
+Using pip
+
 ```bash
 $ pip install pynt
 ```
-Using easy_install::
+
+Using easy_install
+
 ```bash
 $ easy_install pynt
 ```
+
 ## Example
 
 
@@ -130,6 +136,7 @@ Generating HTML in directory "."
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
 ```
+
 The 'html' task dependency 'clean' is run only once. But clean can be explicitly run again later.
 
 pynt tasks can accept parameters from commandline.
@@ -143,6 +150,7 @@ Cleaning build directory...
 Copying from /path/to/foo to path_to_bar
 [ example.py - Completed task "copy_file" ]
 ```
+
 pynt can also accept keyword arguments.
 
 ```bash
