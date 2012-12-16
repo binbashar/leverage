@@ -29,11 +29,16 @@ def copy_file(from_, to, fail_on_error='True'):
 def start_server(port='80', debug='True'):
     tasks_run.append('start_server[%s,%s]' % (port, debug))
 
-@_pynt.task(clean)
+@_pynt.task(ignore=True)
+def ignored(file, contents):
+    tasks_run.append('append_to_file[%s,%s]' % (file, contents))
+
+@_pynt.task(clean, ignored)
 def append_to_file(file, contents):
     tasks_run.append('append_to_file[%s,%s]' % (file, contents))
 
-@_pynt.task()
+    
+@_pynt.task(ignored)
 def echo(*args,**kwargs):
     args_str = []
     if args:

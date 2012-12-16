@@ -3,6 +3,8 @@
 import pytest
 import re
 from .. import _pynt
+import sys
+from cStringIO import StringIO
 
 class TestBuildSimple:
         
@@ -38,17 +40,57 @@ class TestDecorationValidation:
         assert '1234 is not a task.' in exc.value.message
 
 
+import contextlib
+@contextlib.contextmanager
+def mock_stdout():
+    oldout, olderr =  sys.stdout,  sys.stderr
+    try:
+        out = [StringIO(),  StringIO()]
+        sys.stdout, sys.stderr =  out
+        yield out
+    finally:
+        sys.stdout, sys.stderr =  oldout,  olderr
+        out[0] =  out[0].getvalue()
+        out[1] =  out[1].getvalue()
+                                                                                
         
-class TestIgnore:
+class TestOptions:
 
-    def test_ignore_before(self):
-        import build_scripts.ignore_before
-        _pynt.build(build_scripts.ignore_before,["android"])
-
-    def test_ignore_after(self):
-        import build_scripts.ignore_after
-        _pynt.build(build_scripts.ignore_after,["android"])
+    @pytest.fixture
+    def module(self):
+        import build_scripts.options as module
+        module.tasks_run = []
+        self.docs = {'clean': '', 'html': 'Generate HTML.',
+                     'images': '''Prepare images.\n\nShould be ignored.''',
+                     'android': 'Package Android app.'}
+        return module
         
+    def test_ignore_tasks(self, module):
+        _pynt.build(module,["android"])
+        assert ['clean', 'html', 'android'] == module.tasks_run
+
+    def test_docs(self, module):
+        tasks = _pynt._get_tasks(module)
+        assert 4 == len(tasks)
+        
+        for task_ in tasks:
+            assert task_.name in self.docs
+            assert self.docs[task_.name] == task_.doc
+
+    @pytest.mark.parametrize('args', [['-l'], ['--list-tasks'], []])
+    def test_list_docs(self, module, args):
+        with mock_stdout() as out: 
+            _pynt.build(module,args)
+        stdout = out[0]
+        tasks = _pynt._get_tasks(module)
+        for task in tasks:
+            if task.ignored:
+                assert re.findall('%s\s+%s\s+%s' % (task.name,"\[Ignored\]", task.doc), stdout)
+            else:
+                assert re.findall('%s\s+%s' % (task.name, task.doc), stdout)
+            
+
+            
 class TestRuntimeError:
 
     def test_stop_on_exception(self):

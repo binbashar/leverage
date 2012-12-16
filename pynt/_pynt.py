@@ -26,14 +26,33 @@ def build(module,args):
     """
     
     # Build the command line.
-    parser = _create_parser(module)
+    parser = _create_parser()
 
     # Parse arguments.
     args = parser.parse_args(args)
 
     # Run task and all it's dependancies.
-    _run_from_task_names(module,args.task)
+    if args.list_tasks:
+        print_tasks(module)
+    elif not args.tasks:
+        parser.print_help()
+        print "\n"
+        print_tasks(module)
+    else:
+        _run_from_task_names(module,args.tasks)
+
+def print_tasks(module):
+    # Get all tasks.
+    tasks = _get_tasks(module)
     
+    # Build task_list to describe the tasks.
+    task_list = "Tasks in build file %s:" % module.__file__
+    name_width = _get_max_name_length(module)+4
+    task_help_format = "\n  {0:<%s} {1: ^10} {2}" % name_width
+    for task in tasks:
+        task_list += task_help_format.format(task.name, "[Ignored]" if task.ignored else '', task.doc)
+    print task_list + "\n\n"+_CREDIT_LINE
+
 def _run_from_task_names(module,task_names):
     """
     @type module: module
@@ -59,15 +78,15 @@ def _get_task(module, name):
     args, kwargs= _parse_args(args_str)
     if hasattr(module, task_name):
         return getattr(module, task_name), args, kwargs
-    matching_tasks = filter(lambda task: task.__name__.startswith(task_name), tasks)
+    matching_tasks = filter(lambda task: task.name.startswith(task_name), tasks)
         
     if not matching_tasks:
         raise Exception("task should be one of " +
-                        ', '.join([task.__name__ for task in tasks]))
+                        ', '.join([task.name for task in tasks]))
     if len(matching_tasks) == 1:
         return matching_tasks[0], args, kwargs
     raise Exception("Conflicting matches %s for task %s " % (
-        ', '.join([task.__name__ for task in matching_tasks]), task_name
+        ', '.join([task.name for task in matching_tasks]), task_name
     ))
 
 def _parse_args(args_str):
@@ -108,58 +127,43 @@ def _run(module, logger, task, completed_tasks, from_command_line = False, args 
     # Perform current task, if need to.
     if from_command_line or task not in completed_tasks:
 
-        if task.is_ignorable():
+        if task.ignored:
         
-            logger.info("Ignoring task \"%s\"" % task.__name__)
+            logger.info("Ignoring task \"%s\"" % task.name)
             
         else:
 
-            logger.info("Starting task \"%s\"" % task.__name__)
+            logger.info("Starting task \"%s\"" % task.name)
 
             try:
                 # Run task.
                 task(*(args or []),**(kwargs or {}))
             except:
-                logger.critical("Error in task \"%s\"" % task.__name__)
+                logger.critical("Error in task \"%s\"" % task.name)
                 logger.critical("Aborting build")
                 raise
             
-            logger.info("Completed task \"%s\"" % task.__name__)
+            logger.info("Completed task \"%s\"" % task.name)
         
         completed_tasks.add(task)
     
     return completed_tasks
 
-def _create_parser(module):
+def _create_parser():
     """
-    @type module: module
     @rtype: argparse.ArgumentParser
     """
-
-    # Get all tasks.
-    tasks = _get_tasks(module)
-    
-    # Build epilog to describe the tasks.
-    epilog = "tasks:"
-    name_width = _get_max_name_length(module)+4
-    task_help_format = "\n  {0.__name__:<%s} {0.__doc__}" % name_width
-    for task in tasks:
-        epilog += task_help_format.format(task)
-    epilog += "\n\n"+_CREDIT_LINE
-    
-    # Build parser.
-    # Use RawDescriptionHelpFormatter so epilog is not linewrapped.
-    parser = argparse.ArgumentParser(
-        epilog=epilog,
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument("task",help="perform specified task and all it's dependancies",metavar="task", nargs = '+')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("tasks", help="perform specified task and all it's dependancies",
+                        metavar="task", nargs = '*')
+    parser.add_argument('-l', '--list-tasks', help = "List the tasks",
+                        action =  'store_true')
     
     return parser
         
 # Abbreviate for convenience.
 #task = _TaskDecorator
-def task(*dependencies):
+def task(*dependencies, **options):
     for i, dependency in enumerate(dependencies):
         if not Task.is_task(dependency):
                 if inspect.isfunction(dependency):
@@ -172,30 +176,21 @@ def task(*dependencies):
                     raise Exception("%s is not a task." % dependency)
 
     def decorator(fn):
-        return Task(fn, dependencies)
+        return Task(fn, dependencies, options)
     return decorator
 
-def ignore(obj):
-    """
-    Decorator to specify that a task should be ignored.
-    
-    @type obj: function or Task, depending on order @ignore and @task used
-    """
-    obj.ignorable = True
-    return obj
-        
 class Task(object):
     
-    def __init__(self,func,dependancies):
+    def __init__(self, func, dependancies, options):
         """
         @type func: 0-ary function
         @type dependancies: list of Task objects
         """
         self.func = func
-        self.__name__ = func.__name__
-        self.__doc__ = inspect.getdoc(func)
-        self.__module__ = func.__module__
+        self.name = func.__name__
+        self.doc = inspect.getdoc(func) or ''
         self.dependancies = dependancies
+        self.ignored =  bool(options.get('ignore', False))
         
     def __call__(self,*args,**kwargs):
         self.func.__call__(*args,**kwargs)
@@ -206,12 +201,6 @@ class Task(object):
         Returns true is an object is a build task.
         """
         return isinstance(obj,cls)
-        
-    def is_ignorable(self):
-        """
-        Returns true if task can be ignored.
-        """
-        return ( hasattr(self,'ignorable') and self.ignorable == True ) or ( hasattr(self.func,'ignorable') and self.func.ignorable == True )
     
 def _get_tasks(module):
     """
@@ -229,7 +218,7 @@ def _get_max_name_length(module):
     
     @type module: module
     """
-    return max([len(task.__name__) for task in _get_tasks(module)])
+    return max([len(task.name) for task in _get_tasks(module)])
     
 def _get_logger(module):
     """

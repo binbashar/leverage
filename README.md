@@ -57,8 +57,7 @@ def html(target='.'):
     '''Generate HTML.'''
     print 'Generating HTML in directory "%s"' %  target
 
-@ignore
-@task(clean)
+@task(clean, ignore=True)
 def images():
     '''Prepare images.'''
     print 'Preparing images...'
@@ -91,19 +90,27 @@ are extracted from function docstrings.
 
 ```bash    
 $ ./example.py -h
-usage: example.py [-h] task
+usage: example.py [-h] [-l] [task [task ...]]
 
 positional arguments:
-    task        perform specified task and all it's dependancies
+  task              perform specified task and all it's dependancies
 
 optional arguments:
-    -h, --help  show this help message and exit
+  -h, --help        show this help message and exit
+  -l, --list-tasks  List the tasks
 
-tasks:
-    android     Package Android app.
-    clean       Clean build directory.
-    html        Generate HTML.
-    images      Prepare images.
+$ ./example.py -l
+
+Tasks in build file ./example.py:
+  clean                       Clean build directory.
+  copy_file                   
+  echo                        
+  html                        Generate HTML.
+  images           [Ignored]  Prepare images.
+  start_server                Start the server
+  stop_server                 
+
+Powered by pynt - A Lightweight Python Build Tool.
 ```
           
 pynt takes care of dependencies between tasks. In the following case start_server depends on clean, html and image generation (image task is ignored).

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-from pynt import task,ignore,build
+from pynt import task, build
 
 @task()
 def clean():
@@ -13,8 +13,8 @@ def html(target='.'):
     '''Generate HTML.'''
     print 'Generating HTML in directory "%s"' %  target
 
-@ignore
-@task(clean)
+
+@task(clean, ignore=True)
 def images():
     '''Prepare images.'''
     print 'Preparing images...'
