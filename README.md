@@ -45,7 +45,7 @@ run the build.
 #!/usr/bin/python
 
 import sys
-from pynt import task,ignore,build
+from pynt import task, build
 
 @task()
 def clean():
@@ -89,7 +89,7 @@ The command line interface and help is automatically generated. Task description
 are extracted from function docstrings.
 
 ```bash    
-$ ./example.py -h
+$ ./example.py 
 usage: example.py [-h] [-l] [task [task ...]]
 
 positional arguments:
@@ -98,8 +98,6 @@ positional arguments:
 optional arguments:
   -h, --help        show this help message and exit
   -l, --list-tasks  List the tasks
-
-$ ./example.py -l
 
 Tasks in build file ./example.py:
   clean                       Clean build directory.
