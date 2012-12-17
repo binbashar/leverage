@@ -2,21 +2,30 @@
 
 import sys
 import subprocess
-import pynt
+from pynt import task, build
 
-@pynt.task()
+@task()
 def apidoc():
     """
     Generate API documentation using epydoc.
     """
     subprocess.call(["epydoc","--config","epydoc.config"])
     
-@pynt.task()
+@task()
 def test(*args):
     """
     Run unit tests.
     """
     subprocess.call(["py.test"] + list(args))
+
+@task()
+def generate_rst():
     
+    subprocess.call(['pandoc', '-f', 'markdown', '-t', 'rst', '-o', 'README.rst', 'README.md'])
+
+@task(generate_rst)
+def upload():
+    subprocess.call(['python', 'setup.py', 'bdist', '--formats', 'wininst,gztar', 'upload'])
+
 if __name__ == "__main__":
-    pynt.build(sys.modules[__name__],sys.argv[1:])
+    build(sys.modules[__name__],sys.argv[1:])

@@ -1,6 +1,14 @@
 Changes 
 =======
 
+0.6.0 - 17/12/2012
+------------------
+
+* Simplified ignoring tasks. ignore a keyword param for task and not a separate decorator. [This change is NOT backward compatible!!!]
+* Added support for listing tasks
+* Improved help
+
+
 0.5.0 - 01/12/2012
 ------------------
 

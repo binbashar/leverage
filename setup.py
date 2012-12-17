@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name="pynt",
-    version="0.5.0",
+    version="0.6.0",
     author="Raghunandan Rao",
     author_email="r.raghunandan@gmail.com",
     url="https://github.com/rags/pynt",
