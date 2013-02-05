@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
-import sys
-from pynt import task, build
+from pynt import task
 
 @task()
 def clean():
@@ -37,5 +36,3 @@ def echo(*args,**kwargs):
     print args
     print kwargs
     
-if __name__ == '__main__':
-    build(sys.modules[__name__],sys.argv[1:])

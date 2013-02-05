@@ -11,13 +11,16 @@ import inspect
 import argparse
 import logging
 import os
+from os import path
 import re
+import imp
+import sys
 
 _CREDIT_LINE = "Powered by pynt - A Lightweight Python Build Tool."
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 #"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
-def build(module,args):
+def build(args):
     """
     Build the specified module with specified arguments.
     
@@ -31,7 +34,12 @@ def build(module,args):
     # Parse arguments.
     args = parser.parse_args(args)
 
-    # Run task and all it's dependancies.
+    #load build file as a module
+    if not path.isfile(args.file):
+        raise Exception("Build file '%s' does not exist" % args.file) 
+    module = imp.load_source(path.splitext(path.basename(args.file))[0], args.file)
+    
+    # Run task and all it's dependencies.
     if args.list_tasks:
         print_tasks(module)
     elif not args.tasks:
@@ -81,8 +89,9 @@ def _get_task(module, name):
     matching_tasks = filter(lambda task: task.name.startswith(task_name), tasks)
         
     if not matching_tasks:
-        raise Exception("task should be one of " +
-                        ', '.join([task.name for task in tasks]))
+        raise Exception("Invalid task '%s'. Task should be one of %s" %
+                        (name, 
+                         ', '.join([task.name for task in tasks])))
     if len(matching_tasks) == 1:
         return matching_tasks[0], args, kwargs
     raise Exception("Conflicting matches %s for task %s " % (
@@ -158,6 +167,9 @@ def _create_parser():
                         metavar="task", nargs = '*')
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
                         action =  'store_true')
+    parser.add_argument('-f', '--file',
+                        help = "Build file to read the tasks from. Default is build.py",
+                        metavar = "file", default =  "build.py")
     
     return parser
         
@@ -244,3 +256,6 @@ def _get_logger(module):
     logger.addHandler(ch)
 
     return logger
+
+def main():
+    build(sys.argv[1:])

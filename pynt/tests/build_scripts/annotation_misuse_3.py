@@ -1,10 +1,10 @@
-from ... import _pynt
+from pynt import task
 
-@_pynt.task()
+@task()
 def clean():
     pass
     
 # Referring to clean by name rather than reference.
-@_pynt.task(1234)
+@task(1234)
 def html():
     pass

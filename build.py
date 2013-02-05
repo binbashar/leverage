@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
-import sys
 import subprocess
-from pynt import task, build
+from pynt import task
 
 @task()
 def apidoc():
@@ -27,5 +26,3 @@ def generate_rst():
 def upload():
     subprocess.call(['python', 'setup.py', 'sdist', 'bdist_wininst', 'upload'])
 
-if __name__ == "__main__":
-    build(sys.modules[__name__],sys.argv[1:])
