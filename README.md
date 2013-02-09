@@ -188,12 +188,10 @@ You can break up your build files into modules and simple import them into your 
 from deploy_tasks import *
 from test_tasks import functional_tests, report_coverage
 ```
-## Contributors
+## Contributors/Contributing
 
 
-Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
-
-## Contributing
+* Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
 
 
 If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](http://www.pytest.org) to run the tests
@@ -202,6 +200,7 @@ $ ./b t
 ```
 It will be great if you can raise a [pull request](https://help.github.com/articles/using-pull-requests) once you are done.
 
+*If you find any bugs or need new features please raise a ticket in the [issues section](https://github.com/rags/pynt/issues) of the github repo.*
     
 ## License
 
