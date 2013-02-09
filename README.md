@@ -101,7 +101,7 @@ optional arguments:
   -f file, --file file  Build file to read the tasks from. Default is
                         'build.py'
 
-asks in build file ./build.py:
+Tasks in build file ./build.py:
   clean                       Clean build directory.
   copy_file                   
   echo                        
@@ -181,7 +181,7 @@ $ pynt echo[hello,world,foo=bar,blah=123]
 ```
 
 Organizing build scripts
---------------------------
+----------------------------
 You can break up your build files into modules and simple import them into your main build file.
 ```python
 from deploy_tasks import *
