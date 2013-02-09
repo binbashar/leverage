@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 from pynt import task
 
 @task()

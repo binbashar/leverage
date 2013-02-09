@@ -27,10 +27,13 @@ def build(args):
     @type module: module
     @type args: list of arguments
     """
-    
     # Build the command line.
     parser = _create_parser()
 
+    #No args passed. 
+    if not args: #todo: execute default task.
+        parser.print_help
+        exit
     # Parse arguments.
     args = parser.parse_args(args)
 
@@ -41,20 +44,20 @@ def build(args):
     
     # Run task and all it's dependencies.
     if args.list_tasks:
-        print_tasks(module)
+        print_tasks(module, args.file)
     elif not args.tasks:
         parser.print_help()
         print "\n"
-        print_tasks(module)
+        print_tasks(module, args.file)
     else:
         _run_from_task_names(module,args.tasks)
 
-def print_tasks(module):
+def print_tasks(module, file):
     # Get all tasks.
     tasks = _get_tasks(module)
     
     # Build task_list to describe the tasks.
-    task_list = "Tasks in build file %s:" % module.__file__
+    task_list = "Tasks in build file %s:" % file
     name_width = _get_max_name_length(module)+4
     task_help_format = "\n  {0:<%s} {1: ^10} {2}" % name_width
     for task in tasks:
@@ -168,7 +171,7 @@ def _create_parser():
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
                         action =  'store_true')
     parser.add_argument('-f', '--file',
-                        help = "Build file to read the tasks from. Default is build.py",
+                        help = "Build file to read the tasks from. 'build.py' is default value assumed if this argument is unspecified",
                         metavar = "file", default =  "build.py")
     
     return parser

@@ -1,10 +1,11 @@
-# pynt - Lightweight Python Build Tool.
+A pynt of Python build.
+=============================
 
 [**Raghunandan Rao**](https://github.com/rags)
 
 ## Features
 
-* Really quick to learn.
+* Easy to learn.
 * Build tasks are just python funtions.
 * Manages dependancies between tasks.
 * Automatically generates a command line interface.
@@ -33,19 +34,18 @@ $ easy_install pynt
 The build script is written in pure Python and pynt takes care of managing
 any dependancies between tasks and generating a command line interface.
 
-Tasks are just regular Python functions marked with the ``@task()`` decorator. Dependancies
-are specified with ``@task()`` too. Tasks can be ignored with the ``@ignore`` decorator.
+Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python functions marked with the ``@task()`` decorator. Dependancies
+are specified with ``@task()`` too. Tasks can be ignored with the ``task(ignore=True)``.
 
-After defining all tasks ``build(sys.modules[__name__],sys.argv[1:])`` is called to
-run the build.
-
+build.py
+----------
 
 ```python
 
 #!/usr/bin/python
 
 import sys
-from pynt import task, build
+from pynt import task
 
 @task()
 def clean():
@@ -79,27 +79,29 @@ def copy_file(src, dest):
 def echo(*args,**kwargs):
     print args
     print kwargs
-    
-if __name__ == '__main__':
-    build(sys.modules[__name__],sys.argv[1:])
 
 ```
+
+Running pynt tasks
+------------------
 
 The command line interface and help is automatically generated. Task descriptions
 are extracted from function docstrings.
 
 ```bash    
-$ ./example.py 
-usage: example.py [-h] [-l] [task [task ...]]
+$ pynt
+usage: b [-h] [-l] [-f file] [task [task ...]]
 
 positional arguments:
-  task              perform specified task and all it's dependancies
+  task                  perform specified task and all it's dependancies
 
 optional arguments:
-  -h, --help        show this help message and exit
-  -l, --list-tasks  List the tasks
+  -h, --help            show this help message and exit
+  -l, --list-tasks      List the tasks
+  -f file, --file file  Build file to read the tasks from. Default is
+                        'build.py'
 
-Tasks in build file ./example.py:
+asks in build file ./build.py:
   clean                       Clean build directory.
   copy_file                   
   echo                        
@@ -114,7 +116,7 @@ Powered by pynt - A Lightweight Python Build Tool.
 pynt takes care of dependencies between tasks. In the following case start_server depends on clean, html and image generation (image task is ignored).
 
 ```bash
-$ ./example.py start_server
+$ pynt start_server
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
@@ -130,7 +132,7 @@ Starting server at localhost:80
 The first few characters of the task name is enough to execute the task, as long as the partial name is unambigious. You can specify multiple tasks to run in the commandline. Again the dependencies are taken taken care of.
 
 ```bash
-$ ./example.py cle ht cl
+$ pynt cle ht cl
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
@@ -147,7 +149,7 @@ The 'html' task dependency 'clean' is run only once. But clean can be explicitly
 pynt tasks can accept parameters from commandline.
 
 ```bash
-$ ./example.py "copy_file[/path/to/foo, path_to_bar]"
+$ pynt "copy_file[/path/to/foo, path_to_bar]"
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
@@ -159,7 +161,7 @@ Copying from /path/to/foo to path_to_bar
 pynt can also accept keyword arguments.
 
 ```bash
-$ ./example.py start[port=8888]
+$ pynt start[port=8888]
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
@@ -171,13 +173,20 @@ Generating HTML in directory "."
 Starting server at localhost:8888
 [ example.py - Completed task "start_server" ]
     
-$ ./example.py echo[hello,world,foo=bar,blah=123]
+$ pynt echo[hello,world,foo=bar,blah=123]
 [ example.py - Starting task "echo" ]
 ('hello', 'world')
 {'blah': '123', 'foo': 'bar'}
 [ example.py - Completed task "echo" ]
 ```
 
+Organizing build scripts
+--------------------------
+You can break up your build files into modules and simple import them into your main build file.
+```python
+from deploy_tasks import *
+from test_tasks import functional_tests, report_coverage
+```
 ## Contributors
 
 
