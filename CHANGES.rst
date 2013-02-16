@@ -1,6 +1,15 @@
 Changes 
 =======
 
+0.7.0 - 16/02/2013
+------------------
+
+* New commandline interface. Distribution now includes 'pynt' executable.
+* 'build.py' is the default build file.
+* Build files no longer need "if main" construct.
+* pynt no longer exposes build method. This is a backward incompatible change.
+
+
 0.6.0 - 17/12/2012
 ------------------
 

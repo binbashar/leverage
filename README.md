@@ -38,7 +38,7 @@ Writing build tasks is really simple, all you need to know is the @task decorato
 are specified with ``@task()`` too. Tasks can be ignored with the ``task(ignore=True)``.
 
 **build.py**
-- ---------
+------------
 
 ```python
 
@@ -83,7 +83,7 @@ def echo(*args,**kwargs):
 ```
 
 **Running pynt tasks**
-- -----------------
+-----------------------
 
 The command line interface and help is automatically generated. Task descriptions
 are extracted from function docstrings.
@@ -181,13 +181,15 @@ $ pynt echo[hello,world,foo=bar,blah=123]
 ```
 
 **Organizing build scripts**
-- ------------
+-----------------------------
+
 You can break up your build files into modules and simple import them into your main build file.
 
 ```python
 from deploy_tasks import *
 from test_tasks import functional_tests, report_coverage
 ```
+
 ## Contributors/Contributing
 
 
@@ -195,9 +197,11 @@ from test_tasks import functional_tests, report_coverage
 
 
 If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](http://www.pytest.org) to run the tests
+
 ```bash
 $ ./b t
 ```
+
 It will be great if you can raise a [pull request](https://help.github.com/articles/using-pull-requests) once you are done.
 
 *If you find any bugs or need new features please raise a ticket in the [issues section](https://github.com/rags/pynt/issues) of the github repo.*
