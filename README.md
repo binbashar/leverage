@@ -1,4 +1,4 @@
-A pynt of Python build.
+A pynt of Python build. [![Build Status](https://travis-ci.org/rags/pynt.png)](https://travis-ci.org/rags/pynt)
 =============================
 
 [**Raghunandan Rao**](https://github.com/rags)
