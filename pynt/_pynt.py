@@ -2,11 +2,6 @@
 Lightweight Python Build Tool
 
 """
-
-__authors__ = ['Raghunandan Rao', "Calum J. Eadie"]
-__license__ = "MIT License"
-__contact__ = "https://github.com/rags/pynt"
-
 import inspect
 import argparse
 import logging
@@ -15,8 +10,9 @@ from os import path
 import re
 import imp
 import sys
+from pynt import __version__
 
-_CREDIT_LINE = "Powered by pynt - A Lightweight Python Build Tool."
+_CREDIT_LINE = "Powered by pynt %s - A Lightweight Python Build Tool." % __version__
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 #"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"

@@ -1,11 +1,11 @@
 from setuptools import setup
-
+import pynt
 setup(
     name="pynt",
-    version="0.7.0",
+    version= pynt.__version__,
     author="Raghunandan Rao",
     author_email="r.raghunandan@gmail.com",
-    url="https://github.com/rags/pynt",
+    url= pynt.__contact__, 
     packages=["pynt"],
     entry_points =  {'console_scripts': ['pynt=pynt:main']}, 
     license="MIT License",
