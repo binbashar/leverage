@@ -10,6 +10,7 @@ A pynt of Python build. [![Build Status](https://travis-ci.org/rags/pynt.png?bra
 * Manages dependancies between tasks.
 * Automatically generates a command line interface.
 * Rake style param passing to tasks
+* Supports python 2.7 and python 3.x
 
 ## Installation
 

@@ -1,5 +1,9 @@
 Changes 
 =======
+0.7.1 - 17/03/2013
+------------------
+* Migrated pynt to work on python 3.x. pynt still works on 2.7.
+* pynt version now displayed as part of help output.
 
 0.7.0 - 16/02/2013
 ------------------
