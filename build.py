@@ -24,5 +24,6 @@ def generate_rst():
 
 @task(generate_rst)
 def upload():
+    subprocess.call(['ssh-add', '~/.ssh/id_rsa'])
     subprocess.call(['python', 'setup.py', 'sdist', 'bdist_wininst', 'upload'])
 
