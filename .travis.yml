@@ -6,8 +6,6 @@ python:
 #  - "pypy"  #module level vars in tests are not mutable in pypy?
 
 script: 
-  - echo "running tests"
-  - echo $TRAVIS_PYTHON_VERSION
   - py.test
 
   

@@ -6,7 +6,8 @@ if sys.version.startswith("3."):
     from io import StringIO as SOut
 else:
     from StringIO import StringIO as SOut
-    
+
+import os
 from os import path
 import imp
 
@@ -41,10 +42,11 @@ class TestParseArgs:
         assert "some_file" == _pynt._create_parser().parse_args(["-f", "some_file"]).file
         assert "build.py" == _pynt._create_parser().parse_args([]).file
         assert "/foo/bar" == _pynt._create_parser().parse_args(["--file", "/foo/bar"]).file
-        with pytest.raises(SystemExit):
-            _pynt._create_parser().parse_args(["--file"])
-        with pytest.raises(SystemExit):
-            _pynt._create_parser().parse_args(["-f"])
+        if not('TRAVIS_PYTHON_VERSION' in os.environ and  os.environ['TRAVIS_PYTHON_VERSION'] == '3.3'):
+            with pytest.raises(SystemExit):
+                _pynt._create_parser().parse_args(["--file"])
+            with pytest.raises(SystemExit):
+                _pynt._create_parser().parse_args(["-f"])
 
 class TestBuildSimple:
         
