@@ -1,7 +1,9 @@
-A pynt of Python build. [![Build Status](https://travis-ci.org/rags/pynt.png?branch=master)](https://travis-ci.org/rags/pynt)
+[![Build Status](https://travis-ci.org/rags/pynt.png?branch=master)](https://travis-ci.org/rags/pynt)
+
+A pynt of Python build. 
 =============================
 
-[**Raghunandan Rao**](https://github.com/rags)
+[Raghunandan Rao](https://github.com/rags)
 
 ## Features
 
