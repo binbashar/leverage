@@ -47,10 +47,8 @@ class TestParseArgs:
         #These assertions dont work on 3.3 on travis(only)
         #Reported on travis forum. Works fine on 3.3 on macos, windows
         #Some bug in python 3.3 installation on travis
-        if True:
-            
-        #if not('TRAVIS_PYTHON_VERSION' in os.environ and
-        #       os.environ['TRAVIS_PYTHON_VERSION'] == '3.3'):
+        if not('TRAVIS_PYTHON_VERSION' in os.environ and
+               os.environ['TRAVIS_PYTHON_VERSION'] == '3.3'):
             with pytest.raises(SystemExit):
                 _pynt._create_parser().parse_args(["--file"])
             with pytest.raises(SystemExit):
