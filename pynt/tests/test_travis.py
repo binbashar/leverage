@@ -1,10 +1,10 @@
-from pynt import _pynt, main
+#from pynt import _pynt, main
 import pytest
 import argparse
 
-def test_pynt_parser():
-    with pytest.raises(SystemExit):
-          _pynt._create_parser().parse_args(["--file"]) # this line should throw SystemExit
+#def test_pynt_parser():
+#    with pytest.raises(SystemExit):
+#          _pynt._create_parser().parse_args(["--file"]) # this line should throw SystemExit
 
 def test_inline_parser():
     with pytest.raises(SystemExit):
