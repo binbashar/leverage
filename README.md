@@ -37,8 +37,11 @@ $ easy_install pynt
 The build script is written in pure Python and pynt takes care of managing
 any dependancies between tasks and generating a command line interface.
 
-Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python functions marked with the ``@task()`` decorator. Dependancies
-are specified with ``@task()`` too. Tasks can be ignored with the ``task(ignore=True)``.
+Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python 
+functions marked with the ``@task()`` decorator. Dependancies are specified with ``@task()`` too. Tasks can be 
+ignored with the ``@task(ignore=True)``. Disabling a task is an useful feature to have in situations where you have one
+task that a lot of other tasks depend on and you want to quickly remove it from the dependency chains of all the 
+dependent tasks. 
 
 **build.py**
 ------------
