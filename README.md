@@ -96,7 +96,7 @@ $ pynt
 usage: b [-h] [-l] [-f file] [task [task ...]]
 
 positional arguments:
-  task                  perform specified task and all it's dependancies
+  task                  perform specified task and all its dependancies
 
 optional arguments:
   -h, --help            show this help message and exit
