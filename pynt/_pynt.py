@@ -39,7 +39,7 @@ def build(args):
         raise Exception("Build file '%s' does not exist" % args.file) 
     module = imp.load_source(path.splitext(path.basename(args.file))[0], args.file)
     
-    # Run task and all it's dependencies.
+    # Run task and all its dependencies.
     if args.list_tasks:
         print_tasks(module, args.file)
     elif not args.tasks:
@@ -163,7 +163,7 @@ def _create_parser():
     @rtype: argparse.ArgumentParser
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("tasks", help="perform specified task and all it's dependancies",
+    parser.add_argument("tasks", help="perform specified task and all its dependancies",
                         metavar="task", nargs = '*')
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
                         action =  'store_true')
