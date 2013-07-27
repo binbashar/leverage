@@ -125,13 +125,13 @@ def _run(module, logger, task, completed_tasks, from_command_line = False, args 
     @type task: Task
     @type completed_tasts: set Task
     @rtype: set Task
-    @return: Updated set of completed tasks after satisfying all dependancies.
+    @return: Updated set of completed tasks after satisfying all dependencies.
     """
 
-    # Satsify dependancies recursively. Maintain set of completed tasks so each
+    # Satsify dependencies recursively. Maintain set of completed tasks so each
     # task is only performed once.
-    for dependancy in task.dependancies:
-        completed_tasks = _run(module,logger,dependancy,completed_tasks)
+    for dependency in task.dependencies:
+        completed_tasks = _run(module,logger,dependency,completed_tasks)
 
     # Perform current task, if need to.
     if from_command_line or task not in completed_tasks:
@@ -163,7 +163,7 @@ def _create_parser():
     @rtype: argparse.ArgumentParser
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("tasks", help="perform specified task and all its dependancies",
+    parser.add_argument("tasks", help="perform specified task and all its dependencies",
                         metavar="task", nargs = '*')
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
                         action =  'store_true')
@@ -183,7 +183,7 @@ def task(*dependencies, **options):
                     if i == 0:
                         raise Exception("Replace use of @task with @task().")
                     else:
-                        raise Exception("%s is not a task. Each dependancy should be a task." % dependency)
+                        raise Exception("%s is not a task. Each dependency should be a task." % dependency)
                 else:
                     raise Exception("%s is not a task." % dependency)
 
@@ -193,15 +193,15 @@ def task(*dependencies, **options):
 
 class Task(object):
     
-    def __init__(self, func, dependancies, options):
+    def __init__(self, func, dependencies, options):
         """
         @type func: 0-ary function
-        @type dependancies: list of Task objects
+        @type dependencies: list of Task objects
         """
         self.func = func
         self.name = func.__name__
         self.doc = inspect.getdoc(func) or ''
-        self.dependancies = dependancies
+        self.dependencies = dependencies
         self.ignored =  bool(options.get('ignore', False))
         
     def __call__(self,*args,**kwargs):

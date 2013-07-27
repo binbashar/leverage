@@ -61,11 +61,11 @@ class TestBuildSimple:
         ts = _pynt._get_tasks(simple)
         assert len(ts) == 5
         
-class TestBuildWithDependancies:
+class TestBuildWithDependencies:
         
     def test_get_tasks(self):
-        from .build_scripts import dependancies
-        ts = _pynt._get_tasks(dependancies)
+        from .build_scripts import dependencies
+        ts = _pynt._get_tasks(dependencies)
         assert len(ts) == 5
         
 class TestDecorationValidation:

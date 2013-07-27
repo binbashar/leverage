@@ -9,7 +9,7 @@ A pynt of Python build.
 
 * Easy to learn.
 * Build tasks are just python funtions.
-* Manages dependancies between tasks.
+* Manages dependencies between tasks.
 * Automatically generates a command line interface.
 * Rake style param passing to tasks
 * Supports python 2.7 and python 3.x
@@ -35,10 +35,10 @@ $ easy_install pynt
 
 
 The build script is written in pure Python and pynt takes care of managing
-any dependancies between tasks and generating a command line interface.
+any dependencies between tasks and generating a command line interface.
 
 Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python 
-functions marked with the ``@task()`` decorator. Dependancies are specified with ``@task()`` too. Tasks can be 
+functions marked with the ``@task()`` decorator. Dependencies are specified with ``@task()`` too. Tasks can be 
 ignored with the ``@task(ignore=True)``. Disabling a task is an useful feature to have in situations where you have one
 task that a lot of other tasks depend on and you want to quickly remove it from the dependency chains of all the 
 dependent tasks. 
@@ -99,7 +99,7 @@ $ pynt
 usage: b [-h] [-l] [-f file] [task [task ...]]
 
 positional arguments:
-  task                  perform specified task and all its dependancies
+  task                  perform specified task and all its dependencies
 
 optional arguments:
   -h, --help            show this help message and exit
