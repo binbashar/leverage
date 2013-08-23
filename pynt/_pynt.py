@@ -28,24 +28,33 @@ def build(args):
     parser = _create_parser()
 
     #No args passed. 
-    if not args: #todo: execute default task.
-        parser.print_help()
-        exit
+    #if not args: #todo: execute default task.
+    #    parser.print_help()
+    #    print("\n\n"+_CREDIT_LINE)
+    #    exit
     # Parse arguments.
     args = parser.parse_args(args)
 
+    if args.version:
+        print('pynt %s' % __version__)
+        sys.exit(0)
+        
     #load build file as a module
     if not path.isfile(args.file):
-        raise Exception("Build file '%s' does not exist" % args.file) 
+        print("Build file '%s' does not exist. Please specify a buld file\n" % args.file) 
+        parser.print_help()
+        sys.exit(1)
+
     module = imp.load_source(path.splitext(path.basename(args.file))[0], args.file)
     
     # Run task and all its dependencies.
     if args.list_tasks:
         print_tasks(module, args.file)
     elif not args.tasks:
-        parser.print_help()
-        print("\n")
-        print_tasks(module, args.file)
+        if not _run_default_task(module):
+            parser.print_help()
+            print("\n")
+            print_tasks(module,  args.file)
     else:
         _run_from_task_names(module,args.tasks)
 
@@ -57,9 +66,18 @@ def print_tasks(module, file):
     task_list = "Tasks in build file %s:" % file
     name_width = _get_max_name_length(module)+4
     task_help_format = "\n  {0:<%s} {1: ^10} {2}" % name_width
-    for task in tasks:
+    for task in sorted(tasks, key=lambda task: task.name):
         task_list += task_help_format.format(task.name, "[Ignored]" if task.ignored else '', task.doc)
     print(task_list + "\n\n"+_CREDIT_LINE)
+
+def _run_default_task(module):
+    matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
+                      if name == "__DEFAULT__"]
+    if not matching_tasks:
+        return
+    _run(module, _get_logger(module), matching_tasks[0], set())
+    return True
+
 
 def _run_from_task_names(module,task_names):
     """
@@ -67,22 +85,21 @@ def _run_from_task_names(module,task_names):
     @type task_name: string
     @param task_name: Task name, exactly corresponds to function name.
     """
-
     # Create logger.
     logger = _get_logger(module)
-
+    all_tasks = _get_tasks(module)
     completed_tasks = set([])
     for task_name in task_names:
-        task, args, kwargs= _get_task(module,task_name)
+        task, args, kwargs= _get_task(module, task_name, all_tasks)
         _run(module, logger, task, completed_tasks, True, args, kwargs)
 
-def _get_task(module, name):
+def _get_task(module, name, tasks):
     # Get all tasks.
     match = _TASK_PATTERN.match(name)
     if not match:
         raise Exception("Invalid task argument %s" % name)
     task_name, _, args_str = match.groups()
-    tasks = _get_tasks(module)
+    
     args, kwargs= _parse_args(args_str)
     if hasattr(module, task_name):
         return getattr(module, task_name), args, kwargs
@@ -94,7 +111,7 @@ def _get_task(module, name):
                          ', '.join([task.name for task in tasks])))
     if len(matching_tasks) == 1:
         return matching_tasks[0], args, kwargs
-    raise Exception("Conflicting matches %s for task %s " % (
+    raise Exception("Conflicting matches %s for task %s" % (
         ', '.join([task.name for task in matching_tasks]), task_name
     ))
 
@@ -127,7 +144,6 @@ def _run(module, logger, task, completed_tasks, from_command_line = False, args 
     @rtype: set Task
     @return: Updated set of completed tasks after satisfying all dependencies.
     """
-
     # Satsify dependencies recursively. Maintain set of completed tasks so each
     # task is only performed once.
     for dependency in task.dependencies:
@@ -166,6 +182,8 @@ def _create_parser():
     parser.add_argument("tasks", help="perform specified task and all its dependencies",
                         metavar="task", nargs = '*')
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
+                        action =  'store_true')
+    parser.add_argument('-v', '--version', help = "Print version information",
                         action =  'store_true')
     parser.add_argument('-f', '--file',
                         help = "Build file to read the tasks from. 'build.py' is default value assumed if this argument is unspecified",
@@ -222,7 +240,7 @@ def _get_tasks(module):
     """
     # Get all functions that are marked as task and pull out the task object
     # from each (name,value) pair.
-    return [member[1] for member in inspect.getmembers(module,Task.is_task)]
+    return set(member[1] for member in inspect.getmembers(module,Task.is_task))
     
 def _get_max_name_length(module):
     """

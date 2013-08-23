@@ -28,3 +28,4 @@ def upload():
     subprocess.call(['ssh-add', '~/.ssh/id_rsa'])
     subprocess.call(['python', 'setup.py', 'sdist', 'bdist_wininst', 'upload'])
 
+__DEFAULT__ = test

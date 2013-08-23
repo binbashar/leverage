@@ -19,11 +19,13 @@ def simulate_dynamic_module_load(mod):
     file_path = fpath(mod)
     dynamically_loaded_mod = imp.load_source(path.splitext(path.basename(file_path))[0], file_path)
     return dynamically_loaded_mod
-    
-def build(mod, params):
+
+def reset_build_file(mod):
+    mod.tasks_run = []
+def build(mod, params=None, init_mod = reset_build_file):
     dynamically_loaded_mod = simulate_dynamic_module_load(mod)
     dynamically_loaded_mod.tasks_run = []
-    sys.argv = ['pynt', '-f', fpath(mod)] + params
+    sys.argv = ['pynt', '-f', fpath(mod)] + (params or [])
     main()
     return dynamically_loaded_mod
 
@@ -65,8 +67,32 @@ class TestBuildWithDependencies:
         
     def test_get_tasks(self):
         from .build_scripts import dependencies
-        ts = _pynt._get_tasks(dependencies)
-        assert len(ts) == 5
+        tasks = _pynt._get_tasks(dependencies)
+        assert len(tasks) == 5
+        assert 3 == len([task for task in tasks if task.name == 'android'][0].dependencies)
+        assert 3 == len([task for task in tasks if task.name == 'ios'][0].dependencies)
+
+    def test_dependencies_for_imported(self):
+        from .build_scripts import default_task_and_import_dependencies
+        tasks = _pynt._get_tasks(default_task_and_import_dependencies)
+        assert 7 == len(tasks)
+        assert [task for task in tasks if task.name == 'clean']
+        assert [task for task in tasks if task.name == 'local_task']
+        assert [task for task in tasks if task.name == 'android']
+        assert 3 == len([task for task in tasks
+                         if task.name == 'task_with_imported_dependencies'][0].dependencies)
+        
+
+    def test_dependencies_that_are_imported_e2e(self):
+        from .build_scripts import default_task_and_import_dependencies
+        def mod_init(mod):
+            mod.tasks_run = []
+            mod.build_with_params.tasks_run = []
+        module = build(default_task_and_import_dependencies,
+                       ["task_with_imported_dependencies"], init_mod = mod_init)
+        assert module.tasks_run == ['local_task', 'task_with_imported_dependencies']
+        assert module.build_with_params.tasks_run == ['clean[/tmp]', 'html']
+
         
 class TestDecorationValidation:
 
@@ -172,7 +198,20 @@ class TestPartialTaskNames:
     def test_exception_on_conflicting_partial_names(self):
         with pytest.raises(Exception) as exc:
             build(self._mod, ["c"])
-        assert 'Conflicting matches clean, copy_file for task c' in str(exc.value)
+        assert ('Conflicting matches clean, copy_file for task c' in str(exc.value) or
+                'Conflicting matches copy_file, clean for task c' in str(exc.value))
+
+
+
+class TestDefaultTask:
+        def test_simple_default_task(self):
+            from .build_scripts import simple
+            assert _pynt._run_default_task(simple) #returns false if no default task
+
+        def test_module_with_defaults_which_imports_other_files_with_defaults(self):
+            from .build_scripts import default_task_and_import_dependencies
+            mod = build(default_task_and_import_dependencies)
+            assert 'task_with_imported_dependencies' in mod.tasks_run
 
 
 
