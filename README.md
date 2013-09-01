@@ -85,7 +85,13 @@ def copy_file(src, dest):
 def echo(*args,**kwargs):
     print args
     print kwargs
+    
+# Default task (if specified) is run when no task is specified in the command line
+# make sure you define the variable __DEFAULT__ after the task is defined
+# A good convention is to define it at the end of the module
+# __DEFAULT__ is an optional member
 
+__DEFAULT__=start_server
 ```
 
 **Running pynt tasks**
@@ -95,8 +101,8 @@ The command line interface and help is automatically generated. Task description
 are extracted from function docstrings.
 
 ```bash    
-$ pynt
-usage: b [-h] [-l] [-f file] [task [task ...]]
+$ pynt -h
+usage: b [-h] [-l] [-v] [-f file] [task [task ...]]
 
 positional arguments:
   task                  perform specified task and all its dependencies
@@ -104,16 +110,20 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -l, --list-tasks      List the tasks
+  -v, --version         Display the version information
   -f file, --file file  Build file to read the tasks from. Default is
                         'build.py'
+```
 
+```bash
+$ pynt -l
 Tasks in build file ./build.py:
   clean                       Clean build directory.
   copy_file                   
   echo                        
   html                        Generate HTML.
   images           [Ignored]  Prepare images.
-  start_server                Start the server
+  start_server     [Default]  Start the server
   stop_server                 
 
 Powered by pynt - A Lightweight Python Build Tool.
@@ -122,7 +132,7 @@ Powered by pynt - A Lightweight Python Build Tool.
 pynt takes care of dependencies between tasks. In the following case start_server depends on clean, html and image generation (image task is ignored).
 
 ```bash
-$ pynt start_server
+$ pynt #Runs the default task start_server. It does exactly what "pynt start_server" would do.
 [ example.py - Starting task "clean" ]
 Cleaning build directory...
 [ example.py - Completed task "clean" ]
