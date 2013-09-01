@@ -35,3 +35,9 @@ def echo(*args,**kwargs):
     print(args)
     print(kwargs)
     
+# Default task (if specified) is run when no task is specified in the command line
+# make sure you define the variable __DEFAULT__ after the task is defined
+# A good convention is to define it at the end of the module
+# __DEFAULT__ is an optional member
+
+__DEFAULT__=start_server

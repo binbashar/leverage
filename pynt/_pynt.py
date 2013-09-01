@@ -66,16 +66,31 @@ def print_tasks(module, file):
     task_list = "Tasks in build file %s:" % file
     name_width = _get_max_name_length(module)+4
     task_help_format = "\n  {0:<%s} {1: ^10} {2}" % name_width
+    default = _get_default_task(module)
     for task in sorted(tasks, key=lambda task: task.name):
-        task_list += task_help_format.format(task.name, "[Ignored]" if task.ignored else '', task.doc)
+        attributes = []
+        if task.ignored:
+            attributes.append('Ignored')
+        if default and task.name == default.name:
+            attributes.append('Default')
+    
+        task_list += task_help_format.format(task.name,
+                                            ('[' + ', '.join(attributes) + ']')
+                                             if attributes else '', 
+                                             task.doc)
     print(task_list + "\n\n"+_CREDIT_LINE)
 
-def _run_default_task(module):
+def _get_default_task(module):
     matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
                       if name == "__DEFAULT__"]
-    if not matching_tasks:
-        return
-    _run(module, _get_logger(module), matching_tasks[0], set())
+    if matching_tasks:
+        return matching_tasks[0]
+    
+def _run_default_task(module):
+    default_task = _get_default_task(module)
+    if not default_task:
+        return False
+    _run(module, _get_logger(module), default_task, set())
     return True
 
 
@@ -183,7 +198,8 @@ def _create_parser():
                         metavar="task", nargs = '*')
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
                         action =  'store_true')
-    parser.add_argument('-v', '--version', help = "Print version information",
+    parser.add_argument('-v', '--version',
+                        help = "Display the version information",
                         action =  'store_true')
     parser.add_argument('-f', '--file',
                         help = "Build file to read the tasks from. 'build.py' is default value assumed if this argument is unspecified",

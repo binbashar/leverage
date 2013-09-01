@@ -1,5 +1,11 @@
 Changes 
 =======
+0.7.1 - 02/09/2013
+------------------
+* Support for specifying a default task with __DEFAULT__ variable
+* pynt -v (--version) for displays version info
+* pynt -l lists tasks in alphabetical order
+
 0.7.1 - 17/03/2013
 ------------------
 * Migrated pynt to work on python 3.x. pynt still works on 2.7.
