@@ -1,6 +1,6 @@
 Changes 
 =======
-0.7.1 - 02/09/2013
+0.8.0 - 02/09/2013
 ------------------
 * Support for specifying a default task with __DEFAULT__ variable
 * pynt -v (--version) for displays version info
