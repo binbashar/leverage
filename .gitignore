@@ -7,5 +7,4 @@ build
 .pydevproject
 .ropeproject
 *.out
-README.rst
 pynt.egg-info
