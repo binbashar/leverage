@@ -1,5 +1,9 @@
 Changes 
 =======
+0.8.1 - 02/09/2013
+------------------
+* Enabling extensions
+
 0.8.0 - 02/09/2013
 ------------------
 * Support for specifying a default task with __DEFAULT__ variable
