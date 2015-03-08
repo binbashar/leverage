@@ -206,6 +206,10 @@ from deploy_tasks import *
 from test_tasks import functional_tests, report_coverage
 ```
 
+## pynt-contrib
+   
+   [pynt-contrib](https://github.com/rags/pynt-contrib) contains a set of extra tasks/utilities. The idea is to keep this package simple and bloat-free.
+   
 ## Contributors/Contributing
 
 
