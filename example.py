@@ -34,6 +34,11 @@ def copy_file(src, dest):
 def echo(*args,**kwargs):
     print(args)
     print(kwargs)
+
+@task()
+def error_task():
+    print "this should fail with an error"
+    raise IOError
     
 # Default task (if specified) is run when no task is specified in the command line
 # make sure you define the variable __DEFAULT__ after the task is defined
