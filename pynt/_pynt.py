@@ -41,7 +41,7 @@ def build(args):
         
     #load build file as a module
     if not path.isfile(args.file):
-        print("Build file '%s' does not exist. Please specify a buld file\n" % args.file) 
+        print("Build file '%s' does not exist. Please specify a build file\n" % args.file) 
         parser.print_help()
         sys.exit(1)
 
