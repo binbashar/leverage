@@ -237,7 +237,7 @@ class Task(object):
         self.doc = inspect.getdoc(func) or ''
         self.dependencies = dependencies
         self.ignored =  bool(options.get('ignore', False))
-        self.show = not bool(options.get('hide', False))
+        self.show = not self.name.startswith("_")
         
     def __call__(self,*args,**kwargs):
         self.func.__call__(*args,**kwargs)
