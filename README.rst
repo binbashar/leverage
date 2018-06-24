@@ -46,7 +46,10 @@ decorator. Tasks are just regular Python functions marked with the
 Tasks can be ignored with the ``@task(ignore=True)``. Disabling a task
 is an useful feature to have in situations where you have one task that
 a lot of other tasks depend on and you want to quickly remove it from
-the dependency chains of all the dependent tasks.
+the dependency chains of all the dependent tasks. Note that any task
+whose name starts with an underscore(\ ``_``) will be considered
+private. Private tasks are not listed in with ``pynt -l``, but they can
+still be run with ``pynt _private_task_name``
 
 **build.py**
 ------------
@@ -69,19 +72,24 @@ the dependency chains of all the dependent tasks.
         '''Generate HTML.'''
         print 'Generating HTML in directory "%s"' %  target
 
-    @task(clean, ignore=True)
+   @task()
+   def _copy_resources():
+       '''Copy resource files. This is a private task. "pynt -l" will not list this'''
+       print('Copying resource files')
+
+    @task(clean, _copy_resources)
+    def html(target='.'):
+        '''Generate HTML.'''
+        print 'Generating HTML in directory "%s"' %  target
+
+    @task(clean, _copy_resources, ignore=True)
     def images():
         '''Prepare images.'''
         print 'Preparing images...'
 
-    @task(html,images)
-    def start_server(server='localhost', port = '80'):
-        '''Start the server'''
-        print 'Starting server at %s:%s' % (server, port)
-
-    @task(start_server) #Depends on task with all optional params
-    def stop_server():
-        print 'Stopping server....'
+     @task(start_server) #Depends on task with all optional params
+     def stop_server():
+         print 'Stopping server....'
 
     @task()
     def copy_file(src, dest):
@@ -91,7 +99,7 @@ the dependency chains of all the dependent tasks.
     def echo(*args,**kwargs):
         print args
         print kwargs
-        
+
     # Default task (if specified) is run when no task is specified in the command line
     # make sure you define the variable __DEFAULT__ after the task is defined
     # A good convention is to define it at the end of the module

@@ -1,5 +1,10 @@
-Changes 
+Changes
 =======
+0.8.2 - 23/06/2018
+------------------
+* private tasks. Any tasks that start with an underscore(_) are private by convention.
+
+
 0.8.1 - 02/09/2013
 ------------------
 * Enabling extensions

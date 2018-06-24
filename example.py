@@ -6,13 +6,18 @@ def clean():
     '''Clean build directory.'''
     print('Cleaning build directory...')
 
-@task(clean)
+@task()
+def _copy_resources():
+    '''Copy resource files.'''
+    print('Copying resource files')
+
+@task(clean, _copy_resources)
 def html(target='.'):
     '''Generate HTML.'''
     print(('Generating HTML in directory "%s"' %  target))
 
 
-@task(clean, ignore=True)
+@task(clean, _copy_resources, ignore=True)
 def images():
     '''Prepare images.'''
     print('Preparing images...')
@@ -37,7 +42,7 @@ def echo(*args,**kwargs):
 
 @task()
 def error_task():
-    print "this should fail with an error"
+    print("this should fail with an error")
     raise IOError
     
 # Default task (if specified) is run when no task is specified in the command line

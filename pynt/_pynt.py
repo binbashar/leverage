@@ -237,8 +237,10 @@ class Task(object):
         self.doc = inspect.getdoc(func) or ''
         self.dependencies = dependencies
         self.ignored =  bool(options.get('ignore', False))
-        self.show = not self.name.startswith("_")
-        
+
+    def show(self):
+        return not self.name.startswith("_")
+    
     def __call__(self,*args,**kwargs):
         self.func.__call__(*args,**kwargs)
     
@@ -257,7 +259,7 @@ def _get_tasks(module):
     """
     # Get all functions that are marked as task and pull out the task object
     # from each (name,value) pair.
-    return set(member[1] for member in inspect.getmembers(module,Task.is_task) if member[1].show)
+    return set(member[1] for member in inspect.getmembers(module,Task.is_task) if member[1].show())
     
 def _get_max_name_length(module):
     """

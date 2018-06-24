@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/rags/pynt.png?branch=master)](https://travis-ci.org/rags/pynt)
 
-A pynt of Python build. 
+A pynt of Python build.
 =============================
 
 [Raghunandan Rao](https://github.com/rags)
@@ -37,11 +37,12 @@ $ easy_install pynt
 The build script is written in pure Python and pynt takes care of managing
 any dependencies between tasks and generating a command line interface.
 
-Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python 
-functions marked with the ``@task()`` decorator. Dependencies are specified with ``@task()`` too. Tasks can be 
+Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python
+functions marked with the ``@task()`` decorator. Dependencies are specified with ``@task()`` too. Tasks can be
 ignored with the ``@task(ignore=True)``. Disabling a task is an useful feature to have in situations where you have one
-task that a lot of other tasks depend on and you want to quickly remove it from the dependency chains of all the 
-dependent tasks. 
+task that a lot of other tasks depend on and you want to quickly remove it from the dependency chains of all the
+dependent tasks. Note that any task whose name starts with an underscore(``_``) will be considered private.
+Private tasks are not listed in with ``pynt -l``, but they can still be run with ``pynt _private_task_name``
 
 **build.py**
 ------------
@@ -58,12 +59,17 @@ def clean():
     '''Clean build directory.'''
     print 'Cleaning build directory...'
 
-@task(clean)
+@task()
+def _copy_resources():
+    '''Copy resource files. This is a private task. "pynt -l" will not list this'''
+    print('Copying resource files')
+
+@task(clean, _copy_resources)
 def html(target='.'):
     '''Generate HTML.'''
     print 'Generating HTML in directory "%s"' %  target
 
-@task(clean, ignore=True)
+@task(clean, _copy_resources, ignore=True)
 def images():
     '''Prepare images.'''
     print 'Preparing images...'
@@ -188,7 +194,7 @@ Generating HTML in directory "."
 [ example.py - Starting task "start_server" ]
 Starting server at localhost:8888
 [ example.py - Completed task "start_server" ]
-    
+
 $ pynt echo[hello,world,foo=bar,blah=123]
 [ example.py - Starting task "echo" ]
 ('hello', 'world')
@@ -207,9 +213,9 @@ from test_tasks import functional_tests, report_coverage
 ```
 
 ## pynt-contrib
-   
+
    [pynt-contrib](https://github.com/rags/pynt-contrib) contains a set of extra tasks/utilities. The idea is to keep this package simple and bloat-free.
-   
+
 ## Contributors/Contributing
 
 
@@ -225,7 +231,7 @@ $ ./b t
 It will be great if you can raise a [pull request](https://help.github.com/articles/using-pull-requests) once you are done.
 
 *If you find any bugs or need new features please raise a ticket in the [issues section](https://github.com/rags/pynt/issues) of the github repo.*
-    
+
 ## License
 
 pynt is licensed under a [MIT license](http://opensource.org/licenses/MIT)

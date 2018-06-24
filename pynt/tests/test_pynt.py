@@ -63,10 +63,10 @@ class TestBuildWithDependencies:
         
     def test_get_tasks(self):
         from .build_scripts import dependencies
-        tasks = _pynt._get_tasks(dependencies)
+        tasks = _pynt._get_tasks(dependencies)#private tasks are not in this list
         assert len(tasks) == 5
-        assert 3 == len([task for task in tasks if task.name == 'android'][0].dependencies)
-        assert 3 == len([task for task in tasks if task.name == 'ios'][0].dependencies)
+        assert 4 == len([task for task in tasks if task.name == 'android'][0].dependencies)
+        assert 4 == len([task for task in tasks if task.name == 'ios'][0].dependencies)
 
     def test_dependencies_for_imported(self):
         from .build_scripts import default_task_and_import_dependencies
@@ -89,7 +89,6 @@ class TestBuildWithDependencies:
         assert module.tasks_run == ['local_task', 'task_with_imported_dependencies']
         assert module.build_with_params.tasks_run == ['clean[/tmp]', 'html']
 
-        
 class TestDecorationValidation:
 
     def test_task_without_braces(self):
