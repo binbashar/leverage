@@ -17,8 +17,14 @@ def fpath(mod):
     
 def simulate_dynamic_module_load(mod):
     file_path = fpath(mod)
-    dynamically_loaded_mod = imp.load_source(path.splitext(path.basename(file_path))[0], file_path)
-    return dynamically_loaded_mod
+
+    #sys.path.append(path.abspath(script_dir))
+
+    module_name, suffix = path.splitext(path.basename(file_path))
+    description = (suffix, 'r', imp.PY_SOURCE)
+
+    with open(file_path, 'r') as scriptfile:
+        return imp.load_module(module_name, scriptfile, file_path, description)
 
 def reset_build_file(mod):
     mod.tasks_run = []
