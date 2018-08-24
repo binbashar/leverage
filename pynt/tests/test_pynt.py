@@ -296,3 +296,12 @@ class TesttaskArguments:
             build(self._mod, ['copy[bar123=2]'])
         assert "got an unexpected keyword argument 'bar123'" in str(exc.value)
 
+
+class TesttaskLocalImports:
+    def setup_method(self,method):
+        from .build_scripts import build_with_local_import
+        self._mod = build_with_local_import
+        self._mod.tasks_run = []
+
+    def test_load_build_with_local_import_does_not_fail(self):
+        mod = build(self._mod, ["work"])

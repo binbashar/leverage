@@ -45,7 +45,12 @@ def build(args):
         parser.print_help()
         sys.exit(1)
 
-    module = imp.load_source(path.splitext(path.basename(args.file))[0], args.file)
+    script_dir, script_base = path.split(args.file)
+
+    # Append directory of build script to path, to allow importing methods
+    sys.path.append(path.abspath(script_dir))
+
+    module = imp.load_source(path.splitext(script_base)[0], args.file)
     
     # Run task and all its dependencies.
     if args.list_tasks:
