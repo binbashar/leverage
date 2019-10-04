@@ -40,12 +40,7 @@ def build(args):
         sys.exit(0)
         
     #load build file as a module
-    if not path.isfile(args.file):
-        print("Build file '%s' does not exist. Please specify a build file\n" % args.file) 
-        parser.print_help()
-        sys.exit(1)
-
-    module = imp.load_source(path.splitext(path.basename(args.file))[0], args.file)
+    module = _load_buildscript(args.file)
     
     # Run task and all its dependencies.
     if args.list_tasks:
@@ -79,6 +74,23 @@ def print_tasks(module, file):
                                              if attributes else '', 
                                              task.doc)
     print(task_list + "\n\n"+_CREDIT_LINE)
+
+def _load_buildscript(file_path):
+    if not path.isfile(file_path):
+        print("Build file '%s' does not exist. Please specify a build file\n" % file_path) 
+        parser.print_help()
+        sys.exit(1)
+
+    script_dir, script_base = path.split(file_path)
+
+    # Append directory of build script to path, to allow importing modules relatively to the script
+    sys.path.append(path.abspath(script_dir))
+
+    module_name, suffix = path.splitext(script_base)
+    description = (suffix, 'r', imp.PY_SOURCE)
+
+    with open(file_path, 'r') as script_file:
+        return imp.load_module(module_name, script_file, file_path, description)
 
 def _get_default_task(module):
     matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)

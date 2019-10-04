@@ -17,8 +17,14 @@ def fpath(mod):
     
 def simulate_dynamic_module_load(mod):
     file_path = fpath(mod)
-    dynamically_loaded_mod = imp.load_source(path.splitext(path.basename(file_path))[0], file_path)
-    return dynamically_loaded_mod
+
+    #sys.path.append(path.abspath(script_dir))
+
+    module_name, suffix = path.splitext(path.basename(file_path))
+    description = (suffix, 'r', imp.PY_SOURCE)
+
+    with open(file_path, 'r') as scriptfile:
+        return imp.load_module(module_name, scriptfile, file_path, description)
 
 def reset_build_file(mod):
     mod.tasks_run = []
@@ -296,3 +302,12 @@ class TesttaskArguments:
             build(self._mod, ['copy[bar123=2]'])
         assert "got an unexpected keyword argument 'bar123'" in str(exc.value)
 
+
+class TesttaskLocalImports:
+    def setup_method(self,method):
+        from .build_scripts import build_with_local_import
+        self._mod = build_with_local_import
+        self._mod.tasks_run = []
+
+    def test_load_build_with_local_import_does_not_fail(self):
+        mod = build(self._mod, ["work"])
