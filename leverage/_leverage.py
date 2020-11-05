@@ -1,6 +1,5 @@
 """
 Lightweight Python Build Tool
-
 """
 
 import inspect
@@ -11,9 +10,9 @@ from os import path
 import re
 import imp
 import sys
-from pynt import __version__
+from leverage import __version__
 
-_CREDIT_LINE = "Powered by pynt %s - A Lightweight Python Build Tool." % __version__
+_CREDIT_LINE = "Powered by Leverage %s - A Lightweight Python Build Tool." % __version__
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 #"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
@@ -28,15 +27,17 @@ def build(args):
     parser = _create_parser()
 
     #No args passed. 
-    #if not args: #todo: execute default task.
+    # if not args: #todo: execute default task.
     #    parser.print_help()
     #    print("\n\n"+_CREDIT_LINE)
-    #    exit
+    #    sys.exit(0)
+    
     # Parse arguments.
     args = parser.parse_args(args)
+    print(args)
 
     if args.version:
-        print('pynt %s' % __version__)
+        print('leverage %s' % __version__)
         sys.exit(0)
         
     #load build file as a module
@@ -104,7 +105,6 @@ def _run_default_task(module):
         return False
     _run(module, _get_logger(module), default_task, set())
     return True
-
 
 def _run_from_task_names(module,task_names):
     """
@@ -238,7 +238,6 @@ def task(*dependencies, **options):
     return decorator
 
 class Task(object):
-    
     def __init__(self, func, dependencies, options):
         """
         @type func: 0-ary function

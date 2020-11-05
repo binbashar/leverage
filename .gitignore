@@ -7,4 +7,4 @@ build
 .pydevproject
 .ropeproject
 *.out
-pynt.egg-info
+leverage.egg-info
