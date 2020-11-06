@@ -1,9 +1,9 @@
-[![Build Status](https://travis-ci.org/rags/pynt.png?branch=master)](https://travis-ci.org/rags/pynt)
+BinBash Inc - Leverage Build Tool
 
 A pynt of Python build.
 =============================
 
-[Raghunandan Rao](https://github.com/rags)
+[BinBash](https://github.com/binbashar)
 
 ## Features
 
@@ -15,7 +15,6 @@ A pynt of Python build.
 * Supports python 2.7 and python 3.x
 
 ## Installation
-
 
 You can install pynt from the Python Package Index (PyPI) or from source.
 
@@ -212,25 +211,12 @@ from deploy_tasks import *
 from test_tasks import functional_tests, report_coverage
 ```
 
-## pynt-contrib
-
-   [pynt-contrib](https://github.com/rags/pynt-contrib) contains a set of extra tasks/utilities. The idea is to keep this package simple and bloat-free.
-
 ## Contributors/Contributing
 
+* Based on Pynt https://github.com/rags/pynt
 
 * Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
 
-
-If you want to make changes the repo is at https://github.com/rags/pynt. You will need [pytest](http://www.pytest.org) to run the tests
-
-```bash
-$ ./b t
-```
-
-It will be great if you can raise a [pull request](https://help.github.com/articles/using-pull-requests) once you are done.
-
-*If you find any bugs or need new features please raise a ticket in the [issues section](https://github.com/rags/pynt/issues) of the github repo.*
 
 ## License
 

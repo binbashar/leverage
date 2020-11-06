@@ -1,12 +1,12 @@
 """
-Lightweight Python Build Tool
+BinBash Reference Architecture Task Runner
 """
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __license__ = "MIT License"
 __contact__ = "http://github.com/binbashar/"
 
-from ._leverage import task, main
+from .leverage import task, main
 import pkgutil
 
 __path__ = pkgutil.extend_path(__path__,__name__)
