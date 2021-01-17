@@ -5,8 +5,7 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf " - \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Set up requirements
-	python3 -m pip install --user --upgrade setuptools wheel
-	python3 -m pip install --user --upgrade twine
+	python3 -m pip install --user --upgrade setuptools wheel twine gitpython
 
 clean: ## Clean build files
 	rm -rf ./build/

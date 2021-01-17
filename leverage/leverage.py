@@ -7,15 +7,19 @@ import argparse
 import logging
 import os
 from os import path
+from os import listdir
 import re
 import imp
 import sys
+from pathlib import Path
 from leverage import __version__
+from . import path as mypath
 
-_CREDIT_LINE = "Powered by Leverage %s - A Lightweight Python Build Tool." % __version__
+_CREDIT_LINE = "Powered by Leverage %s - A Lightweight Python Build Tool based on Pynt." % __version__
 _LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
 _TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
 #"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
+
 def build(args):
     """
     Build the specified module with specified arguments.
@@ -23,33 +27,24 @@ def build(args):
     @type module: module
     @type args: list of arguments
     """
-    # Build the command line.
+    # Build the command line and parse arguments
     parser = _create_parser()
-
-    #No args passed. 
-    # if not args: #todo: execute default task.
-    #    parser.print_help()
-    #    print("\n\n"+_CREDIT_LINE)
-    #    sys.exit(0)
-    
-    # Parse arguments.
     args = parser.parse_args(args)
-    print(args)
 
     if args.version:
         print('leverage %s' % __version__)
         sys.exit(0)
-        
-    #load build file as a module
-    module = _load_buildscript(args.file)
+
+    # Load build file as a module
+    module = _load_buildscript(args.file, parser)
     
     # Run task and all its dependencies.
-    if args.list_tasks:
+    if args.help:
+        parser.print_help()
+    elif args.list_tasks:
         print_tasks(module, args.file)
     elif not args.tasks:
         if not _run_default_task(module):
-            parser.print_help()
-            print("\n")
             print_tasks(module,  args.file)
     else:
         _run_from_task_names(module,args.tasks)
@@ -76,9 +71,37 @@ def print_tasks(module, file):
                                              task.doc)
     print(task_list + "\n\n"+_CREDIT_LINE)
 
-def _load_buildscript(file_path):
+#
+# Try and find a build script in current directory or in parent directories.
+#
+def _find_buildscript():
+    root_path = Path(mypath.get_root_path())
+    cur_path = Path(mypath.get_working_path())
+
+    while True:
+        # Find build.py in current directory
+        for cur_file in listdir(cur_path):
+            if cur_file == "build.py":
+                # print("[DEBUG] Found build file: %s/%s \n" % (cur_path, cur_file))
+                return "%s/%s" % (cur_path, cur_file)
+
+        # Look up until we reach the root path
+        if (cur_path == root_path):
+            break
+
+        # Move to parent dir
+        cur_path = Path(cur_path).parent
+    
+    return ""
+
+
+def _load_buildscript(file_path, parser):
+    # Try to locate build.py in parent directories
+    file_path = _find_buildscript()
+    
+    # Check if build file exists
     if not path.isfile(file_path):
-        print("Build file '%s' does not exist. Please specify a build file\n" % file_path) 
+        print("A build file could not be found in current or parent directories.\n")
         parser.print_help()
         sys.exit(1)
 
@@ -93,6 +116,9 @@ def _load_buildscript(file_path):
     with open(file_path, 'r') as script_file:
         return imp.load_module(module_name, script_file, file_path, description)
 
+def _load_buildconfig():
+    return
+
 def _get_default_task(module):
     matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
                       if name == "__DEFAULT__"]
@@ -103,7 +129,7 @@ def _run_default_task(module):
     default_task = _get_default_task(module)
     if not default_task:
         return False
-    _run(module, _get_logger(module), default_task, set())
+    _run(module, _get_logger(module.__file__), default_task, set())
     return True
 
 def _run_from_task_names(module,task_names):
@@ -113,7 +139,7 @@ def _run_from_task_names(module,task_names):
     @param task_name: Task name, exactly corresponds to function name.
     """
     # Create logger.
-    logger = _get_logger(module)
+    logger = _get_logger(module.__file__)
     all_tasks = _get_tasks(module)
     completed_tasks = set([])
     for task_name in task_names:
@@ -205,7 +231,7 @@ def _create_parser():
     """
     @rtype: argparse.ArgumentParser
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("tasks", help="perform specified task and all its dependencies",
                         metavar="task", nargs = '*')
     parser.add_argument('-l', '--list-tasks', help = "List the tasks",
@@ -216,6 +242,8 @@ def _create_parser():
     parser.add_argument('-f', '--file',
                         help = "Build file to read the tasks from. 'build.py' is default value assumed if this argument is unspecified",
                         metavar = "file", default =  "build.py")
+    parser.add_argument('-h', '--help', help = "Print this help information",
+                        action =  'store_true')
     
     return parser
         
@@ -280,14 +308,14 @@ def _get_max_name_length(module):
     """
     return max([len(task.name) for task in _get_tasks(module)])
     
-def _get_logger(module):
+def _get_logger(name):
     """
     @type module: module
     @rtype: logging.Logger
     """
 
     # Create Logger
-    logger = logging.getLogger(os.path.basename(module.__file__))
+    logger = logging.getLogger(os.path.basename(name))
     logger.setLevel(logging.DEBUG)
 
     # Create console handler and set level to debug
