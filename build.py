@@ -1,5 +1,6 @@
 from leverage import task
 from leverage import terraform
+from leverage import conf
 
 @task()
 def hello():
@@ -10,3 +11,8 @@ def hello():
 def version():
     '''Print terraform version'''
     terraform.version()
+
+@task()
+def config():
+    '''Show config'''
+    print(conf.load())
