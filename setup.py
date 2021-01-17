@@ -15,7 +15,8 @@ setup(
         'console_scripts': ['leverage=leverage:main']}, 
     license = 'MIT License',
     install_requires = [
-        'GitPython >= 3.1.11',
+        'GitPython == 3.1.11',
+        'yaenv == 1.4.1'
    ],
    keywords = ['BINBASH', 'LEVERAGE'],
    classifiers = [

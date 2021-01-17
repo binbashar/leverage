@@ -12,6 +12,7 @@ import re
 import imp
 import sys
 from pathlib import Path
+from yaenv.core import Env
 from leverage import __version__
 from . import path as mypath
 
@@ -37,7 +38,14 @@ def build(args):
 
     # Load build file as a module
     module = _load_buildscript(args.file, parser)
+
+    # Load build config
+    config = _load_buildconfig()
     
+    #
+    # TODO What's the appropriate way to pass the config to the module?
+    #
+
     # Run task and all its dependencies.
     if args.help:
         parser.print_help()
@@ -47,7 +55,7 @@ def build(args):
         if not _run_default_task(module):
             print_tasks(module,  args.file)
     else:
-        _run_from_task_names(module,args.tasks)
+        _run_from_task_names(module, args.tasks)
 
 def print_tasks(module, file):
     # Get all tasks.
@@ -85,9 +93,8 @@ def _find_buildscript():
                 # print("[DEBUG] Found build file: %s/%s \n" % (cur_path, cur_file))
                 return "%s/%s" % (cur_path, cur_file)
 
-        # Look up until we reach the root path
-        if (cur_path == root_path):
-            break
+        # Keep looking until we reach the root path
+        if (cur_path == root_path): break
 
         # Move to parent dir
         cur_path = Path(cur_path).parent
@@ -117,7 +124,38 @@ def _load_buildscript(file_path, parser):
         return imp.load_module(module_name, script_file, file_path, description)
 
 def _load_buildconfig():
-    return
+    root_path = Path(mypath.get_root_path())
+    cur_path = Path(mypath.get_working_path())
+    config_file_name = "leverage.env"
+    config_files_paths = []
+    config_dict = {}
+
+    # Go from current dir up to the root dir
+    while True:
+        for cur_file in listdir(cur_path):
+            # If a build config file is found, append it to the list
+            if cur_file == config_file_name:
+                print("[DEBUG] Found config file: %s/%s \n" % (cur_path, cur_file))
+                config_files_paths.append("%s/%s" % (cur_path, cur_file))
+
+        # Keep looking until we reach the root path
+        if (cur_path == root_path): break
+
+        # Move to parent dir
+        cur_path = Path(cur_path).parent
+
+    # Reverse the list of config files so it can be traversed from parent to child directory
+    config_files_paths = config_files_paths[::-1]
+
+    # Go through each config file in the list
+    for config_file_path in config_files_paths:
+        config_file = Env(config_file_path)
+
+        # Add entry to the config dict
+        for key, val in config_file:
+            config_dict[key] = val
+
+    return config_dict
 
 def _get_default_task(module):
     matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
