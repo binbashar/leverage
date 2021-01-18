@@ -13,13 +13,9 @@ def get_script_path():
     """Return the path to the actual (Pynt) build file"""
     return Path(__file__).parent.parent
 
-def get_script_modules_path():
-    """Return the path to the module used by the (Pynt) build file"""
-    return Path(__file__).parent
-
 def get_root_path():
     """Return the path to the root of the Git repository"""
-    git_repo = git.Repo(get_script_modules_path(), search_parent_directories=True)
+    git_repo = git.Repo(get_working_path(), search_parent_directories=True)
     return git_repo.git.rev_parse('--show-toplevel')
 
 def get_account_path():
