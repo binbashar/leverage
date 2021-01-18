@@ -7,11 +7,6 @@ def hello():
     print("Hello")
 
 @task()
-def version():
-    '''Print terraform version'''
-    terraform.version()
-
-@task()
 def config():
     '''Show config'''
     print(conf.load())
