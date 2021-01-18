@@ -1,5 +1,4 @@
 from leverage import task
-from leverage import terraform
 from leverage import conf
 
 @task()
