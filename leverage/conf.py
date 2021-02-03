@@ -3,7 +3,7 @@ from os import listdir
 from yaenv.core import Env
 from . import path
 
-_CONFIG_FILENAME = "leverage.env"
+_CONFIG_FILENAME = "build.env"
 
 def load():
     root_path = Path(path.get_root_path())
