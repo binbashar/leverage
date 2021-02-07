@@ -9,10 +9,6 @@ def get_home_path():
     """Return the current user's home directory"""
     return os.path.expanduser("~")
 
-def get_script_path():
-    """Return the path to the actual (Pynt) build file"""
-    return Path(__file__).parent.parent
-
 def get_root_path():
     """Return the path to the root of the Git repository"""
     git_repo = git.Repo(get_working_path(), search_parent_directories=True)
@@ -23,6 +19,11 @@ def get_account_path():
     root_path = Path(get_root_path())
     cur_path = Path(get_working_path())
     prev_path = cur_path
+    
+    #
+    # NOTE: currently we only support up to 5 subdir levels. Normally we use
+    #       only 2 subdirs so this should be enough for most cases.
+    #
     for i in range(5):
         if (cur_path.absolute() == root_path): break
         prev_path = cur_path

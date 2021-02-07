@@ -93,7 +93,6 @@ def _find_buildscript():
     
     return ""
 
-
 def _load_buildscript(file_path, parser):
     # Find build.py in current or parent directories
     file_path = _find_buildscript()
@@ -120,7 +119,7 @@ def _get_default_task(module):
                       if name == "__DEFAULT__"]
     if matching_tasks:
         return matching_tasks[0]
-    
+
 def _run_default_task(module):
     default_task = _get_default_task(module)
     if not default_task:
@@ -128,7 +127,7 @@ def _run_default_task(module):
     _run(module, _get_logger(module.__file__), default_task, set())
     return True
 
-def _run_from_task_names(module,task_names):
+def _run_from_task_names(module, task_names):
     """
     @type module: module
     @type task_name: string
@@ -153,7 +152,7 @@ def _get_task(module, name, tasks):
     if hasattr(module, task_name):
         return getattr(module, task_name), args, kwargs
     matching_tasks = [task for task in tasks if task.name.startswith(task_name)]
-        
+    
     if not matching_tasks:
         raise Exception("Invalid task '%s'. Task should be one of %s" %
                         (name, 
@@ -202,11 +201,8 @@ def _run(module, logger, task, completed_tasks, from_command_line = False, args 
     if from_command_line or task not in completed_tasks:
 
         if task.ignored:
-        
             logger.info("Ignoring task \"%s\"" % task.name)
-            
         else:
-
             logger.info("Starting task \"%s\"" % task.name)
 
             try:
@@ -242,7 +238,7 @@ def _create_parser():
                         action =  'store_true')
     
     return parser
-        
+
 # Abbreviate for convenience.
 #task = _TaskDecorator
 def task(*dependencies, **options):
@@ -276,16 +272,16 @@ class Task(object):
     def show(self):
         return not self.name.startswith("_")
     
-    def __call__(self,*args,**kwargs):
+    def __call__(self, *args, **kwargs):
         self.func.__call__(*args,**kwargs)
     
     @classmethod
-    def is_task(cls,obj):
+    def is_task(cls, obj):
         """
         Returns true is an object is a build task.
         """
         return isinstance(obj,cls)
-    
+
 def _get_tasks(module):
     """
     Returns all functions marked as tasks.
@@ -295,7 +291,7 @@ def _get_tasks(module):
     # Get all functions that are marked as task and pull out the task object
     # from each (name,value) pair.
     return set(member[1] for member in inspect.getmembers(module,Task.is_task) if member[1].show())
-    
+
 def _get_max_name_length(module):
     """
     Returns the length of the longest task name.
@@ -303,13 +299,12 @@ def _get_max_name_length(module):
     @type module: module
     """
     return max([len(task.name) for task in _get_tasks(module)])
-    
+
 def _get_logger(name):
     """
     @type module: module
     @rtype: logging.Logger
     """
-
     # Create Logger
     logger = logging.getLogger(os.path.basename(name))
     logger.setLevel(logging.DEBUG)
