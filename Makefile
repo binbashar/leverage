@@ -23,7 +23,7 @@ check: ## Check distributables
 	python3 -m twine check dist/*
 
 push: ## Push distributables to PyPi
-	python3 -m twine upload --repository testpypi dist/*
+	python3 -m twine upload --repository-url https://pypi.org/project/leverage dist/*
 
 info: ## Show additional info
 	@echo "virtualenv venv"
