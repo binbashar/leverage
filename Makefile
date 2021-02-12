@@ -6,8 +6,8 @@ help:
 
 
 deps: ## Install Leverage dependencies
-	python3 install GitPython
-	python3 install yaenv
+	python3 -m pip install GitPython
+	python3 -m pip install yaenv
 
 setup: ## Set up requirements
 	python3 -m pip install --user --upgrade setuptools wheel twine gitpython
