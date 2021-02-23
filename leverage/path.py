@@ -28,7 +28,7 @@ def get_account_path():
         if (cur_path.absolute() == root_path): break
         prev_path = cur_path
         cur_path = Path(cur_path).parent
-    return prev_path
+    return str(prev_path)
 
 def get_global_config_path():
     """Return the path to the config that is common to all accounts"""

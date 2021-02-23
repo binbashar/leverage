@@ -16,7 +16,7 @@ def load():
         for cur_file in listdir(cur_path):
             # If a build config file is found, append it to the list
             if cur_file == _CONFIG_FILENAME:
-                print("[DEBUG] Found config file: %s/%s \n" % (cur_path, cur_file))
+                print("[DEBUG] Found config file: %s/%s" % (cur_path, cur_file))
                 config_files_paths.append("%s/%s" % (cur_path, cur_file))
 
         # Keep looking until we reach the root path

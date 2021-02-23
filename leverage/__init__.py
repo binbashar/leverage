@@ -2,7 +2,7 @@
 BinBash Reference Architecture Task Runner
 """
 
-__version__ = "0.0.9"
+__version__ = "0.0.10"
 __license__ = "MIT License"
 __contact__ = "http://github.com/binbashar/"
 

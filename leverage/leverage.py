@@ -27,6 +27,7 @@ def build(args):
     @type module: module
     @type args: list of arguments
     """
+    
     # Build the command line and parse arguments
     parser = _create_parser()
     args = parser.parse_args(args)
@@ -82,7 +83,7 @@ def _find_buildscript():
         # Find build.py in current directory
         for cur_file in listdir(cur_path):
             if cur_file == "build.py":
-                # print("[DEBUG] Found build file: %s/%s \n" % (cur_path, cur_file))
+                # print("[DEBUG] Found build file: %s/%s" % (cur_path, cur_file))
                 return "%s/%s" % (cur_path, cur_file)
 
         # Keep looking until we reach the root path
