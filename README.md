@@ -1,57 +1,48 @@
-BinBash Inc - Leverage Build Tool
+[BinBash Inc](https://github.com/binbashar)
 
-A pynt of Python build.
-=============================
-
-[BinBash](https://github.com/binbashar)
+# Leverage CLI: An alternative to Makefiles that are used for running tasks.
 
 ## Features
-
 * Easy to learn.
-* Build tasks are just python funtions.
+* Build tasks are just python functions.
 * Manages dependencies between tasks.
 * Automatically generates a command line interface.
 * Rake style param passing to tasks
-* Supports python 2.7 and python 3.x
+* Supports python 3.x
+
+## Differences with Pynt
+At first we adopted Pynt as a replacement tool for our Makefiles which were growing large and becoming to repetitive and thus harder to maintain. We also needed a better programming language than that provided by Makefiles. Pynt provided what we needed.
+
+Even though most of the core functionality is still there, we did introduce the following changes:
+* A build file is not only looked up in the current working directory but also in parent directories.
+* Custom modules were added next to the core module and more are expected to be added this year.
+* A build config file (build.env) is optionally supported (and can also be located in current working directory or in parent directories) in order to have configuration values that are used by the build script or by the supporting modules.
 
 ## Installation
+You can install leverage from the Python Package Index (PyPI) or from source.
 
-You can install pynt from the Python Package Index (PyPI) or from source.
-
-Using pip
-
+Using pip:
 ```bash
-$ pip install pynt
+$ pip install leverage
 ```
 
-Using easy_install
+## Getting started
+* Define a build script -- Check the example below.
+* Go to the same directory where the build script is (or to a child directory of that)
+* Run `leverage` so it can discover the build script, parse it and show any tasks defined
+* Optionally define build config file (build.env)
+* Optionally create modules and import them from your build script
 
-```bash
-$ easy_install pynt
-```
-
-## Example
-
-
-The build script is written in pure Python and pynt takes care of managing
+## Example build script
+The build script is written in pure Python and Leverage takes care of managing
 any dependencies between tasks and generating a command line interface.
 
-Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python
-functions marked with the ``@task()`` decorator. Dependencies are specified with ``@task()`` too. Tasks can be
-ignored with the ``@task(ignore=True)``. Disabling a task is an useful feature to have in situations where you have one
-task that a lot of other tasks depend on and you want to quickly remove it from the dependency chains of all the
-dependent tasks. Note that any task whose name starts with an underscore(``_``) will be considered private.
-Private tasks are not listed in with ``pynt -l``, but they can still be run with ``pynt _private_task_name``
-
-**build.py**
-------------
-
+### build.py
 ```python
-
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import sys
-from pynt import task
+from leverage import task
 
 @task()
 def clean():
@@ -60,7 +51,7 @@ def clean():
 
 @task()
 def _copy_resources():
-    '''Copy resource files. This is a private task. "pynt -l" will not list this'''
+    '''Copy resource files. This is a private task and will not be listed.'''
     print('Copying resource files')
 
 @task(clean, _copy_resources)
@@ -90,7 +81,7 @@ def copy_file(src, dest):
 def echo(*args,**kwargs):
     print args
     print kwargs
-    
+
 # Default task (if specified) is run when no task is specified in the command line
 # make sure you define the variable __DEFAULT__ after the task is defined
 # A good convention is to define it at the end of the module
@@ -99,111 +90,66 @@ def echo(*args,**kwargs):
 __DEFAULT__=start_server
 ```
 
-**Running pynt tasks**
------------------------
+### Writing tasks
+Writing build tasks is really simple, all you need to know is the @task decorator. Tasks are just regular Python functions marked with the ``@task()`` decorator. Dependencies are specified with ``@task()`` too.
+Tasks can be ignored with the ``@task(ignore=True)``. Disabling a task is an useful feature to have in situations where you have one task that a lot of other tasks depend on and you want to quickly remove it from the dependency chains of all the dependent tasks.
+Note that any task whose name starts with an underscore(``_``) will be considered private.
+Private tasks are not listed, but they can still be run with ``leverage _private_task_name``
 
+### Running Leverage tasks
 The command line interface and help is automatically generated. Task descriptions
 are extracted from function docstrings.
 
+You can list the tasks available as follows:
 ```bash
-$ pynt -h
-usage: pynt [-h] [-l] [-v] [-f file] [task [task ...]]
-
-positional arguments:
-  task                  perform specified task and all its dependencies
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -l, --list-tasks      List the tasks
-  -v, --version         Display the version information
-  -f file, --file file  Build file to read the tasks from. Default is
-                        'build.py'
-```
-
-```bash
-$ pynt -l
-Tasks in build file ./build.py:
+$ leverage -l
+Tasks in build file build.py:
   clean                       Clean build directory.
-  copy_file                   
-  echo                        
+  copy_file
+  echo
   html                        Generate HTML.
   images           [Ignored]  Prepare images.
   start_server     [Default]  Start the server
-  stop_server                 
+  stop_server
 
-Powered by pynt - A Lightweight Python Build Tool.
+Powered by Leverage 0.0.10 - A Lightweight Python Build Tool based on Pynt.
 ```
-          
-pynt takes care of dependencies between tasks. In the following case start_server depends on clean, html and image generation (image task is ignored).
 
+Note: keep in mind that the flag `-l` is needed here because a default task is set, otherwise passing such flag would not be needed.
+
+Task dependencies between tasks are taken care of. In the following case `html` depends on `clean` and `_copy_resources` so those 2 will run before the former task:
 ```bash
-$ pynt #Runs the default task start_server. It does exactly what "pynt start_server" would do.
-[ example.py - Starting task "clean" ]
+$ leverage html
+[ build.py - Starting task "clean" ]
 Cleaning build directory...
-[ example.py - Completed task "clean" ]
-[ example.py - Starting task "html" ]
+[ build.py - Completed task "clean" ]
+[ build.py - Starting task "_copy_resources" ]
+Copying resource files
+[ build.py - Completed task "_copy_resources" ]
+[ build.py - Starting task "html" ]
 Generating HTML in directory "."
-[ example.py - Completed task "html" ]
-[ example.py - Ignoring task "images" ]
-[ example.py - Starting task "start_server" ]
-Starting server at localhost:80
-[ example.py - Completed task "start_server" ]
+[ build.py - Completed task "html" ]
 ```
 
-The first few characters of the task name is enough to execute the task, as long as the partial name is unambigious. You can specify multiple tasks to run in the commandline. Again the dependencies are taken taken care of.
 
+Tasks can accept parameters from commandline:
 ```bash
-$ pynt cle ht cl
-[ example.py - Starting task "clean" ]
-Cleaning build directory...
-[ example.py - Completed task "clean" ]
-[ example.py - Starting task "html" ]
-Generating HTML in directory "."
-[ example.py - Completed task "html" ]
-[ example.py - Starting task "clean" ]
-Cleaning build directory...
-[ example.py - Completed task "clean" ]
-```
-
-The 'html' task dependency 'clean' is run only once. But clean can be explicitly run again later.
-
-pynt tasks can accept parameters from commandline.
-
-```bash
-$ pynt "copy_file[/path/to/foo, path_to_bar]"
-[ example.py - Starting task "clean" ]
-Cleaning build directory...
-[ example.py - Completed task "clean" ]
-[ example.py - Starting task "copy_file" ]
+$ leverage copy_file["/path/to/foo","path_to_bar"]
+[ build.py - Starting task "copy_file" ]
 Copying from /path/to/foo to path_to_bar
-[ example.py - Completed task "copy_file" ]
+[ build.py - Completed task "copy_file" ]
 ```
 
-pynt can also accept keyword arguments.
-
+Tasks can also accept keyword arguments:
 ```bash
-$ pynt start[port=8888]
-[ example.py - Starting task "clean" ]
-Cleaning build directory...
-[ example.py - Completed task "clean" ]
-[ example.py - Starting task "html" ]
-Generating HTML in directory "."
-[ example.py - Completed task "html" ]
-[ example.py - Ignoring task "images" ]
-[ example.py - Starting task "start_server" ]
-Starting server at localhost:8888
-[ example.py - Completed task "start_server" ]
-
-$ pynt echo[hello,world,foo=bar,blah=123]
-[ example.py - Starting task "echo" ]
+$ leverage echo[hello,world,foo=bar,blah=123]
+[ build.py - Starting task "echo" ]
 ('hello', 'world')
-{'blah': '123', 'foo': 'bar'}
-[ example.py - Completed task "echo" ]
+{'foo': 'bar', 'blah': '123'}
+[ build.py - Completed task "echo" ]
 ```
 
-**Organizing build scripts**
------------------------------
-
+### Organizing build scripts
 You can break up your build files into modules and simple import them into your main build file.
 
 ```python
@@ -212,12 +158,8 @@ from test_tasks import functional_tests, report_coverage
 ```
 
 ## Contributors/Contributing
-
-* Based on Pynt https://github.com/rags/pynt
-
+* Leverage CLI is based on Pynt: https://github.com/rags/pynt
 * Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
 
-
 ## License
-
-pynt is licensed under a [MIT license](http://opensource.org/licenses/MIT)
+Leverage CLI is licensed under a [MIT license](http://opensource.org/licenses/MIT)
