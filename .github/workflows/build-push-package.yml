@@ -37,6 +37,8 @@ jobs:
           sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
 
           echo "[INFO] Commit and push"
+          git config user.name binbashdevops
+          git config user.email info@binbash.com.ar
           git add $INIT_FILE
           git commit -m "Bump version from $CURRENT_VERSION to $RELEASE_VERSION"
         env:
