@@ -17,8 +17,7 @@ jobs:
 
       - name: install_dependencies
         run: |
-          pip install GitPython
-          pip install yaenv
+          pip install --user --upgrade setuptools wheel twine gitpython yaenv
         shell: bash
 
       - name: bump_version
