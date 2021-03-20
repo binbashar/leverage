@@ -57,13 +57,10 @@ jobs:
 
       - name: upload
         run: |
-          echo "[pypi]" > ~/.pypirc
-          echo "username = __token__" >> ~/.pypirc
-          echo "password = $PYPI_TOKEN" >> ~/.pypirc
-
           python -m twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
         env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
       - name: commit_push
         run: |
