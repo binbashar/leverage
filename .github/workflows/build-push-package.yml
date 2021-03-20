@@ -23,8 +23,7 @@ jobs:
 
       - name: bump_version
         run: |
-          RELEASE_VERSION=$(git tag | tail -1)
-          echo $RELEASE_VERSION
+          git tag | tail -1
         shell: bash
 
       # - name: build
