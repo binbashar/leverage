@@ -11,20 +11,30 @@ jobs:
   build_push:
     runs-on: ubuntu-latest 
     steps:
-      - uses: actions/checkout@v2
+      - id: leverage
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          owner: binbashar
+          repo: leverage
+          excludes: prerelease, draft
 
+      - uses: actions/checkout@v2
+      
       - uses: actions/setup-python@v2
 
       - name: install_dependencies
         run: |
-          pwd
-          ls -a
-          which python
-          python --version
-          which pip
-          pip --version
+          pip install GitPython
+          pip install yaenv
         shell: bash
-      
+
+      - name: bump_version
+        run: |
+          echo $RELEASE_VERSION
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.leverage.outputs.release }}
+
       # - name: build
       #   run: |
       #     TODO
