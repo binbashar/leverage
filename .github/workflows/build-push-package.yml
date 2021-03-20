@@ -1,8 +1,8 @@
 name: Build Package and Push
 
 on:
-  tags:
-    - '*'
+  release:
+    types: [published]
 
 jobs:
   build_push:
