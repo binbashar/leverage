@@ -1,0 +1,22 @@
+name: Build Package and Push
+
+# Only run this when a tag is pushed
+on:
+  tags:
+    - '*'
+
+jobs:
+  build_push:
+    runs-on: ubuntu-latest 
+    steps:
+      # Checkout code
+      - uses: actions/checkout@v2
+      # Install and set up python
+      - uses: actions/setup-python@v2
+      # Build package and push to PyPi
+      - uses: casperdcl/deploy-pypi@v2
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+          pip: wheel -w dist/ --no-deps .
+          # only upload if a tag is pushed (otherwise just build & check)
+          upload: ${{ github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags') }}
