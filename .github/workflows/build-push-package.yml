@@ -1,6 +1,5 @@
 name: Build Package and Push
 
-# Only run this when a tag is pushed
 on:
   tags:
     - '*'
