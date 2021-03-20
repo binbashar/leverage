@@ -30,15 +30,17 @@ jobs:
           echo $RELEASE_VERSION
 
           echo "[INFO] Get current version"
-          CURRENT_VERSION=$(cat src/init.py | grep "__version__" | grep -oP "([0-9]*\.[0-9]*\.[0-9]*)")
+          CURRENT_VERSION=$(cat $INIT_FILE | grep "__version__" | grep -oP "([0-9]*\.[0-9]*\.[0-9]*)")
           echo $CURRENT_VERSION
 
           echo "[INFO] Bump version"
-          sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ src/init.py
+          sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
 
           echo "[INFO] Commit and push"
-          git add src/init.py
+          git add $INIT_FILE
           git commit -m "Bump version from $CURRENT_VERSION to $RELEASE_VERSION"
+        env:
+          INIT_FILE: leverage/__init__.py
 
       - name: clean
         run: |
