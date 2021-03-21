@@ -66,3 +66,10 @@ jobs:
       - name: commit_push
         run: |
           git push
+
+      - uses: act10ns/slack@v1
+        with: 
+          status: ${{ job.status }}
+          channel: '#tools-ci'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
