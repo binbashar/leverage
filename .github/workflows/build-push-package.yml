@@ -36,12 +36,14 @@ jobs:
           sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
 
           echo "[INFO] Commit and push"
-          git config user.name binbashdevops
-          git config user.email info@binbash.com.ar
+          git config user.name $GIT_USERNAME
+          git config user.email $GIT_EMAIL
           git add $INIT_FILE
           git commit -m "Bump version from $CURRENT_VERSION to $RELEASE_VERSION"
         env:
           INIT_FILE: leverage/__init__.py
+          GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
 
       - name: clean
         run: |
