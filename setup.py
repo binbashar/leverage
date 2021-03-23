@@ -16,7 +16,7 @@ setup(
     license = 'MIT License',
     install_requires = [
         'GitPython == 3.1.11',
-        'yaenv == 1.4.1'
+        'yaenv == 1.2.2'
    ],
    keywords = ['BINBASH', 'LEVERAGE'],
    classifiers = [
