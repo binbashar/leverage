@@ -8,7 +8,8 @@
 * Manages dependencies between tasks.
 * Automatically generates a command line interface.
 * Rake style param passing to tasks
-* Supports python 3.x
+* Supports python >= 3.6
+
 
 ## Differences with Pynt
 At first we adopted Pynt as a replacement tool for our Makefiles which were growing large and becoming to repetitive and thus harder to maintain. We also needed a better programming language than that provided by Makefiles. Pynt provided what we needed.
@@ -20,11 +21,11 @@ Even though most of the core functionality is still there, we did introduce the 
 
 ## Installation
 You can install leverage from the Python Package Index (PyPI) or from source.
-
-Using pip:
+First, make sure your Python version is 3.6 or higher. Then install via pip:
 ```bash
 $ pip install leverage
 ```
+
 
 ## Getting started
 * Define a build script -- Check the example below.
@@ -32,6 +33,7 @@ $ pip install leverage
 * Run `leverage` so it can discover the build script, parse it and show any tasks defined
 * Optionally define build config file (build.env)
 * Optionally create modules and import them from your build script
+
 
 ## Example build script
 The build script is written in pure Python and Leverage takes care of managing
@@ -157,9 +159,31 @@ from deploy_tasks import *
 from test_tasks import functional_tests, report_coverage
 ```
 
+
+## Known issues
+
+### Zsh Glob Patterns: "zsh: no matches found"
+If you use `zsh` as your shell and you need to pass arguments to a task in this way: `leverage state_import["import.json"]`, or this other way: `leverage outout["-json"]`, you might get the an error like this one: `zsh: no matches found: output[-json]`
+The problem in that case has to do with with the square brackets as zhs has glob patterns enabled by default which causes every input to be interpreted like that.
+
+The are a few workarounds to help with this:
+1. Escape the square brackets: `leverage state_import\["import.json"\]`
+2. Enclose the entire task between double quotes: `leverage "state_import[import.json]"`
+3. Disable glob patterns: `noglob leverage state_import["import.json"]`
+4. An improvement over the last point is to create an alias such as this one: `alias leverage='noglob leverage'`
+
+
+## Release Process
+* On every PR, a Github Action workflow is triggered to create/update a release draft.
+* The version number is determined by the labels of those PRs (major, minor, fix).
+* The release draft has to be manually published. This allows for any number of PR (features, fixes) to make the cut.
+* Once a release is published, another workflow is triggered to create and push the package to PyPi.
+
+
 ## Contributors/Contributing
 * Leverage CLI is based on Pynt: https://github.com/rags/pynt
 * Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
+
 
 ## License
 Leverage CLI is licensed under a [MIT license](http://opensource.org/licenses/MIT)
