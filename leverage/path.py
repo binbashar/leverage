@@ -66,7 +66,7 @@ def get_account_path():
     # NOTE: currently we only support up to 5 subdir levels. Normally we use
     #       only 2 subdirectories so this should be enough for most cases.
     for _ in range(5):
-        if cur_path.absolute() == root_path:
+        if cur_path.resolve() == root_path:
             break
 
         prev_path = cur_path
