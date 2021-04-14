@@ -1,32 +1,33 @@
 from setuptools import setup
+
 import leverage
 
 setup(
-    name = 'leverage',
-    version = leverage.__version__,
-    author = 'BinBash Inc',
-    author_email = 'info@binbash.com.ar',
-    description = 'Lightweight Python Build Tool.',
-    long_description = 'A hack of Pynt for https://github.com/binbashar/leverage project',
-    long_description_content_type = "text/x-rst",
-    url = leverage.__contact__, 
-    packages = ['leverage'],
-    entry_points =  {
+    name='leverage',
+    version=leverage.__version__,
+    author='BinBash Inc',
+    author_email='leverage@binbash.com.ar',
+    description='Binbash Leverage Command-line Task Runner',
+    long_description='A hack of Pynt for https://github.com/binbashar/leverage project',
+    long_description_content_type='text/x-rst',
+    url=leverage.__contact__, 
+    packages=['leverage'],
+    entry_points= {
         'console_scripts': ['leverage=leverage:main']}, 
-    license = 'MIT License',
-    install_requires = [
-        'GitPython == 3.1.11',
+    license='MIT License',
+    python_requires='>=3.6',
+    install_requires=[
         'yaenv == 1.2.2'
-   ],
-   keywords = ['BINBASH', 'LEVERAGE'],
-   classifiers = [
-        'Development Status :: 3 - Alpha',      # Either "3 - Alpha", "4 - Beta" or "5 - Production/Stable"
-        'Intended Audience :: Developers',      # Define that your audience are developers
-        'Topic :: Software Development :: Build Tools',
-        'License :: OSI Approved :: MIT License',   # Pick a license
-        'Programming Language :: Python :: 3',      # Supported pyhton versions
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-  ],
+    ],
+    keywords=['BINBASH', 'LEVERAGE'],
+    classifiers=[
+         'Development Status :: 3 - Alpha',
+         'Intended Audience :: Developers',
+         'Topic :: Software Development :: Build Tools',
+         'License :: OSI Approved :: MIT License',
+         'Programming Language :: Python :: 3',
+         'Programming Language :: Python :: 3.6',
+         'Programming Language :: Python :: 3.7',
+         'Programming Language :: Python :: 3.8',
+    ],
 )
