@@ -1,329 +1,276 @@
 """
-Lightweight Python Build Tool
+    Binbash Leverage Command-line Task Runner
 """
 
-import inspect
-import argparse
-import logging
-import os
-from os import path
-from os import listdir
 import re
-import imp
 import sys
 from pathlib import Path
-from leverage import __version__
-from . import path as mypath
+from importlib import util
+from inspect import getmembers
 
-_CREDIT_LINE = "Powered by Leverage %s - A Lightweight Python Build Tool based on Pynt." % __version__
-_LOGGING_FORMAT = "[ %(name)s - %(message)s ]"
-_TASK_PATTERN = re.compile("^([^\[]+)(\[([^\]]*)\])?$")
-#"^([^\[]+)(\[([^\],=]*(,[^\],=]+)*(,[^\],=]+=[^\],=]+)*)\])?$"
+from leverage import __version__
+
+from .task import Task
+from .task import NotATaskError
+from .task import MissingParensInDecoratorError
+from .path import NoBuildScriptFoundError
+from .path import get_build_script_path
+from .logging import get_logger
+from .logging import _attach_build_handler
+from ._parsing import _parse_args
+from ._parsing import _get_argument_parser
+from ._parsing import InvalidArgumentOrderError
+from ._parsing import DuplicateKeywordArgumentError
+
+
+_TASK_PATTERN = re.compile(r"^(?P<name>[^\[]+)(\[(?P<arguments>[^\]]*)\])?$")
+_CREDIT_LINE = f"Powered by Leverage {__version__} - A Lightweight Python Build Tool based on Pynt."
+
+
+_logger = get_logger(name="leverage", level="INFO")
+_build_logger = get_logger(name="build", level="INFO")
+
+
+class MalformedTaskArgumentError(RuntimeError):
+    pass
+
+
+class TaskNotFoundError(RuntimeError):
+    pass
+
 
 def build(args):
-    """
-    Build the specified module with specified arguments.
-    
-    @type module: module
-    @type args: list of arguments
-    """
-    
-    # Build the command line and parse arguments
-    parser = _create_parser()
-    args = parser.parse_args(args)
+    """ Parse received arguments and execute the required action.
 
+    Args:
+        args (list): Arguments as received from command line.
+    """
+    parser = _get_argument_parser()
+    args = parser.parse_args(args=args)
+
+    # -v | --version
     if args.version:
-        print('leverage %s' % __version__)
-        sys.exit(0)
+        _print_version()
 
     # Load build file as a module
-    module = _load_buildscript(args.file, parser)
+    try:
+        build_script = Path(get_build_script_path(filename=args.file))
+        module = _load_build_script(build_script=build_script)
 
-    # Run task and all its dependencies.
+    except (NoBuildScriptFoundError,
+            NotATaskError,
+            MissingParensInDecoratorError) as exc:
+        _terminate(error_message=str(exc))
+
+    # Attach a special filter as to add the name of the build script to every log record
+    _attach_build_handler(logger=_build_logger, build_script_name=module["name"])
+
+    # -h | --help
     if args.help:
         parser.print_help()
+    # -l
     elif args.list_tasks:
-        print_tasks(module, args.file)
+        _print_tasks(module)
+    # no args - run default task or print available tasks
     elif not args.tasks:
-        if not _run_default_task(module):
-            print_tasks(module,  args.file)
+        default_task = module["__DEFAULT__"]
+        if default_task is not None:
+            prepared_default_task = [(default_task, [], {})]
+            _run_tasks(prepared_default_task)
+        else:
+            _print_tasks(module)
+    # tasks - run the given tasks
     else:
-        _run_from_task_names(module, args.tasks)
+        try:
+            tasks_to_run = _prepare_tasks_to_run(module, args.tasks)
 
-def print_tasks(module, file):
-    # Get all tasks.
-    tasks = _get_tasks(module)
-    
-    # Build task_list to describe the tasks.
-    task_list = "Tasks in build file %s:" % file
-    name_width = _get_max_name_length(module)+4
-    task_help_format = "\n  {0:<%s} {1: ^10} {2}" % name_width
-    default = _get_default_task(module)
-    for task in sorted(tasks, key=lambda task: task.name):
-        attributes = []
-        if task.ignored:
-            attributes.append('Ignored')
-        if default and task.name == default.name:
-            attributes.append('Default')
-    
-        task_list += task_help_format.format(task.name,
-                                            ('[' + ', '.join(attributes) + ']')
-                                             if attributes else '', 
-                                             task.doc)
-    print(task_list + "\n\n"+_CREDIT_LINE)
+        except TaskNotFoundError as exc:
+            _terminate(error_message=str(exc))
 
-#
-# Try and find a build script in current directory or in parent directories.
-#
-def _find_buildscript():
-    root_path = Path(mypath.get_root_path())
-    cur_path = Path(mypath.get_working_path())
+        _run_tasks(tasks=tasks_to_run)
 
-    while True:
-        # Find build.py in current directory
-        for cur_file in listdir(cur_path):
-            if cur_file == "build.py":
-                # print("[DEBUG] Found build file: %s/%s" % (cur_path, cur_file))
-                return "%s/%s" % (cur_path, cur_file)
+def _load_build_script(build_script):
+    """ Load build script as module and return the useful bits.
 
-        # Keep looking until we reach the root path
-        if (cur_path == root_path): break
+    Args:
+        build_script (pathlib.Path): File containing the definition of the tasks.
 
-        # Move to parent dir
-        cur_path = Path(cur_path).parent
-    
-    return ""
-
-def _load_buildscript(file_path, parser):
-    # Find build.py in current or parent directories
-    file_path = _find_buildscript()
-    
-    # Check if build file exists
-    if not path.isfile(file_path):
-        print("A build file could not be found in current or parent directories.\n")
-        parser.print_help()
-        sys.exit(1)
-
-    script_dir, script_base = path.split(file_path)
-
-    # Append directory of build script to path, to allow importing modules relatively to the script
-    sys.path.append(path.abspath(script_dir))
-
-    module_name, suffix = path.splitext(script_base)
-    description = (suffix, 'r', imp.PY_SOURCE)
-
-    with open(file_path, 'r') as script_file:
-        return imp.load_module(module_name, script_file, file_path, description)
-
-def _get_default_task(module):
-    matching_tasks = [task for name,task in inspect.getmembers(module,Task.is_task)
-                      if name == "__DEFAULT__"]
-    if matching_tasks:
-        return matching_tasks[0]
-
-def _run_default_task(module):
-    default_task = _get_default_task(module)
-    if not default_task:
-        return False
-    _run(module, _get_logger(module.__file__), default_task, set())
-    return True
-
-def _run_from_task_names(module, task_names):
+    Returns:
+        dict: Name, tasks and default tasks of the module.
     """
-    @type module: module
-    @type task_name: string
-    @param task_name: Task name, exactly corresponds to function name.
-    """
-    # Create logger.
-    logger = _get_logger(module.__file__)
-    all_tasks = _get_tasks(module)
-    completed_tasks = set([])
-    for task_name in task_names:
-        task, args, kwargs= _get_task(module, task_name, all_tasks)
-        _run(module, logger, task, completed_tasks, True, args, kwargs)
+    # Allow importing modules relatively to the script
+    build_script_directory = build_script.parent.resolve().as_posix()
+    sys.path.append(build_script_directory)
 
-def _get_task(module, name, tasks):
-    # Get all tasks.
-    match = _TASK_PATTERN.match(name)
-    if not match:
-        raise Exception("Invalid task argument %s" % name)
-    task_name, _, args_str = match.groups()
-    
-    args, kwargs= _parse_args(args_str)
-    if hasattr(module, task_name):
-        return getattr(module, task_name), args, kwargs
-    matching_tasks = [task for task in tasks if task.name.startswith(task_name)]
-    
-    if not matching_tasks:
-        raise Exception("Invalid task '%s'. Task should be one of %s" %
-                        (name, 
-                         ', '.join([task.name for task in tasks])))
-    if len(matching_tasks) == 1:
-        return matching_tasks[0], args, kwargs
-    raise Exception("Conflicting matches %s for task %s" % (
-        ', '.join([task.name for task in matching_tasks]), task_name
-    ))
+    # Load build script as module
+    spec = util.spec_from_file_location(name=build_script.stem,
+                                        location=build_script)
+    module = util.module_from_spec(spec)
+    sys.modules[build_script.stem] = module
+    spec.loader.exec_module(module)
 
-def _parse_args(args_str):
-    args = []
-    kwargs = {}
-    if not args_str:
-        return args, kwargs
-    arg_parts = args_str.split(",")
-
-    for i, part in enumerate(arg_parts):
-        if "=" in part:
-            key, value = [_str.strip() for _str in part.split("=")]
-            if key in kwargs:
-                raise Exception("duplicate keyword argument %s" % part)
-            kwargs[key] = value
-        else:
-            if len(kwargs) > 0:
-                raise Exception("Non keyword arg %s cannot follows a keyword arg %s"
-                                % (part, arg_parts[i - 1]))
-            args.append(part.strip())
-    return args, kwargs
-    
-def _run(module, logger, task, completed_tasks, from_command_line = False, args = None, kwargs = None):
-    """
-    @type module: module
-    @type logging: Logger
-    @type task: Task
-    @type completed_tasts: set Task
-    @rtype: set Task
-    @return: Updated set of completed tasks after satisfying all dependencies.
-    """
-    # Satsify dependencies recursively. Maintain set of completed tasks so each
-    # task is only performed once.
-    for dependency in task.dependencies:
-        completed_tasks = _run(module,logger,dependency,completed_tasks)
-
-    # Perform current task, if need to.
-    if from_command_line or task not in completed_tasks:
-
-        if task.ignored:
-            logger.info("Ignoring task \"%s\"" % task.name)
-        else:
-            logger.info("Starting task \"%s\"" % task.name)
-
-            try:
-                # Run task.
-                task(*(args or []),**(kwargs or {}))
-            except:
-                logger.critical("Error in task \"%s\"" % task.name)
-                logger.critical("Aborting build")
-                raise
-            
-            logger.info("Completed task \"%s\"" % task.name)
-        
-        completed_tasks.add(task)
-    
-    return completed_tasks
-
-def _create_parser():
-    """
-    @rtype: argparse.ArgumentParser
-    """
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("tasks", help="perform specified task and all its dependencies",
-                        metavar="task", nargs = '*')
-    parser.add_argument('-l', '--list-tasks', help = "List the tasks",
-                        action =  'store_true')
-    parser.add_argument('-v', '--version',
-                        help = "Display the version information",
-                        action =  'store_true')
-    parser.add_argument('-f', '--file',
-                        help = "Build file to read the tasks from. 'build.py' is default value assumed if this argument is unspecified",
-                        metavar = "file", default =  "build.py")
-    parser.add_argument('-h', '--help', help = "Print this help information",
-                        action =  'store_true')
-    
-    return parser
-
-# Abbreviate for convenience.
-#task = _TaskDecorator
-def task(*dependencies, **options):
-    for i, dependency in enumerate(dependencies):
-        if not Task.is_task(dependency):
-                if inspect.isfunction(dependency):
-                    # Throw error specific to the most likely form of misuse.
-                    if i == 0:
-                        raise Exception("Replace use of @task with @task().")
-                    else:
-                        raise Exception("%s is not a task. Each dependency should be a task." % dependency)
-                else:
-                    raise Exception("%s is not a task." % dependency)
-
-    def decorator(fn):
-        return Task(fn, dependencies, options)
-    return decorator
-
-class Task(object):
-    def __init__(self, func, dependencies, options):
-        """
-        @type func: 0-ary function
-        @type dependencies: list of Task objects
-        """
-        self.func = func
-        self.name = func.__name__
-        self.doc = inspect.getdoc(func) or ''
-        self.dependencies = dependencies
-        self.ignored =  bool(options.get('ignore', False))
-
-    def show(self):
-        return not self.name.startswith("_")
-    
-    def __call__(self, *args, **kwargs):
-        self.func.__call__(*args,**kwargs)
-    
-    @classmethod
-    def is_task(cls, obj):
-        """
-        Returns true is an object is a build task.
-        """
-        return isinstance(obj,cls)
+    return {
+        "name": Path(module.__file__).name,
+        "tasks": _get_tasks(module=module),
+        "__DEFAULT__": getattr(module, "__DEFAULT__", None)
+    }
 
 def _get_tasks(module):
+    """ Extract all Task objects from a loaded module.
+
+    Args:
+        module (module): Loaded module containing the definition of tasks.
+
+    Returns:
+        list: All tasks found in the given module.
     """
-    Returns all functions marked as tasks.
-    
-    @type module: module
+    # If there's a default task set, then that task is extracted twice from the
+    # module (as the created task an as the `__DEFAULT__` variable value),
+    # hence, the set, used to avoid repetition
+    return list({task for _, task in getmembers(module, Task.is_task)})
+
+def _prepare_tasks_to_run(module, input_tasks):
+    """ Validate input tasks and arguments and pair them with the corresponding module's task.
+
+    Args:
+        module (dict): Dict containing the tasks from the build script.
+        input_tasks (list): Strings containing the tasks to invoke and their arguments as received
+            from user input.
+
+    Raises:
+        MalformedTaskArgumentError: When the string representing the invocation of a task does not conform
+            to the required pattern.
+        TaskNotFoundError: When the specified task is not found in the ones defined in the build script.
+        AmbiguousTaskNameError: When a given task name matches with multiple defined tasks.
+
+    Returns:
+        list(tuple): List of tasks paired with their corresponding args and kwargs as provided by the user.
     """
-    # Get all functions that are marked as task and pull out the task object
-    # from each (name,value) pair.
-    return set(member[1] for member in inspect.getmembers(module,Task.is_task) if member[1].show())
+    tasks = []
+    for input_task in input_tasks:
+        match = _TASK_PATTERN.match(input_task)
+        if not match:
+            raise MalformedTaskArgumentError(f"Malformed task argument in {input_task}")
 
-def _get_max_name_length(module):
+        name = match.group("name")
+        arguments = match.group("arguments")
+
+        try:
+            args, kwargs = _parse_args(arguments=arguments)
+
+        except (InvalidArgumentOrderError,
+                DuplicateKeywordArgumentError) as exc:
+            _terminate(error_message=str(exc).format(task=name))
+
+        task = [task for task in module["tasks"] if task.name == name]
+
+        if not task:
+            raise TaskNotFoundError(f"Unrecognized task `{name}`.")
+
+        tasks.append((task[0], args, kwargs))
+
+    return tasks
+
+def _run_tasks(tasks):
+    """ Run the tasks provided.
+
+    Args:
+        tasks (list(tuple)): List of 3-tuples containing a task and it's positional and keyword arguments to run.
     """
-    Returns the length of the longest task name.
-    
-    @type module: module
+    completed_tasks = set()
+    for task, args, kwargs in tasks:
+        # Remove current task from dependencies set to force it to run, as it was invoked by the user explicitly
+        completed_tasks.discard(task)
+        _run(task, completed_tasks, *args, **kwargs)
+
+def _run(task, completed_tasks, *args, **kwargs):
+    """ Run the given task and all it's required dependencies, keeping track of all the already
+    completed tasks as not to repeat them.
+
+    Args:
+        task (list): Tasks to run.
+        completed_tasks (set): Tasks that have already ran.
+
+    Returns:
+        set: Updated set of already executed tasks.
     """
-    return max([len(task.name) for task in _get_tasks(module)])
+    # Satisfy dependencies recursively.
+    for dependency in task.dependencies:
+        _completed_tasks = _run(dependency, completed_tasks)
+        completed_tasks.update(_completed_tasks)
 
-def _get_logger(name):
+    if task not in completed_tasks:
+
+        if task.is_ignored:
+            _build_logger.info(f"Ignoring task `{task.name}`")
+
+        else:
+            _build_logger.info(f"Starting task `{task.name}`")
+
+            try:
+                task(*args,**kwargs)
+            except:
+                _build_logger.critical(f"Error in task `{task.name}`")
+                _build_logger.critical("Aborting build")
+                raise
+
+            _build_logger.info(f"Completed task `{task.name}`")
+
+        completed_tasks.add(task)
+
+    return completed_tasks
+
+def _print_version():
+    """ Print leverage version and quit. """
+    _logger.info(f"leverage {__version__}")
+    sys.exit(0)
+
+def _print_tasks(module):
+    """ Print all non-private tasks in a neat table-like format.
+    Indicates whether the task is ignored and/or if it is the default one.
+
+    Args:
+        module (dict): Dictionary containing all tasks and the module name
     """
-    @type module: module
-    @rtype: logging.Logger
+    IGNORED = "Ignored"
+    DEFAULT = "Default"
+
+    # Header
+    print(f"Tasks in build file `{module['name']}`:\n")
+
+    visible_tasks = [task for task in module["tasks"] if not task.is_private]
+
+    tasks_grid = []
+    for task in sorted(visible_tasks, key=attrgetter("name")):
+        # Form the attrs column values
+        task_attrs = []
+        if task == module["__DEFAULT__"]:
+            task_attrs.append(DEFAULT)
+        if task.is_ignored:
+            task_attrs.append(IGNORED)
+        task_attrs = f"[{','.join(task_attrs)}]" if task_attrs else ""
+
+        tasks_grid.append((task.name, task_attrs, task.doc))
+
+    name_column_width = max(len(name) for name, _, _ in tasks_grid)
+    attr_column_width = max(len(attr) for _, attr, _ in tasks_grid)
+
+    # Body
+    for name, attr, doc in tasks_grid:
+        print(f"  {name:<{name_column_width}}  {attr: ^{attr_column_width}}\t{doc}")
+
+    # Footer
+    print(f"\n{_CREDIT_LINE}")
+
+def _terminate(error_message):
+    """ Print error message and terminate program.
+
+    Args:
+        error_message (str): Error message to be displayed upon termination.
     """
-    # Create Logger
-    logger = logging.getLogger(os.path.basename(name))
-    logger.setLevel(logging.DEBUG)
-
-    # Create console handler and set level to debug
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-
-    # Create formatter
-    formatter = logging.Formatter(_LOGGING_FORMAT)
-
-    # Add formatter to ch
-    ch.setFormatter(formatter)
-
-    # Add ch to logger
-    logger.addHandler(ch)
-
-    return logger
+    _logger.error(f"{error_message} Exiting.")
+    sys.exit(1)
 
 def main():
+    """ Leverage entrypoint. """
     build(sys.argv[1:])
