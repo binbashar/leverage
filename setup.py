@@ -6,16 +6,16 @@ setup(
     name='leverage',
     version=leverage.__version__,
     author='BinBash Inc',
-    author_email='info@binbash.com.ar',
+    author_email='leverage@binbash.com.ar',
     description='Binbash Leverage Command-line Task Runner',
     long_description='A hack of Pynt for https://github.com/binbashar/leverage project',
-    long_description_content_type="text/x-rst",
+    long_description_content_type='text/x-rst',
     url=leverage.__contact__, 
     packages=['leverage'],
     entry_points= {
         'console_scripts': ['leverage=leverage:main']}, 
     license='MIT License',
-    python_requires=">=3.6",
+    python_requires='>=3.6',
     install_requires=[
         'yaenv == 1.2.2'
     ],
