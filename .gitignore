@@ -8,3 +8,8 @@ build
 .ropeproject
 *.out
 leverage.egg-info
+Pipfile*
+.python-version
+.vscode
+pyproject.toml
+**/__pycache__*
