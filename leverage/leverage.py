@@ -7,12 +7,14 @@ import sys
 from pathlib import Path
 from importlib import util
 from inspect import getmembers
+from operator import attrgetter
 
 from leverage import __version__
 
 from .task import Task
 from .task import NotATaskError
 from .task import MissingParensInDecoratorError
+from .path import NotARepositoryError
 from .path import NoBuildScriptFoundError
 from .path import get_build_script_path
 from .logging import get_logger
@@ -57,7 +59,8 @@ def build(args):
         build_script = Path(get_build_script_path(filename=args.file))
         module = _load_build_script(build_script=build_script)
 
-    except (NoBuildScriptFoundError,
+    except (NotARepositoryError,
+            NoBuildScriptFoundError,
             NotATaskError,
             MissingParensInDecoratorError) as exc:
         _terminate(error_message=str(exc))
@@ -84,7 +87,8 @@ def build(args):
         try:
             tasks_to_run = _prepare_tasks_to_run(module, args.tasks)
 
-        except TaskNotFoundError as exc:
+        except (TaskNotFoundError,
+                MalformedTaskArgumentError) as exc:
             _terminate(error_message=str(exc))
 
         _run_tasks(tasks=tasks_to_run)
@@ -150,7 +154,7 @@ def _prepare_tasks_to_run(module, input_tasks):
     for input_task in input_tasks:
         match = _TASK_PATTERN.match(input_task)
         if not match:
-            raise MalformedTaskArgumentError(f"Malformed task argument in {input_task}")
+            raise MalformedTaskArgumentError(f"Malformed task argument in `{input_task}`.")
 
         name = match.group("name")
         arguments = match.group("arguments")
@@ -240,24 +244,29 @@ def _print_tasks(module):
 
     visible_tasks = [task for task in module["tasks"] if not task.is_private]
 
-    tasks_grid = []
-    for task in sorted(visible_tasks, key=attrgetter("name")):
-        # Form the attrs column values
-        task_attrs = []
-        if task == module["__DEFAULT__"]:
-            task_attrs.append(DEFAULT)
-        if task.is_ignored:
-            task_attrs.append(IGNORED)
-        task_attrs = f"[{','.join(task_attrs)}]" if task_attrs else ""
+    if visible_tasks:
+        tasks_grid = []
 
-        tasks_grid.append((task.name, task_attrs, task.doc))
+        for task in sorted(visible_tasks, key=attrgetter("name")):
+            # Form the attrs column values
+            task_attrs = []
+            if task == module["__DEFAULT__"]:
+                task_attrs.append(DEFAULT)
+            if task.is_ignored:
+                task_attrs.append(IGNORED)
+            task_attrs = f"[{','.join(task_attrs)}]" if task_attrs else ""
 
-    name_column_width = max(len(name) for name, _, _ in tasks_grid)
-    attr_column_width = max(len(attr) for _, attr, _ in tasks_grid)
+            tasks_grid.append((task.name, task_attrs, task.doc))
 
-    # Body
-    for name, attr, doc in tasks_grid:
-        print(f"  {name:<{name_column_width}}  {attr: ^{attr_column_width}}\t{doc}")
+        name_column_width = max(len(name) for name, _, _ in tasks_grid)
+        attr_column_width = max(len(attr) for _, attr, _ in tasks_grid)
+
+        # Body
+        for name, attr, doc in tasks_grid:
+            print(f"  {name:<{name_column_width}}  {attr: ^{attr_column_width}}\t{doc}")
+    
+    else:
+        print("  --")
 
     # Footer
     print(f"\n{_CREDIT_LINE}")

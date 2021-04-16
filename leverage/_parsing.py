@@ -1,7 +1,6 @@
 """
     Command line arguments and tasks arguments parsing utilities.
 """
-from operator import attrgetter
 from argparse import ArgumentParser
 
 
@@ -69,7 +68,7 @@ def _parse_args(arguments):
             if kwargs:
                 raise InvalidArgumentOrderError(f"Positional argument `{argument}` from task `{{task}}` cannot follow a keyword argument.")
 
-            args.append(argument)
+            args.append(argument.strip())
 
         else:
             key, value = [part.strip() for part in argument.split("=")]

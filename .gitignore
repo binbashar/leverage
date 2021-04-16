@@ -13,3 +13,4 @@ Pipfile*
 .vscode
 pyproject.toml
 **/__pycache__*
+.pytest_cache
