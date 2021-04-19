@@ -50,7 +50,7 @@ def task(*dependencies, **options):
                         "They all must be functions decorated with the `@task()` decorator.")
 
     def _task(func):
-        return Task(func, dependencies, options)
+        return Task(func, list(dependencies), options)
 
     return _task
 
