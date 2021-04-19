@@ -17,8 +17,8 @@ from .task import MissingParensInDecoratorError
 from .path import NotARepositoryError
 from .path import NoBuildScriptFoundError
 from .path import get_build_script_path
-from .logging import get_logger
-from .logging import _attach_build_handler
+from .logger import get_logger
+from .logger import _attach_build_handler
 from ._parsing import _parse_args
 from ._parsing import _get_argument_parser
 from ._parsing import InvalidArgumentOrderError

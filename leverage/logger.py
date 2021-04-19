@@ -30,6 +30,7 @@ def get_logger(name, level, format_string=None):
         formatter = logging.Formatter(format_string)
         handler.setFormatter(formatter)
 
+    logger.handlers = []
     logger.addHandler(handler)
 
     return logger
@@ -48,7 +49,7 @@ class BuildFilter(logging.Filter):
 
 def _attach_build_handler(logger, build_script_name, level="INFO"):
     """ Attach a filter to a logger as to add build script information to every log record.
-    All previously attached handlers are discarded from the logger.
+    All previously attached StreamHandlers are discarded from the logger.
 
     Args:
         logger (logger): The logger to which the filter should be attached.
@@ -58,14 +59,16 @@ def _attach_build_handler(logger, build_script_name, level="INFO"):
     """
 
     level = logging.getLevelName(level)
-    logger.setLevel(level)
 
-    logger.handlers = []
-
-    logfilter = BuildFilter(build_script=build_script_name)
-    logger.addFilter(logfilter)
+    logger.handlers = [handler
+                       for handler in logger.handlers
+                       if not isinstance(handler, logging.StreamHandler)]
 
     handler = logging.StreamHandler()
+    handler.setLevel(level)
+
+    logfilter = BuildFilter(build_script=build_script_name)
+    handler.addFilter(logfilter)
 
     formatter = logging.Formatter(_TASK_LOGGING_FORMAT)
     handler.setFormatter(formatter)
