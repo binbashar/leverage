@@ -17,15 +17,15 @@ from .task import MissingParensInDecoratorError
 from .path import NotARepositoryError
 from .path import NoBuildScriptFoundError
 from .path import get_build_script_path
-from .logging import get_logger
-from .logging import _attach_build_handler
+from .logger import get_logger
+from .logger import _attach_build_handler
 from ._parsing import _parse_args
 from ._parsing import _get_argument_parser
 from ._parsing import InvalidArgumentOrderError
 from ._parsing import DuplicateKeywordArgumentError
 
 
-_TASK_PATTERN = re.compile(r"^(?P<name>[^\[]+)(\[(?P<arguments>[^\]]*)\])?$")
+_TASK_PATTERN = re.compile(r"^(?P<name>[^\[\],\s]+)(\[(?P<arguments>[^\]]*)\])?$")
 _CREDIT_LINE = f"Powered by Leverage {__version__} - A Lightweight Python Build Tool based on Pynt."
 
 

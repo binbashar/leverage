@@ -50,7 +50,7 @@ def task(*dependencies, **options):
                         "They all must be functions decorated with the `@task()` decorator.")
 
     def _task(func):
-        return Task(func, dependencies, options)
+        return Task(func, list(dependencies), options)
 
     return _task
 
@@ -61,21 +61,24 @@ class Task:
     when tasks are listed, this can also be explicitly indicated in the decorator.
     An ignored task won't be ran by Leverage.
     """
-    def __init__(self, task, dependencies, options):
+    def __init__(self, task, dependencies=None, options=None):
         """ Task object initialization
 
         Args:
             task (function): Function to be called upon task execution.
-            dependencies (list(Tasks)): List of tasks that must be performed before this
-                task is executed.
-            options (dict): Options regarding the task nature:
-                - private (bool): Whether the task is private or not.
-                - ignored (bool): When `True` the task won't be executed by Leverage.
+            dependencies (list(Tasks), optional): List of tasks that must be performed before this
+                task is executed. Defaults to an empty list.
+            options (dict, optional): Options regarding the task nature:
+                - private (bool): Whether the task is private or not. Defaults to False.
+                - ignored (bool): When `True` the task won't be executed by Leverage. Defaults to False.
         """
         self.task = task
         self.name = self.task.__name__
         self.doc = self.task.__doc__ or ""
-        self.dependencies = dependencies
+
+        self.dependencies = [] if dependencies is None else dependencies
+
+        options = {} if options is None else options
         self._private = self.name.startswith("_") or bool(options.get("private", False))
         self._ignored = bool(options.get("ignore", False))
 
