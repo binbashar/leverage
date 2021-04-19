@@ -172,6 +172,17 @@ The are a few workarounds to help with this:
 3. Disable glob patterns: `noglob leverage state_import["import.json"]`
 4. An improvement over the last point is to create an alias such as this one: `alias leverage='noglob leverage'`
 
+## Running Tests
+The dependencies required to run the unit tests are available in the corresponding `dev-requirements.txt`.
+
+To install the dependencies:
+```bash
+pip3 install -r dev-requirements.txt
+```
+To run the tests afterwards:
+```bash
+python3 -m pytest
+```
 
 ## Release Process
 * On every PR, a Github Action workflow is triggered to create/update a release draft.

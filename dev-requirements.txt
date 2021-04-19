@@ -1,0 +1,5 @@
+-e .
+cached-property==1.5.2; python_version < '3.8'
+pylint==2.7.4
+pytest==6.2.3
+yaenv==1.2.2
