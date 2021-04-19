@@ -14,26 +14,26 @@ from leverage.leverage import MalformedTaskArgumentError
 
 
 _BUILD_SCRIPTS = Path("./tests/build_scripts/").resolve()
+BUILD_SCRIPT = _BUILD_SCRIPTS / "simple_build.py"
 
 
 def test__load_build_script():
-    build_script = _BUILD_SCRIPTS / "simple_build.py"
-    module = _load_build_script(build_script=build_script)
+    module = _load_build_script(build_script=BUILD_SCRIPT)
     
     # All the important bits are extracted
-    assert module["name"] == build_script.name
+    assert module["name"] == BUILD_SCRIPT.name
     assert len(module["tasks"]) == 1
     assert module["tasks"][0].name == "hello"
     assert module["__DEFAULT__"] is None
     
     # Module is globally available
-    assert build_script.stem in sys.modules
+    assert BUILD_SCRIPT.stem in sys.modules
+    del sys.modules[BUILD_SCRIPT.stem]
 
 
 def test__get_tasks():
-    build_script = _BUILD_SCRIPTS / "simple_build.py"
-    spec = util.spec_from_file_location(name=build_script.stem,
-                                        location=build_script)
+    spec = util.spec_from_file_location(name=BUILD_SCRIPT.stem,
+                                        location=BUILD_SCRIPT)
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
@@ -58,6 +58,30 @@ def test__prepare_tasks_to_run_checks_input_format(input_task):
     with pytest.raises(MalformedTaskArgumentError,
                        match=f"Malformed task argument in `{input_task}`."):
         _prepare_tasks_to_run(module=None, input_tasks=[_input_task])
+
+
+def test__prepare_tasks_to_run_checks_task_existence():
+    module = _load_build_script(build_script=BUILD_SCRIPT)
+
+    with pytest.raises(TaskNotFoundError,
+                       match="Unrecognized task `nothello`."):
+        _prepare_tasks_to_run(module=module, input_tasks=["nothello"])
+    
+    del sys.modules[BUILD_SCRIPT.stem]
+
+
+def test__prepare_tasks_to_run():
+    module = _load_build_script(build_script=BUILD_SCRIPT)
+
+    tasks_to_run = _prepare_tasks_to_run(module, input_tasks=["hello[arg1, kwarg1=val1]"])
+
+    assert len(tasks_to_run) == 1
+    task, args, kwargs = tasks_to_run[0]
+    assert task.name == "hello"
+    assert args == ["arg1"]
+    assert kwargs == {"kwarg1": "val1"}
+
+    del sys.modules[BUILD_SCRIPT.stem]
 
 
 def test__print_version(caplog):
