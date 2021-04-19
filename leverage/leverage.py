@@ -25,7 +25,7 @@ from ._parsing import InvalidArgumentOrderError
 from ._parsing import DuplicateKeywordArgumentError
 
 
-_TASK_PATTERN = re.compile(r"^(?P<name>[^\[]+)(\[(?P<arguments>[^\]]*)\])?$")
+_TASK_PATTERN = re.compile(r"^(?P<name>[^\[\],\s]+)(\[(?P<arguments>[^\]]*)\])?$")
 _CREDIT_LINE = f"Powered by Leverage {__version__} - A Lightweight Python Build Tool based on Pynt."
 
 
