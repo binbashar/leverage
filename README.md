@@ -173,16 +173,26 @@ The are a few workarounds to help with this:
 4. An improvement over the last point is to create an alias such as this one: `alias leverage='noglob leverage'`
 
 ## Running Tests
-The dependencies required to run the unit tests are available in the corresponding `dev-requirements.txt`.
+To run unit tests pytest is the tool of choice, and the required dependencies are available in the corresponding `dev-requirements.txt`.
 
-To install the dependencies:
+Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/). Bear in mind that bats tests are meant to be run in a throwaway environment since they perform filesystem manipulations and installation and removal of packages, and the cleanup may not be completely thorough.
+
+### Manually
+Unit tests:
 ```bash
 pip3 install -r dev-requirements.txt
-```
-To run the tests afterwards:
-```bash
 python3 -m pytest
 ```
+Integration tests:
+```bash
+bats -r tests/bats
+```
+### Using docker image
+A Dockerfile suited for running all tests is provided along with useful Makefile targets.
+
+To build such image run `make build-image`.
+
+To run all tests `make tests`. Alternatively `make test-unit` or `make test-int` for unit or integration tests respectively.
 
 ## Release Process
 * On every PR, a Github Action workflow is triggered to create/update a release draft.
