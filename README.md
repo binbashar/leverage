@@ -175,7 +175,7 @@ The are a few workarounds to help with this:
 ## Running Tests
 To run unit tests pytest is the tool of choice, and the required dependencies are available in the corresponding `dev-requirements.txt`.
 
-Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/).
+Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/). Bear in mind that bats tests are meant to be run in a throwaway environment since they perform filesystem manipulations and installation and removal of packages, and the cleanup may not be completely thorough.
 
 ### Manually
 Unit tests:
