@@ -19,6 +19,6 @@ _create_leverage_directory_structure(){
     "
     ROOT_DIR="$(_create_directory_structure)"
     cd $ROOT_DIR
-    git init 1>2&
+    git init >/dev/null 2>&1
     echo $ROOT_DIR
 }

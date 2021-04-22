@@ -3,12 +3,12 @@
 
 setup_file(){
     # Uninstall git
-    apt-get remove -y git
+    apt-get remove -y git >/dev/null 2>&1
 }
 
 teardown_file(){
     # Reinstall git
-    apt-get install -y git
+    apt-get install -y git >/dev/null 2>&1
 }
 
 setup(){
