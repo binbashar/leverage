@@ -6,8 +6,18 @@ help:
 
 
 deps: ## Install Leverage dependencies
-	python3 -m pip install GitPython
-	python3 -m pip install yaenv
+	python3 -m pip install -r dev-requirements.txt
+
+build-image: ## Build docker image
+	docker build . -t leverage-testing
+
+test-unit: ## Run unit tests
+	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t leverage-testing -c "pytest --verbose"
+
+test-int: ## Run integration tests
+	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t leverage-testing bats -r tests/bats
+
+tests: test-unit test-int## Run full set of tests
 
 setup: ## Set up requirements
 	python3 -m pip install --user --upgrade setuptools wheel twine gitpython
