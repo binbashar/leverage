@@ -88,6 +88,7 @@ teardown(){
     # Print statements inside tasks end up after all logging statements
     # we should look more into it, still, task order seems to be conserved
     # One suspect for this behaviour is the file descriptor manipulation done by bats
+    assert_output --partial "Hello"
     assert_line --index 0 "[ build.py - Starting task \`hello\` ]"
     assert_line --index 1 "[ build.py - Completed task \`hello\` ]"
 }
