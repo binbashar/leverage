@@ -45,10 +45,10 @@ def test__get_tasks():
 @pytest.mark.parametrize(
     "input_task",
     [
-        "task1\[",
-        "task1\[arg,",
-        "arg2,",
-        "val2\]"
+        r"task1\[",
+        r"task1\[arg,",
+        r"arg2,",
+        r"val2\]"
     ]
 )
 def test__prepare_tasks_to_run_checks_input_format(input_task):
