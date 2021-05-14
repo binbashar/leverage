@@ -18,6 +18,9 @@ from .path import NotARepositoryError
 from .path import get_build_script_path
 from ._utils import _list_tasks
 
+from .modules import run
+from .modules import create_project
+
 
 @click.group(invoke_without_command=True)
 @click.option("--filename", "-f",
@@ -61,6 +64,9 @@ def leverage(context, filename, list_tasks, verbose):
         _list_tasks(context.obj["module"])
 
 
+# Add modules to leverage
+leverage.add_command(run)
+leverage.add_command(create_project)
 
 
 def _load_build_script(build_script):
