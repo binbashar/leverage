@@ -32,21 +32,21 @@ def load(config_filename="build.env"):
     config_dict = {}
 
     while True:
-        for cur_file in cur_path.iterdir():
-            if cur_file.name == config_filename:
-                print(f"[DEBUG] Found config file: {cur_file.resolve().as_posix()}")
+        env_file = list(cur_path.glob(config_filename))
 
-                config_files_paths.append(cur_file.resolve().as_posix())
+        if env_file:
+            env_file = env_file[0].as_posix()
+            print(f"[DEBUG] Found config file: {env_file}")
+
+            config_files_paths.append(env_file)
 
         if cur_path == root_path:
             break
 
         cur_path = cur_path.parent
 
-    # Reverse the list of config files so it can be traversed from parent to child directory
-    config_files_paths = config_files_paths[::-1]
-
-    for config_file_path in config_files_paths:
+    # Traverse config files from parent to child
+    for config_file_path in reversed(config_files_paths):
         config_file = Env(config_file_path)
 
         for key, val in config_file:
