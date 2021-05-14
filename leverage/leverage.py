@@ -1,5 +1,5 @@
 """
-    Binbash Leverage Command-line Task Runner
+    Binbash Leverage Command-line tool.
 """
 
 import sys
@@ -7,21 +7,59 @@ from pathlib import Path
 from importlib import util
 from inspect import getmembers
 
-from leverage import __version__
+import click
+from click import ClickException
 
+from leverage import __version__
 from .task import Task
 from .task import NotATaskError
 from .task import MissingParensInDecoratorError
 from .path import NotARepositoryError
 from .path import get_build_script_path
+from ._utils import _list_tasks
+
+
+@click.group(invoke_without_command=True)
+@click.option("--filename", "-f",
+                default="build.py",
+                show_default=True,
+                help="Name of the build file containing the tasks definitions.")
+@click.option("--list-tasks", "-l",
+                is_flag=True,
+                help="List available tasks to run.")
+@click.option("-v", "--verbose",
+                is_flag=True,
+                help="Increase output verbosity.")
+@click.version_option(version=__version__)
+@click.pass_context
+def leverage(context, filename, list_tasks, verbose):
+    """ Leverage Reference Architecture projects command-line tool. """
+    context.ensure_object(dict)
+
+    # --verbose | -v
+    context.obj["verbose"] = verbose
 
     # Load build file as a module
     try:
+        build_script = get_build_script_path(filename=filename)
 
     except (NotARepositoryError,
             NotATaskError,
             MissingParensInDecoratorError) as exc:
+        raise ClickException(str(exc)) from exc
+
+    if build_script:
+        build_script = Path(build_script)
+        module = _load_build_script(build_script=build_script)
     else:
+        module = None
+
+    context.obj["module"] = module
+
+    # --list-tasks|-l
+    if list_tasks and module is not None:
+        _list_tasks(context.obj["module"])
+
 
 
 
@@ -51,6 +89,7 @@ def _load_build_script(build_script):
         "__DEFAULT__": getattr(module, "__DEFAULT__", None)
     }
 
+
 def _get_tasks(module):
     """ Extract all Task objects from a loaded module.
 
@@ -61,23 +100,6 @@ def _get_tasks(module):
         list: All tasks found in the given module.
     """
     # If there's a default task set, then that task is extracted twice from the
-    # module (as the created task an as the `__DEFAULT__` variable value),
-    # hence, the set, used to avoid repetition
+    # module (as the created task and as the `__DEFAULT__` variable value),
+    # hence the set, used to avoid repetition
     return list({task for _, task in getmembers(module, Task.is_task)})
-def _print_version():
-    """ Print leverage version and quit. """
-    _logger.info(f"leverage {__version__}")
-    sys.exit(0)
-
-def _terminate(error_message):
-    """ Print error message and terminate program.
-
-    Args:
-        error_message (str): Error message to be displayed upon termination.
-    """
-    _logger.error(f"{error_message} Exiting.")
-    sys.exit(1)
-
-def main():
-    """ Leverage entrypoint. """
-    build(sys.argv[1:])
