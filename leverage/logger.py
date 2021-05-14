@@ -3,32 +3,43 @@
 """
 import logging
 
+from click import get_current_context
+
 
 _TASK_LOGGING_FORMAT = "[ %(build_script)s - %(message)s ]"
 
 
-def get_logger(name, level, format_string=None):
+# TODO: Consider creating a custom handler to use click.echo to emit messages instead StreamHandler
+
+
+def get_logging_level():
+    """ Define logging level based on whether the verbose option was given or not
+
+    Returns:
+        int: logging.DEBUG or logging.INFO
+    """
+    context = get_current_context()
+    verbose = context.obj["verbose"]
+
+    return logging.DEBUG if verbose else logging.INFO
+
+
+def get_logger(name="leverage"):
     """ Build a logger with the given name and log level
 
     Args:
         name (str): Logger name.
-        level (str): Logging level can be one of the names specified in
-            the standard library.
 
     Returns:
         logger: configured logger
     """
-    level = logging.getLevelName(level)
+    level = get_logging_level()
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
     handler = logging.StreamHandler()
     handler.setLevel(level)
-
-    if format_string is not None:
-        formatter = logging.Formatter(format_string)
-        handler.setFormatter(formatter)
 
     logger.handlers = []
     logger.addHandler(handler)
@@ -47,7 +58,7 @@ class BuildFilter(logging.Filter):
         return True
 
 
-def _attach_build_handler(logger, build_script_name, level="INFO"):
+def attach_build_handler(logger, build_script_name):
     """ Attach a filter to a logger as to add build script information to every log record.
     All previously attached StreamHandlers are discarded from the logger.
 
@@ -57,8 +68,7 @@ def _attach_build_handler(logger, build_script_name, level="INFO"):
         level (str, optional): Log level name it can be any of the defined in the standard library.
             Defaults to "INFO".
     """
-
-    level = logging.getLevelName(level)
+    level = get_logging_level()
 
     logger.handlers = [handler
                        for handler in logger.handlers
