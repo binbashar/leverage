@@ -20,7 +20,6 @@ from .path import get_build_script_path
 from .logger import get_logger
 from .logger import _attach_build_handler
 from ._parsing import _parse_args
-from ._parsing import _get_argument_parser
 from ._parsing import InvalidArgumentOrderError
 from ._parsing import DuplicateKeywordArgumentError
 
