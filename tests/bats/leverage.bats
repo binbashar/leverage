@@ -23,28 +23,11 @@ teardown(){
 }
 
 @test "Prints version" {
-    VERSION_REGEX="^leverage [0-9]+\.[0-9]+\.[0-9]+$"
+    VERSION_REGEX="^leverage, version [0-9]+\.[0-9]+\.[0-9]+$"
 
-    # Short version of the command
-    run leverage -v
-
-    assert_output --regexp $VERSION_REGEX
-    # Long version
     run leverage --version
 
     assert_output --regexp $VERSION_REGEX
-}
-
-@test "Prints error and exits on missing build script" {
-    ROOT_DIR=$(_create_leverage_directory_structure)
-
-    # Go to created directory
-    cd "$ROOT_DIR"
-
-    run leverage -l
-
-    assert_failure
-    assert_output "No file 'build.py' found in the current directory or its parents. Exiting."
 }
 
 @test "Lists tasks with build script in current directory" {
@@ -59,7 +42,7 @@ teardown(){
 
     assert_line --index 0 "Tasks in build file \`build.py\`:"
     assert_line --index 1 --regexp "^  hello\s+Say hello.\s+$"
-    assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+ -.+$"
+    assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
 }
 
 @test "Lists tasks with build script in parent directory" {
@@ -73,7 +56,7 @@ teardown(){
 
     assert_line --index 0 "Tasks in build file \`build.py\`:"
     assert_line --index 1 --regexp "^  hello\s+Say hello.\s+$"
-    assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+ -.+$"
+    assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
 }
 
 @test "Simple task runs correctly" {
@@ -83,11 +66,8 @@ teardown(){
     cp "$BUILD_SCRIPTS/simple_build.py" "$ROOT_DIR/build.py"
     cd "$ROOT_DIR"
 
-    run leverage hello
+    run leverage run hello
 
-    # Print statements inside tasks end up after all logging statements
-    # we should look more into it, still, task order seems to be conserved
-    # One suspect for this behaviour is the file descriptor manipulation done by bats
     assert_output --partial "Hello"
     assert_line --index 0 "[ build.py - Starting task \`hello\` ]"
     assert_line --index 1 "[ build.py - Completed task \`hello\` ]"
@@ -102,7 +82,7 @@ teardown(){
     echo "USE_VERBOSE_HELLO=false" > "$ACC_DIR/build.env"
     cd "$ACC_DIR"
 
-    run leverage confhello
+    run leverage run confhello
 
     assert_output --partial "Hello"
 }
@@ -115,7 +95,7 @@ teardown(){
     echo "USE_VERBOSE_HELLO=false" > "$ROOT_DIR/build.env"
     cd "$ROOT_DIR/account"
 
-    run leverage confhello
+    run leverage run confhello
 
     assert_output --partial "Hello"
 }
@@ -131,7 +111,7 @@ teardown(){
     echo "USE_VERBOSE_HELLO=true" > "$ACC_DIR/build.env"
     cd "$ACC_DIR"
 
-    run leverage confhello
+    run leverage run confhello
 
     assert_output --partial "This is a way too long hello for anyone to say"
 }
