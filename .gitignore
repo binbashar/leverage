@@ -11,6 +11,5 @@ leverage.egg-info
 Pipfile*
 .python-version
 .vscode
-pyproject.toml
 **/__pycache__*
 .pytest_cache

@@ -11,10 +11,6 @@ class NotARepositoryError(RuntimeError):
     pass
 
 
-class NoBuildScriptFoundError(RuntimeError):
-    pass
-
-
 def get_working_path():
     """ Get the interpreters current directory.
 
@@ -23,13 +19,15 @@ def get_working_path():
     """
     return Path.cwd().as_posix()
 
+
 def get_home_path():
     """ Get the current user's home directory.
 
     Returns:
         str: User's home directory.
     """
-    return Path("~").expanduser().as_posix()
+    return Path.home().as_posix()
+
 
 def get_root_path():
     """ Get the path to the root of the Git repository.
@@ -53,6 +51,7 @@ def get_root_path():
 
     return root.strip()
 
+
 def get_account_path():
     """ Get the path to the current account directory.
 
@@ -74,6 +73,7 @@ def get_account_path():
 
     return prev_path.as_posix()
 
+
 def get_global_config_path():
     """ Get the path to the config that is common to all accounts.
 
@@ -81,6 +81,7 @@ def get_global_config_path():
         str: Global config file path.
     """
     return f"{get_root_path()}/config"
+
 
 def get_account_config_path():
     """ Get the path to the config of the current account.
@@ -90,6 +91,7 @@ def get_account_config_path():
     """
     return f"{get_account_path()}/config"
 
+
 def get_build_script_path(filename="build.py"):
     """ Get path to the build script containing all tasks to be run.
     Search through the current directory up to the repository's root directory.
@@ -98,24 +100,19 @@ def get_build_script_path(filename="build.py"):
         filename (str, optional): The name of the build script containing the tasks.
             Defaults to "build.py".
 
-    Raises:
-        NoBuildScriptFoundError: If no file with the given name is found either in the
-            current directory or any of its parents.
-
     Returns:
-        str: Build script file path.
+        str: Build script file path. None if no file with the given name is found.
     """
     root_path = Path(get_root_path())
     cur_path = Path(get_working_path())
 
     while True:
-        for cur_file in cur_path.iterdir():
-            if cur_file.name == filename:
-                return cur_file.as_posix()
+        build_script = list(cur_path.glob(filename))
+
+        if build_script:
+            return build_script[0].as_posix()
 
         if cur_path == root_path:
             break
 
         cur_path = cur_path.parent
-
-    raise NoBuildScriptFoundError(f"No file '{filename}' found in the current directory or its parents.")
