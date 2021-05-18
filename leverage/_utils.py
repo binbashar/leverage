@@ -20,12 +20,12 @@ def _list_tasks(module):
     Args:
         module (dict): Dictionary containing all tasks and the module name
     """
-    # Header
-    click.echo(f"Tasks in build file `{module['name']}`:\n")
-
     visible_tasks = [task for task in module["tasks"] if not task.is_private]
 
     if visible_tasks:
+        # Header
+        click.echo(f"Tasks in build file `{module['name']}`:\n")
+
         tasks_grid = []
 
         for task in sorted(visible_tasks, key=attrgetter("name")):
@@ -52,8 +52,8 @@ def _list_tasks(module):
             for doc_line in doc[1:]:
                 click.echo(f"    {'': <{name_column_width + attr_column_width}}\t{doc_line}")
 
-    else:
-        click.echo("  --")
+        # Footer
+        click.echo(f"\n{_CREDIT_LINE}")
 
-    # Footer
-    click.echo(f"\n{_CREDIT_LINE}")
+    else:
+        click.echo("  No tasks found or no build script present in current directory.")

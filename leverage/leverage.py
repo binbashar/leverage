@@ -50,16 +50,11 @@ def leverage(context, filename, list_tasks, verbose):
             MissingParensInDecoratorError) as exc:
         raise ClickException(str(exc)) from exc
 
-    if build_script:
-        build_script = Path(build_script)
-        module = _load_build_script(build_script=build_script)
-    else:
-        module = None
-
+    module = _load_build_script(build_script=build_script)
     context.obj["module"] = module
 
-    # --list-tasks|-l
-    if list_tasks and module is not None:
+    # --list-tasks|-l or leverage invoked with no subcommand
+    if list_tasks or context.invoked_subcommand is None:
         _list_tasks(context.obj["module"])
 
 
@@ -69,13 +64,24 @@ leverage.add_command(run)
 
 def _load_build_script(build_script):
     """ Load build script as module and return the useful bits.
+    If the input is an empty string an empty module named `build.py` is returned.
 
     Args:
-        build_script (pathlib.Path): File containing the definition of the tasks.
+        build_script (str): Path to the file containing the definition of the tasks.
 
     Returns:
         dict: Name, tasks and default tasks of the module.
     """
+    # Return an empty module named `build.py` if no path is given
+    if not build_script:
+        return {
+            "name": "build.py",
+            "tasks": [],
+            "__DEFAULT__": None
+        }
+
+    build_script = Path(build_script)
+
     # Allow importing modules relatively to the script
     build_script_directory = build_script.parent.resolve().as_posix()
     sys.path.append(build_script_directory)
