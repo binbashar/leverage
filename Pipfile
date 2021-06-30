@@ -1,0 +1,25 @@
+[[source]]
+verify_ssl = true
+name = "pypi"
+url = "https://pypi.org/simple"
+
+[requires]
+python_version = ">=3.6.1"
+
+[dev-packages]
+pylint = "2.8.3"
+pytest = "6.2.4"
+pytest-cov = "2.12.1"
+setuptools = "56.2.0"
+wheel = "0.36.2"
+twine = "3.4.1"
+leverage = {editable = true, path = "."}
+
+[packages]
+yaenv = "1.2.2"
+"ruamel.yaml" = "0.17.9"
+click = "8.0.1"
+rich = "10.3.0"
+jinja2 = "3.0.1"
+docker = "5.0.0" 
+dockerpty = "0.4.1"
