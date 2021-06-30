@@ -1,39 +1,91 @@
 import logging
 
-from leverage.logger import get_logger
+import pytest
+from rich.logging import RichHandler
+
+from leverage.logger import get_mfa_script_log_level
+from leverage.logger import get_verbosity
+from leverage.logger import _configure_logger
+from leverage.logger import initialize_logger
+from leverage.logger import get_tasks_logger
 from leverage.logger import BuildFilter
+from leverage.logger import _leverage_logger
 from leverage.logger import _TASK_LOGGING_FORMAT
-from leverage.logger import attach_build_handler
 
 
-def test_get_logger(click_context):
-    with click_context():
-        logger = get_logger("build")
+DEBUG = logging.getLevelName("DEBUG")
+INFO = logging.getLevelName("INFO")
+WARNING = logging.getLevelName("WARNING")
 
-        assert logger.name == "build"
+
+@pytest.mark.parametrize(
+    "verbose, expected_value",
+    [(True, 2), (False, 1)]
+)
+def test_get_mfa_script_log_level(click_context, verbose, expected_value):
+    with click_context(verbose=verbose):
+        mfa_log_level = get_mfa_script_log_level()
+
+    assert mfa_log_level == expected_value
+
+
+def test_get_verbosity():
+    assert get_verbosity(verbose=True) == DEBUG
+    assert get_verbosity(verbose=False) == INFO
+
+
+def test__configure_logger(click_context):
+    with click_context(verbose=False):
+        logger = logging.getLogger("build")
+
+        _configure_logger(logger)
+
+        assert logger.level == INFO
         assert len(logger.handlers) == 1
+
         handler = logger.handlers[0]
-        assert isinstance(handler, logging.StreamHandler)
-        assert handler.level == logging.getLevelName("DEBUG")
-        assert handler.formatter is None
-
-        assert not logger.filters
+        assert isinstance(handler, RichHandler)
+        assert handler.level == INFO
 
 
-def test_attach_build_handler(click_context):
-    with click_context():
-        logger = get_logger()
+def test_initialize_logger(with_click_context):
+    # Just in case we clear the logger state
+    _leverage_logger.handlers = []
+    _leverage_logger.setLevel(WARNING)
 
-        attach_build_handler(logger=logger, build_script_name="build.py")
+    @initialize_logger
+    def nop():
+        pass
 
-        assert len(logger.handlers) == 1
-        handler = logger.handlers[0]
-        assert isinstance(handler, logging.StreamHandler)
-        assert handler.level == logging.getLevelName("DEBUG")
+    nop()
 
-        logfilter = handler.filters[0]
-        assert isinstance(logfilter, BuildFilter)
-        assert logfilter._build_script == "build.py"
+    assert _leverage_logger.level == DEBUG
+    assert len(_leverage_logger.handlers) == 1
 
-        formatter = handler.formatter
-        assert formatter._fmt == _TASK_LOGGING_FORMAT
+    handler = _leverage_logger.handlers[0]
+    assert isinstance(handler, RichHandler)
+    assert handler.level == DEBUG
+
+    # Just in case we clear the logger state
+    _leverage_logger.handlers = []
+    _leverage_logger.setLevel(WARNING)
+
+
+def test_get_tasks_logger(with_click_context):
+    logger = get_tasks_logger()
+
+    assert logger.level == DEBUG
+    assert len(logger.handlers) == 1
+
+    handler = logger.handlers[0]
+    assert handler.level == DEBUG
+    assert not handler._log_render.show_level
+
+    filter = handler.filters[0]
+    assert isinstance(filter, BuildFilter)
+    assert filter._build_script is None
+
+    logger.info("Some message")
+    assert logger.handlers[0].filters[0]._build_script == "build.py"
+
+    assert handler.formatter._fmt == _TASK_LOGGING_FORMAT

@@ -1,9 +1,11 @@
 import sys
 import pytest
 
-from click import ClickException
+from click.exceptions import Exit
 
-from leverage.leverage import _load_build_script
+from leverage.tasks import _load_build_script
+from leverage.logger import _leverage_logger
+from leverage.logger import _configure_logger
 from leverage.modules.run import _prepare_tasks_to_run
 from leverage.modules.run import TaskNotFoundError
 from leverage.modules.run import MalformedTaskArgumentError
@@ -36,8 +38,6 @@ def test__prepare_tasks_to_run_checks_task_existence():
                        match="Unrecognized task `nothello`."):
         _prepare_tasks_to_run(module=module, input_tasks=["nothello"])
 
-    del sys.modules[BUILD_SCRIPT.stem]
-
 
 @pytest.mark.parametrize(
     "input_task, message",
@@ -52,12 +52,17 @@ def test__prepare_tasks_to_run_checks_task_existence():
         )
     ]
 )
-def test__prepare_tasks_to_run_handles_bad_arguments(input_task, message):
-    with pytest.raises(ClickException, match=message):
+def test__prepare_tasks_to_run_handles_bad_arguments(input_task, message, caplog, with_click_context):
+    _configure_logger(logger=_leverage_logger)
+    _leverage_logger.propagate = True
+
+    with pytest.raises(Exit):
         _prepare_tasks_to_run(module=None, input_tasks=[input_task])
 
+    assert any(log_message == message for log_message in caplog.messages)
 
-def test__prepare_tasks_to_run():
+
+def test__prepare_tasks_to_run(with_click_context):
     module = _load_build_script(build_script=BUILD_SCRIPT)
 
     tasks_to_run = _prepare_tasks_to_run(module, input_tasks=["hello[arg1, kwarg1=val1]"])
@@ -67,5 +72,3 @@ def test__prepare_tasks_to_run():
     assert task.name == "hello"
     assert args == ["arg1"]
     assert kwargs == {"kwarg1": "val1"}
-
-    del sys.modules[BUILD_SCRIPT.stem]
