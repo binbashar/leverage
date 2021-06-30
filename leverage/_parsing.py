@@ -9,7 +9,7 @@ class DuplicateKeywordArgumentError(RuntimeError):
     pass
 
 
-def _parse_args(arguments):
+def parse_task_args(arguments):
     """ Parse the arguments for a task and return args and kwargs appropriately
 
     Args:
