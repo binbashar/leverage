@@ -101,9 +101,14 @@ def get_build_script_path(filename="build.py"):
             Defaults to "build.py".
 
     Returns:
-        str: Build script file path. None if no file with the given name is found.
+        str: Build script file path. None if no file with the given name is found or
+            the current directory is not a git repository.
     """
-    root_path = Path(get_root_path())
+    try:
+        root_path = Path(get_root_path())
+    except NotARepositoryError:
+        return
+
     cur_path = Path(get_working_path())
 
     while True:
