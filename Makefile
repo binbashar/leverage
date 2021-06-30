@@ -4,19 +4,19 @@ help:
 	@echo 'Available Commands:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf " - \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-deps: ## Install Leverage dependencies
-	python3 -m pip install -r dev-requirements.txt
-
 build-image: ## Build docker image
 	docker build . -t leverage-testing
 
-test-unit: ## Run unit tests
+test-unit: ## Run unit tests and create a coverage report
 	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t leverage-testing -c "pytest --verbose"
+
+test-unit-no-cov: ## Run unit tests with no coverage report
+	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t leverage-testing -c "pytest --verbose --no-cov"
 
 test-int: ## Run integration tests
 	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t leverage-testing bats -r tests/bats
 
-tests: test-unit test-int## Run full set of tests
+tests: test-unit-no-cov test-int ## Run full set of tests
 
 setup: ## Set up requirements
 	python3 -m pip install --user --upgrade setuptools wheel twine gitpython
