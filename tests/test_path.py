@@ -54,8 +54,8 @@ def test_get_root_path_not_in_a_git_repository(pytester):
         from leverage.path import NotARepositoryError
 
         def test_get_root_path():
-            with pytest.raises(NotARepositoryError) as exc:
-                path = get_root_path()
+            with pytest.raises(NotARepositoryError):
+                get_root_path()
         """
     )
     result = pytester.runpytest(test_file)

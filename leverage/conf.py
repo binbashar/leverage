@@ -5,8 +5,9 @@ from pathlib import Path
 
 from yaenv.core import Env
 
-from .path import get_root_path
-from .path import get_working_path
+from leverage import logger
+from leverage.path import get_root_path
+from leverage.path import get_working_path
 
 
 def load(config_filename="build.env"):
@@ -29,6 +30,7 @@ def load(config_filename="build.env"):
     cur_path = Path(get_working_path())
 
     config_files_paths = []
+    # TODO: Return an Env object instead of a dictionary, to be able to leverage its type casting utilities
     config_dict = {}
 
     while True:
@@ -36,7 +38,7 @@ def load(config_filename="build.env"):
 
         if env_file:
             env_file = env_file[0].as_posix()
-            print(f"[DEBUG] Found config file: {env_file}")
+            logger.debug(f"Found config file {env_file}")
 
             config_files_paths.append(env_file)
 

@@ -1,7 +1,6 @@
 import pytest
 
 from leverage.conf import load
-from leverage import conf as leconf
 
 
 ROOT_ENV_FILE = """
@@ -40,18 +39,19 @@ CONFIG_PATH=/home/user/.config/
         )
     ]
 )
-def test_load_config(monkeypatch, tmp_path, write_files, expected_values):
-    root_dir = tmp_path
-    account_dir = tmp_path / "account"
-    account_dir.mkdir()
+def test_load_config(monkeypatch, click_context, tmp_path, write_files, expected_values):
+    with click_context():
+        root_dir = tmp_path
+        account_dir = tmp_path / "account"
+        account_dir.mkdir()
 
-    monkeypatch.setattr(leconf, "get_root_path", lambda: root_dir)
-    monkeypatch.setattr(leconf, "get_working_path", lambda: account_dir)
+        monkeypatch.setattr("leverage.conf.get_root_path", lambda: root_dir.as_posix())
+        monkeypatch.setattr("leverage.conf.get_working_path", lambda: account_dir.as_posix())
 
-    if write_files:
-        (root_dir / "build.env").write_text(ROOT_ENV_FILE)
-        (account_dir / "build.env").write_text(ACC_ENV_FILE)
+        if write_files:
+            (root_dir / "build.env").write_text(ROOT_ENV_FILE)
+            (account_dir / "build.env").write_text(ACC_ENV_FILE)
 
-    loaded_values = load()
+        loaded_values = load()
 
-    assert loaded_values == expected_values
+        assert dict(loaded_values) == expected_values

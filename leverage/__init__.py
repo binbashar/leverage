@@ -1,22 +1,17 @@
 """
     Binbash Leverage Command-line tool.
 """
+#pylint: disable=wrong-import-position
 
 __version__ = "0.0.18"
 
 import sys
-import pkgutil
 from shutil import which
 
-from .task import task
-from .leverage import leverage
-
-
-if which("git") is None:
+if which("git") is None: #pragma: no cover
     print("No git installation found in the system. Exiting.")
     sys.exit(1)
 
-
-__path__ = pkgutil.extend_path(__path__, __name__)
-
-__all__ = ["task"]
+from leverage import logger
+from leverage.tasks import task
+from leverage.leverage import leverage

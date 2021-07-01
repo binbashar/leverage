@@ -8,8 +8,9 @@ build
 .ropeproject
 *.out
 leverage.egg-info
-Pipfile*
 .python-version
 .vscode
 **/__pycache__*
 .pytest_cache
+coverage
+.coverage

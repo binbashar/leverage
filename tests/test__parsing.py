@@ -1,6 +1,6 @@
 import pytest
 
-from leverage._parsing import _parse_args
+from leverage._parsing import parse_task_args
 from leverage._parsing import InvalidArgumentOrderError
 from leverage._parsing import DuplicateKeywordArgumentError
 
@@ -32,7 +32,7 @@ from leverage._parsing import DuplicateKeywordArgumentError
     ]
 )
 def test__parse_args(arguments, expected_args, expected_kwargs):
-    args, kwargs = _parse_args(arguments=arguments)
+    args, kwargs = parse_task_args(arguments=arguments)
 
     assert args == expected_args
     assert kwargs == expected_kwargs
@@ -55,4 +55,4 @@ def test__parse_args(arguments, expected_args, expected_kwargs):
 )
 def test__parse_args_incorrect_arguments(arguments, exception, message):
     with pytest.raises(exception, match=message):
-        _parse_args(arguments=arguments)
+        parse_task_args(arguments=arguments)

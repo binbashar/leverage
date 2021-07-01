@@ -2,85 +2,156 @@
     Logging utilities.
 """
 import logging
+from functools import wraps
 
+from rich.console import Console
+from rich.logging import RichHandler
 from click import get_current_context
 
 
-_TASK_LOGGING_FORMAT = "[ %(build_script)s - %(message)s ]"
+_TASK_LOGGING_FORMAT = ("[bold light_yellow3][ %(build_script)s -[/bold light_yellow3]"
+                        " %(message)s [bold light_yellow3]][/bold light_yellow3]")
+_TIME_FORMAT = lambda time: f"[{time:%H:%M:%S}.{time.microsecond//1000:03}]"
+
+_leverage_logger = logging.getLogger("leverage")
 
 
-# TODO: Consider creating a custom handler to use click.echo to emit messages instead StreamHandler
+# Use the same console for the logging handler and any other special cases like
+# spinners, tables or progress bars.
+console = Console()
 
 
-def get_logging_level():
-    """ Define logging level based on whether the verbose option was given or not
+def get_mfa_script_log_level():
+    """ Get the verbosity level from the application state and map it to the MFA script log level.
+    Logging level in the MFA script is implemented as:
+        ERROR = 0
+        INFO = 1
+        DEBUG = 2
 
     Returns:
-        int: logging.DEBUG or logging.INFO
+        int: Logging level as defined in the MFA script.
     """
-    context = get_current_context()
-    verbose = context.obj["verbose"]
+    mfa_log_level = {
+        logging.ERROR: 0,
+        logging.INFO: 1,
+        logging.DEBUG: 2
+    }
 
+    verbosity = get_current_context().obj.verbosity
+    return mfa_log_level[verbosity]
+
+
+def get_verbosity(verbose):
+    """ Transform the given verbosity level into the corresponding logging level.
+
+    Args:
+        verbose (bool): Whether the logging should be verbose or not
+
+    Returns:
+        int: Logging level
+    """
     return logging.DEBUG if verbose else logging.INFO
 
 
-def get_logger(name="leverage"):
-    """ Build a logger with the given name and log level
+def _configure_logger(logger, show_level=True):
+    """ Provide the given logger with the most basic configuration possible to be used.
 
     Args:
-        name (str): Logger name.
-
-    Returns:
-        logger: configured logger
+        logger (logging.Logger): Logger to be configured
+        show_level (bool): Whether to display the logging level in the record. Defaults to True
     """
-    level = get_logging_level()
+    state = get_current_context().obj
 
-    logger = logging.getLogger(name)
+    level = state.verbosity
     logger.setLevel(level)
 
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
+    logger.propagate = False
+
+    handler = RichHandler(level=level,
+                          console=console,
+                          show_level=show_level,
+                          show_path=False,
+                          enable_link_path=False,
+                          markup=True,
+                          rich_tracebacks=True,
+                          tracebacks_show_locals=True,
+                          log_time_format=_TIME_FORMAT)
 
     logger.handlers = []
     logger.addHandler(handler)
 
-    return logger
+
+def initialize_logger(log_func):
+    """ Decorator to initialize the global logger before logging a message if it wasn't already initialized. """
+    @wraps(log_func)
+    def wrapper(*args, **kwargs):
+        if not _leverage_logger.handlers:
+            _configure_logger(logger=_leverage_logger)
+        log_func(*args, **kwargs)
+
+    return wrapper
+
+
+@initialize_logger
+def debug(message): #pragma: no cover
+    """ Utility debug function to ease logging. """
+    _leverage_logger.debug(message)
+
+
+@initialize_logger
+def info(message): #pragma: no cover
+    """ Utility info function to ease logging. """
+    _leverage_logger.info(message)
+
+
+@initialize_logger
+def warning(message): #pragma: no cover
+    """ Utility warning function to ease logging. """
+    _leverage_logger.warning(message)
+
+
+@initialize_logger
+def error(message): #pragma: no cover
+    """ Utility error function to ease logging. """
+    _leverage_logger.error(message)
+
+
+@initialize_logger
+def critical(message): #pragma: no cover
+    """ Utility critical function to ease logging. """
+    _leverage_logger.critical(message)
+
+
+@initialize_logger
+def exception(message, exc_info=False): #pragma: no cover
+    """ Utility exception function to ease logging. """
+    _leverage_logger.exception(message, exc_info=exc_info)
 
 
 class BuildFilter(logging.Filter):
     """ Filter class to add additional info to a log record. """
-    def __init__(self, build_script):
+    def __init__(self):
         super().__init__()
-        self._build_script = build_script
+        self._build_script = None
 
     def filter(self, record):
+        if self._build_script is None:
+            state = get_current_context().obj
+            self._build_script = state.module.name
+
         record.build_script = self._build_script
         return True
 
 
-def attach_build_handler(logger, build_script_name):
-    """ Attach a filter to a logger as to add build script information to every log record.
-    All previously attached StreamHandlers are discarded from the logger.
+def get_tasks_logger():
+    """ Provide a logger specially configured to display the status of tasks execution. """
+    logger = logging.getLogger("build")
+    _configure_logger(logger=logger, show_level=False)
 
-    Args:
-        logger (logger): The logger to which the filter should be attached.
-        build_script_name (str): Name of the build script file.
-        level (str, optional): Log level name it can be any of the defined in the standard library.
-            Defaults to "INFO".
-    """
-    level = get_logging_level()
-
-    logger.handlers = [handler
-                       for handler in logger.handlers
-                       if not isinstance(handler, logging.StreamHandler)]
-
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-
-    logfilter = BuildFilter(build_script=build_script_name)
-    handler.addFilter(logfilter)
+    logfilter = BuildFilter()
+    logger.handlers[0].addFilter(logfilter)
 
     formatter = logging.Formatter(_TASK_LOGGING_FORMAT)
-    handler.setFormatter(formatter)
+    logger.handlers[0].setFormatter(formatter)
 
-    logger.addHandler(handler)
+    return logger

@@ -4,20 +4,21 @@
 import re
 
 import click
-from click import ClickException
+from click.exceptions import Exit
 
-from .._utils import _list_tasks
-from ..logger import get_logger
-from ..logger import attach_build_handler
-from .._parsing import _parse_args
-from .._parsing import InvalidArgumentOrderError
-from .._parsing import DuplicateKeywordArgumentError
+from leverage import logger
+from leverage.tasks import list_tasks
+from leverage.logger import get_tasks_logger
+from leverage._parsing import parse_task_args
+from leverage._parsing import InvalidArgumentOrderError
+from leverage._parsing import DuplicateKeywordArgumentError
+from leverage._utils import clean_exception_traceback
+from leverage._internals import pass_state
 
 
 _TASK_PATTERN = re.compile(r"^(?P<name>[^\[\],\s]+)(\[(?P<arguments>[^\]]*)\])?$")
 
-
-_build_logger = None
+_logger = None
 
 
 class MalformedTaskArgumentError(RuntimeError):
@@ -30,39 +31,36 @@ class TaskNotFoundError(RuntimeError):
 
 @click.command()
 @click.argument("tasks", nargs=-1)
-@click.pass_obj
-def run(obj, tasks):
+@pass_state
+def run(state, tasks):
     """ Perform specified task(s) and all of its dependencies.
 
     When no task is given, the default (__DEFAULT__) task is run, if no default task has been defined, all available tasks are listed.
     """
-    module = obj["module"]
-
-    global _build_logger
-    _build_logger = get_logger("build")
-    # Attach a special filter to build logger as to add the name of the build script to every log record
-    attach_build_handler(logger=_build_logger, build_script_name=module["name"])
+    global _logger
+    _logger = get_tasks_logger()
 
     if tasks:
         # Run the given tasks
         try:
-            tasks_to_run = _prepare_tasks_to_run(module, tasks)
+            tasks_to_run = _prepare_tasks_to_run(state.module, tasks)
 
         except (TaskNotFoundError,
                 MalformedTaskArgumentError) as exc:
-            raise ClickException(str(exc)) from exc
+            logger.error(str(exc))
+            raise Exit(1)
 
         _run_tasks(tasks=tasks_to_run)
 
     else:
-        # Run the default task or  available tasks
-        default_task = module["__DEFAULT__"]
+        # Run the default task or list available tasks
+        default_task = state.module.default_task
         if default_task is not None:
             prepared_default_task = [(default_task, [], {})]
             _run_tasks(prepared_default_task)
 
         else:
-            _list_tasks(module)
+            list_tasks(state.module)
 
 
 def _prepare_tasks_to_run(module, input_tasks):
@@ -91,13 +89,14 @@ def _prepare_tasks_to_run(module, input_tasks):
         arguments = match.group("arguments")
 
         try:
-            args, kwargs = _parse_args(arguments=arguments)
+            args, kwargs = parse_task_args(arguments=arguments)
 
         except (InvalidArgumentOrderError,
                 DuplicateKeywordArgumentError) as exc:
-            raise ClickException(str(exc).format(task=name)) from exc
+            logger.error(str(exc).format(task=name))
+            raise Exit(1)
 
-        task = [task for task in module["tasks"] if task.name == name]
+        task = [task for task in module.tasks if task.name == name]
 
         if not task:
             raise TaskNotFoundError(f"Unrecognized task `{name}`.")
@@ -139,19 +138,24 @@ def _run(task, completed_tasks, *args, **kwargs):
     if task not in completed_tasks:
 
         if task.is_ignored:
-            _build_logger.info(f"Ignoring task `{task.name}`")
+            _logger.info(f"[bold yellow]⤳[/bold yellow] Ignoring task [bold italic]{task.name}[/bold italic]")
 
         else:
-            _build_logger.info(f"Starting task `{task.name}`")
+            _logger.info(f"[bold yellow]➜[/bold yellow] Starting task [bold italic]{task.name}[/bold italic]")
 
             try:
-                task(*args,**kwargs)
-            except:
-                _build_logger.critical(f"Error in task `{task.name}`")
-                _build_logger.critical("Aborting build")
-                raise
+                task(*args, **kwargs)
+            except Exception as exc:
+                # Remove the two topmost frames of the traceback since they are internal leverage function calls,
+                # only frames pertaining to the build script and its dependencies are shown.
+                exc.__traceback__ = exc.__traceback__.tb_next.tb_next
+                exc = clean_exception_traceback(exception=exc)
 
-            _build_logger.info(f"Completed task `{task.name}`")
+                _logger.exception(f"[bold red]![/bold red] Error in task [bold italic]{task.name}[/bold italic]", exc_info=exc)
+                _logger.critical("[red]✘[/red] [bold on red]Aborting build[/bold on red]")
+                raise Exit(1)
+
+            _logger.info(f"[green]✔[/green] Completed task [bold italic]{task.name}[/bold italic]")
 
         completed_tasks.add(task)
 
