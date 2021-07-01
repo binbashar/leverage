@@ -1,0 +1,56 @@
+name: Test Build Package and Push
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_push:
+    runs-on: ubuntu-latest 
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: master
+
+      - uses: actions/setup-python@v2
+
+      - name: install_dependencies
+        run: |
+          python3 -m pip3 install --user --upgrade pipenv && pipenv install --dev
+        shell: bash
+
+      - name: bump_version
+        run: |
+          echo "[INFO] Get latest tag"
+          git fetch --all --tags
+          RELEASE_VERSION=$(git tag | tail -1)
+          RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/v//)
+          echo $RELEASE_VERSION
+
+          echo "[INFO] Get current version"
+          CURRENT_VERSION=$(cat $INIT_FILE | grep "__version__" | grep -oP "([0-9]*\.[0-9]*\.[0-9]*)")
+          echo $CURRENT_VERSION
+
+          echo "[INFO] Bump version"
+          sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
+
+        env:
+          INIT_FILE: leverage/__init__.py
+
+      - name: clean
+        run: |
+          rm -rf ./build/ &&	rm -rf ./dist/
+
+      - name: build
+        run: |
+          pipenv run python setup.py sdist bdist_wheel
+
+      - name: check
+        run:
+          pipenv run twine check dist/*
+
+      - name: upload
+        run: |
+          pipenv twine upload --non-interactive --repository testpypi dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
