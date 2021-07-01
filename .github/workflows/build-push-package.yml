@@ -16,7 +16,7 @@ jobs:
 
       - name: install_dependencies
         run: |
-          pip install --user --upgrade setuptools wheel twine gitpython yaenv
+          python3 -m pip3 install --user --upgrade pipenv && pipenv install --dev
         shell: bash
 
       - name: bump_version
@@ -46,19 +46,19 @@ jobs:
 
       - name: clean
         run: |
-          rm -rf ./build/ && rm -rf ./dist/
+          rm -rf ./build/ &&	rm -rf ./dist/
 
       - name: build
         run: |
-          python setup.py sdist bdist_wheel
+          pipenv run python setup.py sdist bdist_wheel
 
       - name: check
         run:
-          python -m twine check dist/*
+          pipenv run twine check dist/*
 
       - name: upload
         run: |
-          python -m twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
+          pipenv twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
