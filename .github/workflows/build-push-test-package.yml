@@ -8,14 +8,12 @@ jobs:
     runs-on: ubuntu-latest 
     steps:
       - uses: actions/checkout@v2
-        with:
-          ref: master
 
       - uses: actions/setup-python@v2
 
       - name: install_dependencies
         run: |
-          python3 -m pip3 install --user --upgrade pipenv && pipenv install --dev
+          pip3 install --user --upgrade pipenv && pipenv install --dev --python 3.8
         shell: bash
 
       - name: bump_version
@@ -33,8 +31,15 @@ jobs:
           echo "[INFO] Bump version"
           sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
 
+          echo "[INFO] Commit and push"
+          git config user.name $GIT_USERNAME
+          git config user.email $GIT_EMAIL
+          git add $INIT_FILE
+          git commit -m "Bump version from $CURRENT_VERSION to $RELEASE_VERSION"
         env:
           INIT_FILE: leverage/__init__.py
+          GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
 
       - name: clean
         run: |
@@ -50,7 +55,7 @@ jobs:
 
       - name: upload
         run: |
-          pipenv twine upload --non-interactive --repository testpypi dist/*
+          pipenv run twine upload --non-interactive --repository testpypi dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
