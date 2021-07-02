@@ -25,7 +25,7 @@ Currently the tool provides commands that implement the required interactions ne
 
 ## Installation
 You can install leverage from the Python Package Index (PyPI) or from source.
-First, make sure your Python version is 3.6 or higher. Then install via pip:
+First, make sure your Python version is 3.8 or higher. Then install via pip:
 ```bash
 $ pip install leverage
 ```
@@ -210,8 +210,7 @@ To run all tests `make tests`. Alternatively `make test-unit` or `make test-int`
 
 
 ## Contributors/Contributing
-* Leverage CLI is based on Pynt: https://github.com/rags/pynt
-* Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
+* Leverage CLI was initially based on [Pynt](https://github.com/rags/pynt)
 
 
 ## License
