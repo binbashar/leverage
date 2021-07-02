@@ -11,7 +11,7 @@ Provides the means to interact with your Leverage project and allows you to defi
 * Custom tasks are simple python functions.
 * Manages dependencies between tasks.
 * Rake style param passing to tasks.
-* Supports python >= 3.6
+* Supports python >= 3.8
 
 ## Requirements
 Leverage CLI assumes the installation of `git` and `docker` in the system. These are required to manage the project in the form of repositories, and to deploy and configure the project through `AWS CLI`, `Terraform` and `Ansible` in containerized environments.
@@ -25,7 +25,7 @@ Currently the tool provides commands that implement the required interactions ne
 
 ## Installation
 You can install leverage from the Python Package Index (PyPI) or from source.
-First, make sure your Python version is 3.6 or higher. Then install via pip:
+First, make sure your Python version is 3.8 or higher. Then install via pip:
 ```bash
 $ pip install leverage
 ```
@@ -124,7 +124,7 @@ Tasks in build file build.py:
   start_server     [Default]  Start the server
   stop_server
 
-Powered by Leverage 0.0.10.
+Powered by Leverage 1.0.0.
 ```
 
 Task dependencies between tasks are taken care of. In the following case `html` depends on `clean` and `_copy_resources` so those 2 will run before the former task:
@@ -210,8 +210,7 @@ To run all tests `make tests`. Alternatively `make test-unit` or `make test-int`
 
 
 ## Contributors/Contributing
-* Leverage CLI is based on Pynt: https://github.com/rags/pynt
-* Calum J. Eadie - pynt is preceded by and forked from [microbuild](https://github.com/CalumJEadie/microbuild), which was created by [Calum J. Eadie](https://github.com/CalumJEadie).
+* Leverage CLI was initially based on Pynt: https://github.com/rags/pynt
 
 
 ## License

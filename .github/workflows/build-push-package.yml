@@ -16,7 +16,7 @@ jobs:
 
       - name: install_dependencies
         run: |
-          python3 -m pip3 install --user --upgrade pipenv && pipenv install --dev
+          pip3 install --user --upgrade pipenv && pipenv install --dev --python 3.8
         shell: bash
 
       - name: bump_version
@@ -58,7 +58,7 @@ jobs:
 
       - name: upload
         run: |
-          pipenv twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
+          pipenv run twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
