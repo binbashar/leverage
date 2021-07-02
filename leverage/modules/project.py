@@ -19,6 +19,7 @@ from leverage import logger
 from leverage.path import get_root_path
 from leverage.path import NotARepositoryError
 
+from leverage.modules.terraform import format as _format
 
 # Leverage related base definitions
 # NOTE: Should LEVERAGE_DIR be a bit more platform agnostic?
@@ -232,7 +233,8 @@ def _render_project_template(config, source=TEMPLATE_DIR):
 
 
 @project.command()
-def create():
+@click.pass_context
+def create(context):
     """ Create the directory structure required by the project configuration and set up each account accordingly. """
 
     # Load project configuration file
@@ -252,3 +254,9 @@ def create():
 
     # Render project
     _render_project_template(config=config)
+
+    # Format the code correctly
+    logger.info("Reformatting terraform configuration to the standard style.")
+    context.invoke(_format)
+
+    logger.info("Finished setting up project.")
