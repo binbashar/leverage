@@ -27,11 +27,13 @@ jobs:
         run: |
           echo "[INFO] Get current version"
           CURRENT_VERSION=$(cat $INIT_FILE | grep "__version__" | grep -oP "([0-9]*\.[0-9]*\.[0-9]*)")
-          echo $CURRENT_VERSION
+          echo "[INFO] Current version: $CURRENT_VERSION"
 
           [ -z "$RELEASE_VERSION" ] && \
-            LATEST_VERSION=$(curl -sL "https://test.pypi.org/pypi/leverage/json" | jq ".releases | keys | sort | .[-1]") && \
-            RELEASE_VERSION=$(echo ${LATEST_VERSION:1:-1} | awk 'BEGIN{FS="."; OFS="."} {print $1,$2,$3+1}')
+            echo "[INFO] Get latest version from TestPypi." && \
+            LATEST_VERSION=$(curl -sL "https://test.pypi.org/pypi/leverage/json" | jq -r ".releases | keys | sort | .[-1]") && \
+            echo "[INFO] Latest version: $LATEST_VERSION" && \
+            RELEASE_VERSION=$(echo $LATEST_VERSION | awk 'BEGIN{FS="."; OFS="."} {print $1,$2,$3+1}')
 
           echo "[INFO] Bump version to $RELEASE_VERSION"
           sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
