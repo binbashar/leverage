@@ -26,7 +26,7 @@ LEVERAGE_DIR = Path.home() / ".leverage"
 TEMPLATE_DIR = LEVERAGE_DIR / "template"
 TEMPLATE_PATTERN = "*.template"
 LEVERAGE_TEMPLATE_REPO = "https://github.com/binbashar/le-tf-infra-aws-template.git"
-IGNORE_PATTERNS = ignore_patterns(TEMPLATE_PATTERN, ".gitkeep")
+IGNORE_PATTERNS = ignore_patterns([TEMPLATE_PATTERN, ".gitkeep"])
 
 # Useful project related definitions
 try:
