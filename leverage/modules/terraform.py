@@ -282,11 +282,11 @@ def shell(args):
     run(entrypoint="/bin/sh", args=list(args), enable_mfa=False)
 
 
-@terraform.command()
+@terraform.command("format")
 @click.option("--check",
               is_flag=True,
               help="Only perform format checking, do not rewrite the files.")
-def format(check):
+def _format(check):
     """ Check if all files meet the canonical format and rewrite them accordingly. """
     arguments = ["-recursive"]
     if check:
