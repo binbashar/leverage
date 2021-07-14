@@ -306,3 +306,14 @@ def validate():
 def _import(address, _id):
     """ Import a resource. """
     run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
+
+
+@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.option("--no-mfa",
+              is_flag=True,
+              default=False,
+              help="Disable MFA.")
+@click.argument("args", nargs=-1)
+def aws(no_mfa, args):
+    """ Run a command in AWS cli. """
+    run(entrypoint="/usr/bin/aws", args=list(args), enable_mfa=not no_mfa)
