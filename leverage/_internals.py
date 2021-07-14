@@ -2,6 +2,8 @@
 	Definitions for internal use of the cli.
 """
 import click
+from click import Option
+from click import UsageError
 
 from leverage.logger import get_verbosity
 
@@ -35,3 +37,27 @@ class State:
 
 
 pass_state =  click.make_pass_decorator(State, ensure=True)
+
+
+class MutuallyExclusiveOption(Option):
+    """ Click option that allows implementation of mutual exclusivity between options. """
+    def __init__(self, *args, **kwargs):
+        self.conflicting_options = kwargs.pop("conflicting_options")
+
+        kwargs["help"] = f"{kwargs.get('help', '')} Option is mutually exclusive with {', '.join(self.conflicting_options)}.".strip()
+        super().__init__(*args, **kwargs)
+
+    def handle_parse_result(self, ctx, opts, args):
+        current_option = self.consume_value(ctx, opts)[0]
+
+        for parameter in ctx.command.get_params(ctx):
+            if (parameter is not self
+                    and parameter.human_readable_name in self.conflicting_options
+                    and parameter.consume_value(ctx, opts)[0]):
+                if current_option:
+                    raise UsageError(f"Illegal use: Option '{self.name}' is mutually exclusive "
+                                     f"with option '{parameter.human_readable_name}'.")
+
+                self.required = None
+
+        return super().handle_parse_result(ctx, opts, args)
