@@ -275,11 +275,10 @@ def version():
     run(command="version")
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("args", nargs=-1)
-def shell(args):
+@terraform.command()
+def shell():
     """ Open a shell into the Terraform container in this layer. """
-    run(entrypoint="/bin/sh", args=list(args), enable_mfa=False)
+    run(entrypoint="/bin/sh", enable_mfa=False)
 
 
 @terraform.command("format")
