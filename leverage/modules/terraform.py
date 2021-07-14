@@ -223,6 +223,21 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     return container_exit_code, container_output
 
 
+def awscli(command):
+    """ Utility function to run AWS cli commands in a simple and readable line from within leverage.
+
+    Args:
+        commands (str | list): Command or list Full command to run.
+
+    Returns:
+        int, str: Command's exit code and output.
+    """
+    return run(entrypoint="/usr/bin/aws",
+               command=command,
+               enable_mfa=False,
+               interactive=False)
+
+
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 
 
