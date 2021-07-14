@@ -16,6 +16,9 @@ organization:
   - name: shared
     email: aws+shared@leverage.com
   organizational_units:
+    # Available organizations policies:
+    # - aws_organizations_policy.default
+    # - aws_organizations_policy.standard
   - name: security
     policy:
     - aws_organizations_policy.default
@@ -33,6 +36,14 @@ accounts:
     - john.doe
     - jane.doe
     groups:
+    # Available groups:
+    # - admins:
+    #   Default policies:
+    #   - "arn:aws:iam::aws:policy/AdministratorAccess"
+    # - finops:
+    #   Default policies:
+    #   - "arn:aws:iam::aws:policy/job-function/Billing"
+    #   - "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
     - name: admins
       users:
       - john.doe
@@ -42,6 +53,19 @@ accounts:
     users:
     - john.doe
     groups:
+    # Available groups:
+    # - admins:
+    #   Default policies:
+    #   - aws_iam_policy.assume_admin_role.arn
+    # - auditors:
+    #   Default policies:
+    #   - aws_iam_policy.assume_auditor_role.arn
+    # - devops:
+    #   Default policies:
+    #   - aws_iam_policy.assume_devops_role.arn
+    # - deploymaster:
+    #   Default policies:
+    #   - aws_iam_policy.assume_deploymaster_role.arn
     - name: devops
       users:
       - john.doe
@@ -51,6 +75,11 @@ accounts:
     users:
     - john.doe
     groups:
+    # Available groups:
+    # - admins:
+    #   Default policies:
+    #    - "arn:aws:iam::aws:policy/SecurityAudit"
+    #    - "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
     - name: auditors
       users:
       - john.doe
