@@ -297,3 +297,12 @@ def _format(check):
 def validate():
     """ Validate code of the current directory. Previous initialization might be needed. """
     run(command="validate", enable_mfa=False)
+
+
+@terraform.command("import")
+@click.argument("address")
+@click.argument("_id", metavar="ID")
+@check_directory
+def _import(address, _id):
+    """ Import a resource. """
+    run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
