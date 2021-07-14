@@ -26,7 +26,7 @@ LEVERAGE_DIR = Path.home() / ".leverage"
 TEMPLATE_DIR = LEVERAGE_DIR / "template"
 TEMPLATE_PATTERN = "*.template"
 LEVERAGE_TEMPLATE_REPO = "https://github.com/binbashar/le-tf-infra-aws-template.git"
-IGNORE_PATTERNS = ignore_patterns([TEMPLATE_PATTERN, ".gitkeep"])
+IGNORE_PATTERNS = ignore_patterns(TEMPLATE_PATTERN, ".gitkeep")
 
 # Useful project related definitions
 try:
@@ -42,7 +42,7 @@ ROOT_DIRECTORIES = [
 
 DEFAULT_ACCOUNT_LAYERS = [
     "config",
-    "tf-backend"
+    "base-tf-backend"
 ]
 # TODO: Keep this structure in the project's directory
 PROJECT_STRUCTURE = {
@@ -58,7 +58,7 @@ PROJECT_STRUCTURE = {
     "shared": [
         "base-identities",
         "security-base",
-        "network"
+        "base-network"
     ]
 }
 
@@ -86,9 +86,6 @@ def init():
         run(["git", "clone", LEVERAGE_TEMPLATE_REPO, TEMPLATE_DIR.as_posix()],
             stdout=PIPE, stderr=PIPE, check=True)
         logger.info("Finished cloning template.")
-        run(["git", "-C", TEMPLATE_DIR.as_posix(), "checkout", "temp_branch"],
-        stdout=PIPE, stderr=PIPE, check=True)
-
 
     # Leverage projects are git repositories too
     logger.info("Initializing git repository in project directory.")
