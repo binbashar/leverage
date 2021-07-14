@@ -258,3 +258,23 @@ def create():
         tfrun(command="fmt -recursive", enable_mfa=False, interactive=False)
 
     logger.info("Finished setting up project.")
+
+
+def render_file(file):
+    """ Utility to re-render specific files.
+
+    Args:
+        file (str): Relative path to file to render.
+
+    Returns:
+        bool: Whether the action succeeded or not
+    """
+    if not PROJECT_CONFIG.exists():
+        logger.error("No configuration file found for the project."
+                     " Make sure the project has already been initialized ([bold]leverage project init[/bold]).")
+        return False
+    config = YAML().load(PROJECT_CONFIG)
+
+    _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
+
+    return True
