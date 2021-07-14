@@ -232,7 +232,7 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 @click.argument("args", nargs=-1)
 @check_directory
 def init(no_backend, args):
-    """ Initialize Terraform in this layer. """
+    """ Initialize this layer. """
     backend_config = ["-backend=false" if no_backend else f"-backend-config={BACKEND_TFVARS}"]
     run(command="init", args=backend_config + list(args))
 
@@ -241,7 +241,7 @@ def init(no_backend, args):
 @click.argument("args", nargs=-1)
 @check_directory
 def plan(args):
-    """ Generate a Terraform execution plan for this layer. """
+    """ Generate an execution plan for this layer. """
     run(command="plan", args=TF_DEFAULT_ARGS + list(args))
 
 
@@ -249,7 +249,7 @@ def plan(args):
 @click.argument("args", nargs=-1)
 @check_directory
 def apply(args):
-    """ Build or change the Terraform infrastructure in this layer. """
+    """ Build or change the infrastructure in this layer. """
     run(command="apply", args=TF_DEFAULT_ARGS + list(args))
 
 
@@ -257,7 +257,7 @@ def apply(args):
 @click.argument("args", nargs=-1)
 @check_directory
 def output(args):
-    """ Show all Terraform output variables of this layer. """
+    """ Show all output variables of this layer. """
     run(command="output", args=list(args), enable_mfa=False)
 
 
@@ -265,13 +265,13 @@ def output(args):
 @click.argument("args", nargs=-1)
 @check_directory
 def destroy(args):
-    """ Destroy Terraform infrastructure in this layer. """
+    """ Destroy infrastructure in this layer. """
     run(command="destroy", args=TF_DEFAULT_ARGS + list(args))
 
 
 @terraform.command()
 def version():
-    """ Print Terraform version. """
+    """ Print version. """
     run(command="version")
 
 
@@ -284,10 +284,10 @@ def shell(args):
 
 @terraform.command()
 @click.option("--check",
-                  is_flag=True,
-                  help="Only perform the checking do not rewrite the files.")
+              is_flag=True,
+              help="Only perform format checking, do not rewrite the files.")
 def format(check):
-    """ Check if all Terraform files meet the canonical format and rewrite them accordingly. """
+    """ Check if all files meet the canonical format and rewrite them accordingly. """
     arguments = ["-recursive"]
     if check:
         arguments.extend(["-check", WORKING_DIR])
@@ -296,5 +296,5 @@ def format(check):
 
 @terraform.command()
 def validate():
-    """ Validate the Terraform code of the current directory. Previous initialization might be needed. """
+    """ Validate code of the current directory. Previous initialization might be needed. """
     run(command="validate", enable_mfa=False)
