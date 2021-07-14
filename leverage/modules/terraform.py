@@ -144,11 +144,14 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
 
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
-        Mount(target="/config", source=ACCOUNT_CONFIG, type="bind"),
-        Mount(target="/common-config", source=CONFIG, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
         Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind")
     ]
+    if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
+        mounts.extend([
+            Mount(target="/common-config", source=CONFIG, type="bind"),
+            Mount(target="/config", source=ACCOUNT_CONFIG, type="bind")
+        ])
 
     environment = {
         "AWS_SHARED_CREDENTIALS_FILE": f"/root/.aws/{project}/credentials",
