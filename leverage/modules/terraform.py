@@ -108,7 +108,7 @@ def ensure_image(docker_client, image, tag):
         logger.info(info)
 
 
-def run(entrypoint=None, command="", args=None, enable_mfa=True):
+def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=True):
     """ Run a command on a Leverage docker container.
 
     Args:
@@ -116,6 +116,11 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True):
         command (str, optional): Command to run. Defaults to "".
         args (list(str)), optional): Command arguments. Defaults to None.
         enable_mfa (bool, optional): Whether to enable multi factor authentication. Defaults to True.
+        interactive (bool, optional): If set to False, container will be run in the background and its output grabbed after its
+            execution ends, otherwise access to the container terminal will be given. Defaults to True
+
+    Returns:
+        int, str: Container exit code and output when interactive is false, otherwise 0, None.
     """
     docker_client = DockerClient(base_url="unix://var/run/docker.sock")
     env = conf.load()
@@ -189,14 +194,25 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True):
 
     logger.debug(f"[bold cyan]Container parameters:[/bold cyan]\n{json.dumps(container_params, indent=2)}")
 
+    container_output = None
+    container_exit_code = 0
     try:
-        dockerpty.start(client=docker_client.api,
-                        container=container)
-        docker_client.api.remove_container(container)
+        if interactive:
+            dockerpty.start(client=docker_client.api,
+                            container=container)
+        else:
+            docker_client.api.start(container)
+            container_exit_code = docker_client.api.wait(container)["StatusCode"]
+            container_output = docker_client.api.logs(container).decode("utf-8")
 
     except APIError as exc:
         logger.exception("Error during container execution:", exc_info=exc)
 
+    finally:
+        docker_client.api.stop(container)
+        docker_client.api.remove_container(container)
+
+    return container_exit_code, container_output
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
