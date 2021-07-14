@@ -16,9 +16,11 @@ from jinja2 import Environment
 from jinja2 import FileSystemLoader
 
 from leverage import logger
+from leverage.logger import console
 from leverage.path import get_root_path
 from leverage.path import NotARepositoryError
 
+from leverage.modules.terraform import run as tfrun
 
 # Leverage related base definitions
 # NOTE: Should LEVERAGE_DIR be a bit more platform agnostic?
@@ -249,3 +251,10 @@ def create():
 
     # Render project
     _render_project_template(config=config)
+
+    # Format the code correctly
+    logger.info("Reformatting terraform configuration to the standard style.")
+    with console.status("Formatting..."):
+        tfrun(command="fmt -recursive", enable_mfa=False, interactive=False)
+
+    logger.info("Finished setting up project.")
