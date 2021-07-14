@@ -3,6 +3,7 @@
     execution of Terraform commands and interaction with the AWS CLI for infrastructure handling.
 """
 import json
+from pathlib import Path
 from functools import wraps
 
 import click
@@ -126,9 +127,14 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     env = conf.load()
     logger.debug(f"[bold cyan]Env config values:[/bold cyan]\n{json.dumps(env, indent=2)}")
 
-    if not env.get("PROJECT", False):
+    project = env.get("PROJECT", False)
+    if not project:
         logger.error("Project name has not been set. Exiting.")
         return
+
+    aws_credentials_directory = Path(HOME) / ".aws" / project
+    if not aws_credentials_directory.exists():
+        aws_credentials_directory.mkdir()
 
     ensure_image(docker_client=docker_client,
                  image=TERRAFORM_IMAGE,
@@ -144,7 +150,6 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
         Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind")
     ]
 
-    project = env.get("PROJECT")
     environment = {
         "AWS_SHARED_CREDENTIALS_FILE": f"/root/.aws/{project}/credentials",
         "AWS_CONFIG_FILE": f"/root/.aws/{project}/config"
