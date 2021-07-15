@@ -17,7 +17,6 @@ from leverage.modules.terraform import awscli
 from leverage.modules.terraform import run as tfrun
 from leverage.modules.project import PROJECT_CONFIG
 from leverage.modules.project import render_file
-from leverage._internals import MutuallyExclusiveOption
 
 
 # Regexes for general validation
@@ -282,23 +281,20 @@ def _backup_file(filename):
           interactive=False)
 
 
-def configure_credentials(profile, file=None, key_id=None, secret_key=None, make_backup=False):
+def configure_credentials(profile, file=None, make_backup=False):
     """ Set credentials in `credentials` file for AWS cli. Make backup if required.
 
     Args:
         profile (str): Name of the profile to configure.
         file (Path, optional): Credentials file. Defaults to None.
-        key_id (str, optional): AWS access key ID. Defaults to None.
-        secret_key (str, optional): AWS secret access key. Defaults to None.
         make_backup (bool, optional): Whether to make a backup of the credentials file. Defaults to False.
     """
-    if not any([file, key_id, secret_key]):
-        file = _ask_for_credentials_location()
+    file = file or _ask_for_credentials_location()
 
     if file:
         key_id, secret_key = _extract_credentials(file)
 
-    if not key_id and not secret_key:
+    else:
         key_id, secret_key = _ask_for_credentials()
 
     if make_backup:
@@ -331,19 +327,9 @@ def _get_management_account_id(profile):
 
 @credentials.command()
 @click.option("--file",
-              cls=MutuallyExclusiveOption,
-              conflicting_options=["key_id", "secret_key"],
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
-@click.option("--key-id",
-              cls=MutuallyExclusiveOption,
-              conflicting_options=["file"],
-              help="AWS cli access key ID.")
-@click.option("--secret-key",
-              cls=MutuallyExclusiveOption,
-              conflicting_options=["file"],
-              help="AWS cli access secret key.")
-def create(file, key_id, secret_key):
+def create(file):
     """ Initialize credentials for the project.
 
     Configure the required credentials for the bootstrap process and a default profile.
@@ -370,10 +356,7 @@ def create(file, key_id, secret_key):
     logger.info(f"[bold]Default profile configured in:[/bold] {profiles_config.as_posix()}")
 
     logger.info("Configuring [bold]bootstrap[/bold] credentials.")
-    configure_credentials(profile=profile_name,
-                          file=file,
-                          key_id=key_id,
-                          secret_key=secret_key)
+    configure_credentials(profile=profile_name, file=file)
     credentials_config = credentials_dir / "credentials"
     logger.info(f"[bold]Bootstrap credentials configured in:[/bold] {credentials_config.as_posix()}")
 
@@ -514,25 +497,15 @@ def configure_accounts_profiles(profile_name, region, username, organization_acc
                                 case_sensitive=False),
               help="Profile credentials to set.")
 @click.option("--file",
-              cls=MutuallyExclusiveOption,
-              conflicting_options=["key_id", "secret_key"],
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
-@click.option("--key-id",
-              cls=MutuallyExclusiveOption,
-              conflicting_options=["file"],
-              help="AWS cli access key ID.")
-@click.option("--secret-key",
-              cls=MutuallyExclusiveOption,
-              conflicting_options=["file"],
-              help="AWS cli access secret key.")
 @click.option("--username",
               help="Name of the user associated with the given credentials. "
                    "Used when setting a profile with MFA enabled, ignored otherwise.")
 @click.option("--only-account-profiles",
               is_flag=True,
               help="Only update accounts' profiles, don't change key/secret.")
-def update(profile, file, key_id, secret_key, username, only_account_profiles):
+def update(profile, file, username, only_account_profiles):
     """ Update credentials for the given profile.
 
     Only to be run after having initialized the project credentials. Generate the profiles for all
@@ -566,7 +539,7 @@ def update(profile, file, key_id, secret_key, username, only_account_profiles):
     already_configured = _profile_is_configured(profile=profile_name)
     if not only_account_profiles:
         logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
-        configure_credentials(profile_name, file, key_id, secret_key, make_backup=already_configured)
+        configure_credentials(profile_name, file, make_backup=already_configured)
         logger.info(f"[bold]{profile.capitalize()} credentials configured in:[/bold] {credentials_config.as_posix()}")
 
     elif not already_configured:
