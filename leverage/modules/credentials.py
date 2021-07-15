@@ -563,12 +563,15 @@ def update(profile, file, key_id, secret_key, username, only_account_profiles):
     if PROFILES[profile]["mfa"]:
         username = username or _ask_for_username()
 
+    already_configured = _profile_is_configured(profile=profile_name)
     if not only_account_profiles:
-        make_backup = _profile_is_configured(profile=profile_name)
-
         logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
-        configure_credentials(profile_name, file, key_id, secret_key, make_backup=make_backup)
+        configure_credentials(profile_name, file, key_id, secret_key, make_backup=already_configured)
         logger.info(f"[bold]{profile.capitalize()} credentials configured in:[/bold] {credentials_config.as_posix()}")
+
+    elif not already_configured:
+        logger.error("Credentials for this profile haven't been configured yet.\n"
+                     "Please re-run the command without the [bold]--only-account-profiles[/bold] flag.")
 
     project_accounts = project_config.get("organization").get("accounts")
     if _organization_is_created(profile=profile_name) and project_accounts:
