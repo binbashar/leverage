@@ -21,12 +21,14 @@ from leverage.modules.project import render_file
 
 # Regexes for general validation
 PROJECT_SHORT = r"[a-z]{2}"
-USERNAME = r"[a-zA-Z0-9\.\-_]+" # NOTE: Is this thorough enough?
+USERNAME = r"[a-zA-Z0-9\+,=\.@\-_]{1,64}" # https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html#id_users_create_console
+                                          # https://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateUser.html#API_CreateUser_RequestParameters
 KEY_ID = r"[A-Z0-9]{20}"
 SECRET_KEY = r"[a-zA-Z0-9]{40}"
 REGION = (r"[a-z]{2}-[gov-]?"
           r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-3]")
 ACCOUNT_ID = r"[0-9]{12}"
+MFA_SERIAL = fr"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 CREDENTIALS_FILE = fr"Access key ID,Secret access key\s+(?P<key_id>{KEY_ID}),(?P<secret_key>{SECRET_KEY})"
 
 AWSCLI_CONFIG_DIR = Path(get_home_path()) / ".aws"
@@ -179,26 +181,6 @@ def _ask_for_credentials():
     if not credentials:
         raise Exit(1)
     return list(credentials.values())
-
-
-def _ask_for_username():
-    """ Prompt for username or quit application if user cancels mid input process.
-
-    Raises:
-        Exit: When the user cancels input.
-
-    Returns:
-        str: User name.
-    """
-    username = questionary.text(
-        message="User associated to credentials:",
-        qmark=">",
-        validate=lambda value: bool(re.fullmatch(USERNAME, value)) or "Invalid username."
-    ).ask()
-
-    if not username:
-        raise Exit(1)
-    return username
 
 
 @click.group()
@@ -415,20 +397,22 @@ def _get_organization_accounts(profile, project_name):
     return accounts
 
 
-def _get_mfa_serial(profile, username):
-    """ Get MFA serial for the profile and user given.
+def _get_mfa_serial(profile):
+    """ Get MFA serial for the given profile credentials.
 
     Args:
         profile (str): Name of profile.
-        username (str): User name.
 
     Returns:
         str: MFA device serial.
     """
     _, mfa_devices = awscli(f"--output json iam list-mfa-devices --profile {profile}")
-
     mfa_devices = json.loads(mfa_devices)
-    return next((device["SerialNumber"] for device in mfa_devices["MFADevices"] if device["UserName"] == username), "")
+
+    # Either zero or one MFA device should be configured for either `management` or `security` accounts users.
+    # Just for safety, and because we only support VirtualMFA devices, we check that the `SerialNumber` is an `arn`
+    # https://docs.aws.amazon.com/IAM/latest/APIReference/API_MFADevice.html
+    return next((device["SerialNumber"] for device in mfa_devices["MFADevices"] if re.fullmatch(MFA_SERIAL, device["SerialNumber"])), "")
 
 
 def configure_profile(profile, values):
@@ -442,13 +426,12 @@ def configure_profile(profile, values):
         awscli(f"configure set {key} {value} --profile {profile}")
 
 
-def configure_accounts_profiles(profile_name, region, username, organization_accounts, project_accounts):
+def configure_accounts_profiles(profile_name, region, organization_accounts, project_accounts):
     """ Set up the required profiles for all accounts to be used with AWS cli. Backup previous profiles.
 
     Args:
         profile_name (str): Name of the profile to configure.
         region (str): Region.
-        username (str): Name of user associated with the credentials.
         organization_accounts (dict): Name and id of all accounts in the organization.
         project_accounts (dict): Name and email of all accounts in project configuration file.
     """
@@ -457,7 +440,7 @@ def configure_accounts_profiles(profile_name, region, username, organization_acc
     mfa_serial = None
     if PROFILES[profile]["mfa"]:
         logger.info("Fetching MFA device serial.")
-        mfa_serial = _get_mfa_serial(profile_name, username)
+        mfa_serial = _get_mfa_serial(profile_name)
         if not mfa_serial:
             logger.error("No MFA device found for user. Please set up a device before configuring the accounts profiles.")
             raise Exit(1)
@@ -499,13 +482,10 @@ def configure_accounts_profiles(profile_name, region, username, organization_acc
 @click.option("--file",
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
-@click.option("--username",
-              help="Name of the user associated with the given credentials. "
-                   "Used when setting a profile with MFA enabled, ignored otherwise.")
 @click.option("--only-account-profiles",
               is_flag=True,
               help="Only update accounts' profiles, don't change key/secret.")
-def update(profile, file, username, only_account_profiles):
+def update(profile, file, only_account_profiles):
     """ Update credentials for the given profile.
 
     Only to be run after having initialized the project credentials. Generate the profiles for all
@@ -533,9 +513,6 @@ def update(profile, file, username, only_account_profiles):
     credentials_config = credentials_dir / "credentials"
     profiles_config = credentials_dir / "config"
 
-    if PROFILES[profile]["mfa"]:
-        username = username or _ask_for_username()
-
     already_configured = _profile_is_configured(profile=profile_name)
     if not only_account_profiles:
         logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
@@ -554,7 +531,7 @@ def update(profile, file, username, only_account_profiles):
         logger.info("Fetching organization accounts.")
         organization_accounts = _get_organization_accounts(profile=profile_name, project_name=project_name)
 
-        configure_accounts_profiles(profile_name, region, username, organization_accounts, project_accounts)
+        configure_accounts_profiles(profile_name, region, organization_accounts, project_accounts)
         logger.info(f"[bold]Account profiles configured in:[/bold] {profiles_config.as_posix()}")
 
         for account in project_accounts:
