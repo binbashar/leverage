@@ -72,17 +72,6 @@ accounts:
       policies:
       - aws_iam_policy.assume_devops_role.arn
   shared:
-    users:
-    - john.doe
-    groups:
-    # Available groups:
-    # - admins:
-    #   Default policies:
-    #    - "arn:aws:iam::aws:policy/SecurityAudit"
-    #    - "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
-    - name: auditors
-      users:
-      - john.doe
     networks:
     - cidr_block: "172.18.0.0/20"
       availability_zones: [a,b]
