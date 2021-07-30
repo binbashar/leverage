@@ -123,7 +123,14 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     Returns:
         int, str: Container exit code and output when interactive is false, otherwise 0, None.
     """
-    docker_client = DockerClient(base_url="unix://var/run/docker.sock")
+    try:
+        docker_client = DockerClient(base_url="unix://var/run/docker.sock")
+
+    except:
+        logger.error("Docker daemon doesn't seem to be responding. "
+                     "Please check it is up and running correctly before re-running the command.")
+        return
+
     env = conf.load()
     logger.debug(f"[bold cyan]Env config values:[/bold cyan]\n{json.dumps(env, indent=2)}")
 
