@@ -326,11 +326,12 @@ def create(file):
     region = project_config.get("primary_region") or _ask_for_region()
     profile_name = f"{short_name}-bootstrap"
 
-    if _profile_is_configured(profile=profile_name):
-        logger.error("Bootstrap credentials already set.")
-        return
-
     credentials_dir = AWSCLI_CONFIG_DIR / short_name
+
+    if _profile_is_configured(profile=profile_name):
+        logger.error("Bootstrap credentials already set. "
+                     f"Please delete files in {credentials_dir.as_posix()} before re-running the command.")
+        return
 
     logger.info("Configuring default profile information.")
     configure_default_profile(region)
