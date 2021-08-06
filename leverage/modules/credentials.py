@@ -554,14 +554,24 @@ def update(profile, file, only_accounts_profiles):
     profiles_config = credentials_dir / "config"
 
     already_configured = _profile_is_configured(profile=profile_name)
-    if not only_account_profiles:
-        logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
-        configure_credentials(profile_name, file, make_backup=already_configured)
-        logger.info(f"[bold]{profile.capitalize()} credentials configured in:[/bold] {credentials_config.as_posix()}")
 
-    elif not already_configured:
-        logger.error("Credentials for this profile haven't been configured yet.\n"
-                     "Please re-run the command without the [bold]--only-account-profiles[/bold] flag.")
+    if only_accounts_profiles:
+        if not already_configured:
+            logger.error("Credentials for this profile haven't been configured yet.\n"
+                         "Please re-run the command without the [bold]--only-account-profiles[/bold] flag.")
+            return
+
+    else:
+        if (not already_configured
+                or _ask_for_credentials_overwrite(
+                    profile=profile,
+                    skip_option_title="Skip credentials setup. Only update accounts' profiles.",
+                    overwrite_option_title="Overwrite current credentials. Backups will be made."
+                )
+            ):
+            logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
+            configure_credentials(profile_name, file, make_backup=already_configured)
+            logger.info(f"[bold]{profile.capitalize()} credentials configured in:[/bold] {credentials_config.as_posix()}")
 
     project_accounts = project_config.get("organization").get("accounts")
     if _organization_is_created(profile=profile_name) and project_accounts:
