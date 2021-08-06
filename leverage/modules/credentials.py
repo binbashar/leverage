@@ -423,6 +423,7 @@ def configure_profile(profile, values):
         profile (str): Profile name.
         values (dict): Mapping of values to be set in the profile.
     """
+    logger.info(f"\tConfiguring profile [bold]{profile}[/bold]")
     for key, value in values.items():
         awscli(f"configure set {key} {value} --profile {profile}")
 
