@@ -551,4 +551,8 @@ def update(profile, file, only_accounts_profiles):
         except FileNotFoundError:
             pass
 
+    else:
+        logger.info("No organization has been created yet or no accounts were found in project configuration file."
+                    " Skipping accounts' profiles configuration.")
+
     logger.info(f"Finished updating [bold]{profile}[/bold] credentials.")
