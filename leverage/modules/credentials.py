@@ -322,6 +322,26 @@ def configure_credentials(profile, file=None, make_backup=False):
         awscli(f"configure set {key} {value} --profile {profile}")
 
 
+def _credentials_are_valid(profile):
+    """ Check if credentials for given profile are valid.
+    If credentials are invalid, the command output will be as follows:
+    Exit code:
+        255
+    Error message:
+        An error occurred (InvalidClientTokenId) when calling the GetCallerIdentity operation:
+        The security token included in the request is invalid.
+
+    Args:
+        profile (str): Name of profile for which credentials must be checked.
+
+    Returns:
+        bool: Whether the credentials are valid.
+    """
+    error_code, output = awscli(f"sts get-caller-identity --profile {profile}")
+
+    return error_code != 255 and "InvalidClientTokenId" not in output
+
+
 def _get_management_account_id(profile):
     """ Get management account id through AWS cli.
 
@@ -381,6 +401,10 @@ def create(file, force):
     configure_credentials(profile=profile_name, file=file)
     credentials_config = credentials_dir / "credentials"
     logger.info(f"[bold]Bootstrap credentials configured in:[/bold] {credentials_config.as_posix()}")
+
+    if not _credentials_are_valid(profile=profile_name):
+        logger.error("Invalid bootstrap credentials. Please check the given keys.")
+        return
 
     accounts = project_config.get("organization").get("accounts")
     management_account = next((account for account in accounts if account["name"] == "management"), None)
@@ -572,6 +596,10 @@ def update(profile, file, only_accounts_profiles):
             logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
             configure_credentials(profile_name, file, make_backup=already_configured)
             logger.info(f"[bold]{profile.capitalize()} credentials configured in:[/bold] {credentials_config.as_posix()}")
+
+            if not _credentials_are_valid(profile=profile_name):
+                logger.error(f"Invalid {profile} credentials. Please check the given keys.")
+                return
 
     project_accounts = project_config.get("organization").get("accounts")
     if _organization_is_created(profile=profile_name) and project_accounts:
