@@ -122,6 +122,35 @@ def _ask_for_profile():
 
 
 @_exit_if_user_cancels_input
+def _ask_for_credentials_overwrite(profile, skip_option_title, overwrite_option_title):
+    """ Prompt user with options regarding already existing credentials, whether to 
+    skip their configuration or overwrite them.
+
+    Args:
+        profile (str): Name of the profile being configured.
+        skip_option_title (str): Message to display in the `skip` option.
+        overwrite_option_title (str): Message to display in the `overwrite` option.
+
+    Returns:
+        bool: Whether to overwrite the current credentials or not.
+    """
+    return questionary.select(
+        message=f"Credentials already configured for {profile}:",
+        qmark=">",
+        choices=[
+            Choice(skip_option_title,
+                   value=False,
+                   shortcut_key="s",
+                   checked=True),
+            Choice(overwrite_option_title,
+                   value=True,
+                   shortcut_key="o")
+        ],
+        use_shortcuts=True
+    ).ask()
+
+
+@_exit_if_user_cancels_input
 def _ask_for_credentials_location():
     """ Prompt for credential input method and location if path is selected.
 
@@ -312,7 +341,10 @@ def _get_management_account_id(profile):
 @click.option("--file",
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
-def create(file):
+@click.option("--force",
+              is_flag=True,
+              help="Force credentials creation, even if they are already configured.")
+def create(file, force):
     """ Initialize credentials for the project.
 
     Configure the required credentials for the bootstrap process and a default profile.
@@ -330,9 +362,15 @@ def create(file):
     credentials_dir = AWSCLI_CONFIG_DIR / short_name
 
     if _profile_is_configured(profile=profile_name):
-        logger.error("Bootstrap credentials already set. "
-                     f"Please delete files in {credentials_dir.as_posix()} before re-running the command.")
-        return
+        if not (force
+                    or _ask_for_credentials_overwrite(
+                        profile="bootstrap",
+                        skip_option_title="Skip credentials configuration.",
+                        overwrite_option_title="Overwrite current credentials."
+                    )
+                ):
+            logger.info("Exiting credentials configuration.")
+            return
 
     logger.info("Configuring default profile information.")
     configure_default_profile(region)
