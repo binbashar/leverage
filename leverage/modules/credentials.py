@@ -484,10 +484,10 @@ def configure_accounts_profiles(profile_name, region, organization_accounts, pro
 @click.option("--file",
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
-@click.option("--only-account-profiles",
+@click.option("--only-accounts-profiles",
               is_flag=True,
               help="Only update accounts' profiles, don't change key/secret.")
-def update(profile, file, only_account_profiles):
+def update(profile, file, only_accounts_profiles):
     """ Update credentials for the given profile.
 
     Only to be run after having initialized the project credentials. Generate the profiles for all
