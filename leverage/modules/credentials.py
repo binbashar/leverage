@@ -366,7 +366,6 @@ def _organization_is_created(profile):
 
     Args:
         profile (str): Name of profile to configure.
-        management_id (str | int): Management account id.
 
     Returns:
         bool: Whether the organization exists or not.
