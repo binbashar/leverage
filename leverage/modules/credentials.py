@@ -14,10 +14,12 @@ from ruamel.yaml import YAML
 
 from leverage import logger
 from leverage.path import get_home_path
+from leverage._internals import pass_state
 from leverage.modules.terraform import awscli
 from leverage.modules.terraform import run as tfrun
-from leverage.modules.project import PROJECT_CONFIG
 from leverage.modules.project import render_file
+from leverage.modules.project import PROJECT_CONFIG
+from leverage.modules.project import load_project_config
 
 
 # Regexes for general validation
@@ -214,11 +216,15 @@ def _ask_for_credentials():
 
 
 @click.group()
-def credentials():
+@pass_state
+def credentials(state):
     """ Manage AWS cli credentials. """
+    state.project_config = load_project_config()
+
     # NOTE: Workaround until we remove root build.env
     if not render_file("build.env"):
         raise Exit(1)
+
 
 
 def _profile_is_configured(profile):
@@ -364,16 +370,14 @@ def _get_management_account_id(profile):
 @click.option("--force",
               is_flag=True,
               help="Force credentials creation, even if they are already configured.")
-def create(file, force):
+@pass_state
+def create(state, file, force):
     """ Initialize credentials for the project.
 
     Configure the required credentials for the bootstrap process and a default profile.
     Fetch management account id and update project configuration file.
     """
-    project_config = {}
-    if PROJECT_CONFIG.exists():
-        logger.info("Loading project config file.")
-        project_config = YAML().load(PROJECT_CONFIG)
+    project_config = state.project_config
 
     short_name = project_config.get("short_name") or _ask_for_short_name()
     region = project_config.get("primary_region") or _ask_for_region()
@@ -549,7 +553,8 @@ def configure_accounts_profiles(profile_name, region, organization_accounts, pro
 @click.option("--only-accounts-profiles",
               is_flag=True,
               help="Only update accounts' profiles, don't change key/secret.")
-def update(profile, file, only_accounts_profiles):
+@pass_state
+def update(state, profile, file, only_accounts_profiles):
     """ Update credentials for the given profile.
 
     Only to be run after having initialized the project credentials. Generate the profiles for all
@@ -558,10 +563,7 @@ def update(profile, file, only_accounts_profiles):
     Backup previously existent credentials if necessary and update the project configuration file with
     the ids for all accounts.
     """
-    project_config = {}
-    if PROJECT_CONFIG.exists():
-        logger.info("Loading config file.")
-        project_config = YAML().load(PROJECT_CONFIG)
+    project_config = state.project_config
 
     short_name = project_config.get("short_name") or _ask_for_short_name()
     region = project_config.get("primary_region") or _ask_for_region()

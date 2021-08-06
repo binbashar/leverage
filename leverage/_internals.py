@@ -24,6 +24,7 @@ class State:
     def __init__(self):
         self._verbosity = None
         self.module = Module()
+        self.project_config = {}
 
     @property
     def verbosity(self):
