@@ -505,7 +505,7 @@ def update(profile, file, only_account_profiles):
     region = project_config.get("primary_region") or _ask_for_region()
 
     if not _profile_is_configured(profile=f"{short_name}-bootstrap"):
-        logger.error("Credentials haven't been created, please run the credentials creation command first.")
+        logger.error("Credentials haven't been created yet, please run the credentials creation command first.")
         return
 
     profile = profile or _ask_for_profile()
