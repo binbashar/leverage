@@ -4,6 +4,7 @@
 import re
 import json
 from pathlib import Path
+from functools import wraps
 
 import click
 from click.exceptions import Exit
@@ -55,75 +56,77 @@ PROFILES = {
 }
 
 
-def _ask_for_short_name():
-    """ Prompt for project short name or quit application if user cancels mid input process.
+def _exit_if_user_cancels_input(question):
+    """ Prompt user for input, exit application if user cancels it.
+
+    Args:
+        question (callable): Question to be asked to user.
 
     Raises:
-        Exit: When the user cancels input.
+        Exit: When user cancels input.
+
+    Returns:
+        any: Question return value
+    """
+
+    @wraps(question)
+    def handle_keyboard_interrupt(*args, **kwargs):
+        answer = question(*args, **kwargs)
+        if answer is None:
+            raise Exit(1)
+        return answer
+
+    return handle_keyboard_interrupt
+
+
+@_exit_if_user_cancels_input
+def _ask_for_short_name():
+    """ Prompt for project short name.
 
     Returns:
         str: Project short name.
     """
-    short_name = questionary.text(
+    return questionary.text(
         message="Short name:",
         qmark=">",
         validate=lambda value: bool(re.fullmatch(PROJECT_SHORT, value)) or "The project short name should be a two letter lowercase word"
     ).ask()
 
-    if not short_name:
-        raise Exit(1)
-    return short_name
 
-
+@_exit_if_user_cancels_input
 def _ask_for_region():
-    """ Prompt for region or quit application if user cancels mid input process.
-
-    Raises:
-        Exit: When the user cancels input.
+    """ Prompt for region.
 
     Returns:
         str: Region.
     """
-    region = questionary.text(
+    return questionary.text(
         message="Region:",
         qmark=">",
         validate=lambda value: bool(re.fullmatch(REGION, value)) or "Invalid region."
-    )
-
-    if not region:
-        raise Exit(1)
-    return region
+    ).ask()
 
 
+@_exit_if_user_cancels_input
 def _ask_for_profile():
-    """ Prompt for profile selection or quit application if user cancels mid input process.
-
-    Raises:
-        Exit: When the user cancels input.
+    """ Prompt for profile selection.
 
     Returns:
         str : Profile to configure.
     """
-    profile = questionary.select(
+    return questionary.select(
         message="Select the credentials to set:",
         qmark=">",
         choices=[Choice(profile["choice_title"], value=name) for name, profile in PROFILES.items()]
     ).ask()
 
-    if not profile:
-        raise Exit(1)
-    return profile
 
-
+@_exit_if_user_cancels_input
 def _ask_for_credentials_location():
     """ Prompt for credential input method and location if path is selected.
-    Quit application if user cancels mid input process.
-
-    Raises:
-        Exit: When the user cancels input.
 
     Returns:
-        Path | None: Path to location or none if `Manual` is selected.
+        Path | str: Path to location or `manual` if `Manual` is selected.
     """
     location = questionary.prompt([
         {
@@ -145,18 +148,16 @@ def _ask_for_credentials_location():
             "validate": lambda value: (Path(value).is_file() and Path(value).exists()) or "Path must be an existing file"
         }
     ])
-
     if not location:
-        raise Exit(1)
-    location = location.get("path")
-    return Path(location) if location else location
+        return
+
+    input_type = location.get("input_type")
+    return Path(location.get("path")) if input_type == "path" else input_type
 
 
+@_exit_if_user_cancels_input
 def _ask_for_credentials():
-    """ Prompt for key id and secret keys or quit application if user cancels mid input process.
-
-    Raises:
-        Exit: When the user cancels input.
+    """ Prompt for key id and secret keys.
 
     Returns:
         str, str: Kei ID, Secret Key
@@ -177,9 +178,9 @@ def _ask_for_credentials():
             "validate": lambda value: bool(re.fullmatch(SECRET_KEY, value)) or "Invalid Secret",
         }
     ])
-
     if not credentials:
-        raise Exit(1)
+        return
+
     return list(credentials.values())
 
 
@@ -273,7 +274,7 @@ def configure_credentials(profile, file=None, make_backup=False):
     """
     file = file or _ask_for_credentials_location()
 
-    if file:
+    if file is not None and file != "manual":
         key_id, secret_key = _extract_credentials(file)
 
     else:
