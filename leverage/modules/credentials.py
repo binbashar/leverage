@@ -259,7 +259,7 @@ def _backup_file(filename):
     env_var = credential_files_env_vars.get(filename)
 
     tfrun(entrypoint="/bin/sh -c",
-          command=f"'cp ${env_var} \"${{{env_var}}}_bkp\"'",
+          command=f"'cp ${env_var} \"${{{env_var}}}.bkp\"'",
           enable_mfa=False,
           interactive=False)
 
