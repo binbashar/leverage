@@ -348,7 +348,7 @@ def create(file):
     management_account = next((account for account in accounts if account["name"] == "management"), None)
     if management_account:
         logger.info("Fetching management account id.")
-        management_account["id"] = int(_get_management_account_id(profile=profile_name))
+        management_account["id"] = _get_management_account_id(profile=profile_name)
 
         logger.info("Updating project configuration file.")
         YAML().dump(data=project_config, stream=PROJECT_CONFIG)
@@ -538,7 +538,7 @@ def update(profile, file, only_account_profiles):
 
         for account in project_accounts:
             try: # Account in config file may not be already created
-                account["id"] = int(organization_accounts[account["name"]])
+                account["id"] = organization_accounts[account["name"]]
             except KeyError:
                 continue
 
