@@ -16,6 +16,11 @@ organization:
   - name: shared
     email: aws+shared@leverage.com
   organizational_units:
+    ##-------------------------------------##
+    ## Available organizations policies:
+    ## - aws_organizations_policy.default
+    ## - aws_organizations_policy.standard
+    ##-------------------------------------##
   - name: security
     policy:
     - aws_organizations_policy.default
@@ -29,31 +34,45 @@ organization:
 
 accounts:
   management:
-    users:
-    - john.doe
-    - jane.doe
     groups:
+    ##------------------------------------------------------------##
+    ## Available groups:
+    ## - admins:
+    ##   Default policies:
+    ##   - "arn:aws:iam::aws:policy/AdministratorAccess"
+    ## - finops:
+    ##   Default policies:
+    ##   - "arn:aws:iam::aws:policy/job-function/Billing"
+    ##   - "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+    ##------------------------------------------------------------##
     - name: admins
       users:
       - john.doe
       policies:
       - '"arn:aws:iam::aws:policy/AdministratorAccess"'
   security:
-    users:
-    - john.doe
     groups:
+    ##------------------------------------------------------------##
+    ## Available groups:
+    ## - admins:
+    ##   Default policies:
+    ##   - aws_iam_policy.assume_admin_role.arn
+    ## - auditors:
+    ##   Default policies:
+    ##   - aws_iam_policy.assume_auditor_role.arn
+    ## - devops:
+    ##   Default policies:
+    ##   - aws_iam_policy.assume_devops_role.arn
+    ## - deploymaster:
+    ##   Default policies:
+    ##   - aws_iam_policy.assume_deploymaster_role.arn
+    ##------------------------------------------------------------##
     - name: devops
       users:
       - john.doe
       policies:
       - aws_iam_policy.assume_devops_role.arn
   shared:
-    users:
-    - john.doe
-    groups:
-    - name: auditors
-      users:
-      - john.doe
     networks:
     - cidr_block: "172.18.0.0/20"
       availability_zones: [a,b]

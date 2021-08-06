@@ -3,6 +3,7 @@
     execution of Terraform commands and interaction with the AWS CLI for infrastructure handling.
 """
 import json
+from pathlib import Path
 from functools import wraps
 
 import click
@@ -108,7 +109,7 @@ def ensure_image(docker_client, image, tag):
         logger.info(info)
 
 
-def run(entrypoint=None, command="", args=None, enable_mfa=True):
+def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=True):
     """ Run a command on a Leverage docker container.
 
     Args:
@@ -116,14 +117,31 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True):
         command (str, optional): Command to run. Defaults to "".
         args (list(str)), optional): Command arguments. Defaults to None.
         enable_mfa (bool, optional): Whether to enable multi factor authentication. Defaults to True.
+        interactive (bool, optional): If set to False, container will be run in the background and its output grabbed after its
+            execution ends, otherwise access to the container terminal will be given. Defaults to True
+
+    Returns:
+        int, str: Container exit code and output when interactive is false, otherwise 0, None.
     """
-    docker_client = DockerClient(base_url="unix://var/run/docker.sock")
+    try:
+        docker_client = DockerClient(base_url="unix://var/run/docker.sock")
+
+    except:
+        logger.error("Docker daemon doesn't seem to be responding. "
+                     "Please check it is up and running correctly before re-running the command.")
+        return
+
     env = conf.load()
     logger.debug(f"[bold cyan]Env config values:[/bold cyan]\n{json.dumps(env, indent=2)}")
 
-    if not env.get("PROJECT", False):
+    project = env.get("PROJECT", False)
+    if not project:
         logger.error("Project name has not been set. Exiting.")
         return
+
+    aws_credentials_directory = Path(HOME) / ".aws" / project
+    if not aws_credentials_directory.exists():
+        aws_credentials_directory.mkdir()
 
     ensure_image(docker_client=docker_client,
                  image=TERRAFORM_IMAGE,
@@ -133,13 +151,15 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True):
 
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
-        Mount(target="/config", source=ACCOUNT_CONFIG, type="bind"),
-        Mount(target="/common-config", source=CONFIG, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
         Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind")
     ]
+    if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
+        mounts.extend([
+            Mount(target="/common-config", source=CONFIG, type="bind"),
+            Mount(target="/config", source=ACCOUNT_CONFIG, type="bind")
+        ])
 
-    project = env.get("PROJECT")
     environment = {
         "AWS_SHARED_CREDENTIALS_FILE": f"/root/.aws/{project}/credentials",
         "AWS_CONFIG_FILE": f"/root/.aws/{project}/config"
@@ -189,14 +209,40 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True):
 
     logger.debug(f"[bold cyan]Container parameters:[/bold cyan]\n{json.dumps(container_params, indent=2)}")
 
+    container_output = None
+    container_exit_code = 0
     try:
-        dockerpty.start(client=docker_client.api,
-                        container=container)
-        docker_client.api.remove_container(container)
+        if interactive:
+            dockerpty.start(client=docker_client.api,
+                            container=container)
+        else:
+            docker_client.api.start(container)
+            container_exit_code = docker_client.api.wait(container)["StatusCode"]
+            container_output = docker_client.api.logs(container).decode("utf-8")
 
     except APIError as exc:
         logger.exception("Error during container execution:", exc_info=exc)
 
+    finally:
+        docker_client.api.stop(container)
+        docker_client.api.remove_container(container)
+
+    return container_exit_code, container_output
+
+
+def awscli(command):
+    """ Utility function to run AWS cli commands in a simple and readable line from within leverage.
+
+    Args:
+        commands (str | list): Command or list Full command to run.
+
+    Returns:
+        int, str: Command's exit code and output.
+    """
+    return run(entrypoint="/usr/bin/aws",
+               command=command,
+               enable_mfa=False,
+               interactive=False)
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
@@ -208,7 +254,7 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 @click.argument("args", nargs=-1)
 @check_directory
 def init(no_backend, args):
-    """ Initialize Terraform in this layer. """
+    """ Initialize this layer. """
     backend_config = ["-backend=false" if no_backend else f"-backend-config={BACKEND_TFVARS}"]
     run(command="init", args=backend_config + list(args))
 
@@ -217,7 +263,7 @@ def init(no_backend, args):
 @click.argument("args", nargs=-1)
 @check_directory
 def plan(args):
-    """ Generate a Terraform execution plan for this layer. """
+    """ Generate an execution plan for this layer. """
     run(command="plan", args=TF_DEFAULT_ARGS + list(args))
 
 
@@ -225,7 +271,7 @@ def plan(args):
 @click.argument("args", nargs=-1)
 @check_directory
 def apply(args):
-    """ Build or change the Terraform infrastructure in this layer. """
+    """ Build or change the infrastructure in this layer. """
     run(command="apply", args=TF_DEFAULT_ARGS + list(args))
 
 
@@ -233,7 +279,7 @@ def apply(args):
 @click.argument("args", nargs=-1)
 @check_directory
 def output(args):
-    """ Show all Terraform output variables of this layer. """
+    """ Show all output variables of this layer. """
     run(command="output", args=list(args), enable_mfa=False)
 
 
@@ -241,29 +287,28 @@ def output(args):
 @click.argument("args", nargs=-1)
 @check_directory
 def destroy(args):
-    """ Destroy Terraform infrastructure in this layer. """
+    """ Destroy infrastructure in this layer. """
     run(command="destroy", args=TF_DEFAULT_ARGS + list(args))
 
 
 @terraform.command()
 def version():
-    """ Print Terraform version. """
+    """ Print version. """
     run(command="version")
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("args", nargs=-1)
-def shell(args):
-    """ Open a shell into the Terraform container in this layer. """
-    run(entrypoint="/bin/sh", args=list(args), enable_mfa=False)
-
-
 @terraform.command()
+def shell():
+    """ Open a shell into the Terraform container in this layer. """
+    run(entrypoint="/bin/sh", enable_mfa=False)
+
+
+@terraform.command("format")
 @click.option("--check",
-                  is_flag=True,
-                  help="Only perform the checking do not rewrite the files.")
-def format(check):
-    """ Check if all Terraform files meet the canonical format and rewrite them accordingly. """
+              is_flag=True,
+              help="Only perform format checking, do not rewrite the files.")
+def _format(check):
+    """ Check if all files meet the canonical format and rewrite them accordingly. """
     arguments = ["-recursive"]
     if check:
         arguments.extend(["-check", WORKING_DIR])
@@ -272,5 +317,25 @@ def format(check):
 
 @terraform.command()
 def validate():
-    """ Validate the Terraform code of the current directory. Previous initialization might be needed. """
+    """ Validate code of the current directory. Previous initialization might be needed. """
     run(command="validate", enable_mfa=False)
+
+
+@terraform.command("import")
+@click.argument("address")
+@click.argument("_id", metavar="ID")
+@check_directory
+def _import(address, _id):
+    """ Import a resource. """
+    run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
+
+
+@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.option("--no-mfa",
+              is_flag=True,
+              default=False,
+              help="Disable MFA.")
+@click.argument("args", nargs=-1)
+def aws(no_mfa, args):
+    """ Run a command in AWS cli. """
+    run(entrypoint="/usr/bin/aws", args=list(args), enable_mfa=not no_mfa)

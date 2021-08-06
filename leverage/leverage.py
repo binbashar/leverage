@@ -11,6 +11,7 @@ from leverage._internals import pass_state
 from leverage.modules import run
 from leverage.modules import project
 from leverage.modules import terraform
+from leverage.modules import credentials
 
 
 CONTEXT_SETTINGS = {
@@ -50,3 +51,4 @@ leverage.add_command(run)
 leverage.add_command(project)
 leverage.add_command(terraform)
 leverage.add_command(terraform, name="tf")
+leverage.add_command(credentials)
