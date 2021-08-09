@@ -21,15 +21,15 @@ CONTEXT_SETTINGS = {
 
 @click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
 @click.option("--filename", "-f",
-                default="build.py",
-                show_default=True,
-                help="Name of the build file containing the tasks definitions.")
+              default="build.py",
+              show_default=True,
+              help="Name of the build file containing the tasks definitions.")
 @click.option("--list-tasks", "-l",
-                is_flag=True,
-                help="List available tasks to run.")
+              is_flag=True,
+              help="List available tasks to run.")
 @click.option("-v", "--verbose",
-                is_flag=True,
-                help="Increase output verbosity.")
+              is_flag=True,
+              help="Increase output verbosity.")
 @click.version_option(version=__version__)
 @pass_state
 @click.pass_context
@@ -41,9 +41,14 @@ def leverage(context, state, filename, list_tasks, verbose):
     # Load build file as a module
     state.module = load_tasks(build_script_filename=filename)
 
-    # --list-tasks|-l or leverage invoked with no subcommand
-    if list_tasks or context.invoked_subcommand is None:
-        _list_tasks(state.module)
+    if context.invoked_subcommand is None:
+        # --list-tasks|-l
+        if list_tasks:
+            _list_tasks(state.module)
+
+        else:
+            # leverage called with no subcommand
+            click.echo(context.get_help())
 
 
 # Add modules to leverage

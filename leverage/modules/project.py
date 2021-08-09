@@ -10,6 +10,7 @@ from subprocess import run
 from subprocess import PIPE
 
 import click
+from click.exceptions import Exit
 import pkg_resources
 from ruamel.yaml import YAML
 from jinja2 import Environment
@@ -230,17 +231,37 @@ def _render_project_template(config, source=TEMPLATE_DIR):
     logger.info("Project configuration finished.")
 
 
+def load_project_config():
+    """ Load project configuration file.
+
+    Raises:
+        Exit: For any error produced during configuration loading.
+
+    Returns:
+        dict:  Project configuration.
+    """
+    if not PROJECT_CONFIG.exists():
+        return {}
+
+    logger.info("Loading configuration file.")
+    try:
+        return YAML().load(PROJECT_CONFIG)
+
+    except Exception as exc:
+        exc.__traceback__ = None
+        logger.exception(message="Error loading configuration file.", exc_info=exc)
+        raise Exit(1)
+
+
 @project.command()
 def create():
     """ Create the directory structure required by the project configuration and set up each account accordingly. """
 
-    # Load project configuration file
-    if not PROJECT_CONFIG.exists():
+    config = load_project_config()
+    if not config:
         logger.error("No configuration file found for the project."
                      " Make sure the project has already been initialized ([bold]leverage project init[/bold]).")
         return
-    logger.info("Loading configuration file.")
-    config = YAML().load(PROJECT_CONFIG)
 
     if (PROJECT_ROOT / "config").exists():
         logger.error("Project has already been created.")
@@ -269,11 +290,10 @@ def render_file(file):
     Returns:
         bool: Whether the action succeeded or not
     """
-    if not PROJECT_CONFIG.exists():
-        logger.error("No configuration file found for the project."
-                     " Make sure the project has already been initialized ([bold]leverage project init[/bold]).")
+    # TODO: Make use of internal state
+    config = load_project_config()
+    if not config:
         return False
-    config = YAML().load(PROJECT_CONFIG)
 
     _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
 

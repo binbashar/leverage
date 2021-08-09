@@ -107,7 +107,8 @@ def get_build_script_path(filename="build.py"):
     try:
         root_path = Path(get_root_path())
     except NotARepositoryError:
-        return
+        script = Path(filename)
+        return script.absolute().as_posix() if script.exists() else None
 
     cur_path = Path(get_working_path())
 
