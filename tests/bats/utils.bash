@@ -6,7 +6,7 @@ _create_directory_structure(){
               └ account
         And print the root path
     "
-    ROOT_DIR=$(mktemp -d)
+    ROOT_DIR=$(mktemp -d /tmp/tmpXXXXX)
     LEAF_DIR="$ROOT_DIR/account"
     mkdir -p $LEAF_DIR
     echo $ROOT_DIR
