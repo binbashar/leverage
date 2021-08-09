@@ -69,8 +69,8 @@ teardown(){
     run leverage run hello
 
     assert_output --partial "Hello"
-    assert_line --index 0 "[ build.py - Starting task \`hello\` ]"
-    assert_line --index 1 "[ build.py - Completed task \`hello\` ]"
+    assert_line --index 0 --regexp "\[[0-9]+:[0-9]+:[0-9]+\.[0-9]+\] \[ build\.py - ➜ Starting task hello \]"
+    assert_line --index 2 --regexp "\[[0-9]+:[0-9]+:[0-9]+\.[0-9]+\] \[ build\.py - ✔ Completed task hello \]"
 }
 
 @test "Values are loaded from .env file in current directory" {
