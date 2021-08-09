@@ -24,11 +24,36 @@ Currently the tool provides commands that implement the required interactions ne
 
 
 ## Installation
-You can install leverage from the Python Package Index (PyPI) or from source.
+You can install leverage from the Python Package Index (PyPI).
 First, make sure your Python version is 3.8 or higher. Then install via pip:
 ```bash
 $ pip install leverage
 ```
+
+### Autocompletion
+To enable autocompletion follow these steps and then start a new shell to load the changes:
+
+
+#### For Bash:
+
+`_LEVERAGE_COMPLETE=bash_source leverage > ~/.leverage-complete.bash`
+
+Source the file in `~/.bashrc`:
+
+`. ~/.leverage-complete.bash`
+
+#### For Zsh:
+
+`_LEVERAGE_COMPLETE=zsh_source leverage > ~/.leverage-complete.zsh`
+
+Source the file in `~/.zshrc`:
+
+`. ~/.leverage-complete.zsh`
+
+#### For Fish:
+
+`_LEVERAGE_COMPLETE=fish_source leverage > ~/.config/fish/completions/leverage.fish`
+
 
 ## Custom tasks
 Most of the core functionality of Pynt is still there, but we did introduce the following changes:
@@ -48,7 +73,7 @@ Most of the core functionality of Pynt is still there, but we did introduce the 
 The build script is written in pure Python and Leverage takes care of managing
 any dependencies between tasks and generating a command line interface.
 
-### build.py
+#### build.py
 ```python
 #!/usr/bin/python3
 
@@ -57,41 +82,41 @@ from leverage import task
 
 @task()
 def clean():
-    '''Clean build directory.'''
-    print 'Cleaning build directory...'
+    """Clean build directory."""
+    print("Cleaning build directory...")
 
 @task()
 def _copy_resources():
-    '''Copy resource files. This is a private task and will not be listed.'''
-    print('Copying resource files')
+    """Copy resource files. This is a private task and will not be listed."""
+    print("Copying resource files")
 
 @task(clean, _copy_resources)
-def html(target='.'):
-    '''Generate HTML.'''
-    print 'Generating HTML in directory "%s"' %  target
+def html(target="."):
+    """Generate HTML."""
+    print(f"Generating HTML in directory \"{target}\"")
 
 @task(clean, _copy_resources, ignore=True)
 def images():
-    '''Prepare images.'''
-    print 'Preparing images...'
+    """Prepare images."""
+    print("Preparing images...")
 
-@task(html,images)
-def start_server(server='localhost', port = '80'):
-    '''Start the server'''
-    print 'Starting server at %s:%s' % (server, port)
+@task(html, images)
+def start_server(server="localhost", port="80"):
+    """Start the server"""
+    print(f"Starting server at {server}:{port}")
 
 @task(start_server) #Depends on task with all optional params
 def stop_server():
-    print 'Stopping server....'
+    print "Stopping server...."
 
 @task()
 def copy_file(src, dest):
-    print 'Copying from %s to %s' % (src, dest)
+    print(f"Copying from {src} to {dst}")
 
 @task()
-def echo(*args,**kwargs):
-    print args
-    print kwargs
+def echo(*args, **kwargs):
+    print(args)
+    print(kwargs)
 
 # Default task (if specified) is run when no task is specified in the command line
 # make sure you define the variable __DEFAULT__ after the task is defined
@@ -130,33 +155,33 @@ Powered by Leverage 1.0.0.
 Task dependencies between tasks are taken care of. In the following case `html` depends on `clean` and `_copy_resources` so those 2 will run before the former task:
 ```bash
 $ leverage run html
-[ build.py - Starting task "clean" ]
+[12:07:44.431] [ build.py - ➜ Starting task clean ]
 Cleaning build directory...
-[ build.py - Completed task "clean" ]
-[ build.py - Starting task "_copy_resources" ]
+[12:07:44.505] [ build.py - ✔ Completed task clean ] 
+               [ build.py - ➜ Starting task _copy_resources ]
 Copying resource files
-[ build.py - Completed task "_copy_resources" ]
-[ build.py - Starting task "html" ]
+[12:07:45.073] [ build.py - ✔ Completed task _copy_resources ] 
+[12:07:45.123] [ build.py - ➜ Starting task html ]
 Generating HTML in directory "."
-[ build.py - Completed task "html" ]
+[12:07:45.335] [ build.py - ✔ Completed task html ]
 ```
 
 
-Tasks can accept parameters from commandline:
+Tasks can accept parameters from command line:
 ```bash
 $ leverage run copy_file["/path/to/foo","path_to_bar"]
-[ build.py - Starting task "copy_file" ]
+[12:15:03.000] [ build.py - ➜ Starting task copy_file ]
 Copying from /path/to/foo to path_to_bar
-[ build.py - Completed task "copy_file" ]
+[12:15:03.111] [ build.py - ✔ Completed task copy_file ] 
 ```
 
 Tasks can also accept keyword arguments:
 ```bash
 $ leverage run echo[hello,world,foo=bar,blah=123]
-[ build.py - Starting task "echo" ]
+[12:15:03.000] [ build.py - ➜ Starting task echo ]
 ('hello', 'world')
 {'foo': 'bar', 'blah': '123'}
-[ build.py - Completed task "echo" ]
+[12:15:03.111] [ build.py - ✔ Completed task echo ] 
 ```
 
 ### Organizing build scripts
