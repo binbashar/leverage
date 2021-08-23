@@ -3,7 +3,7 @@
 """
 #pylint: disable=wrong-import-position
 
-__version__ = "0.0.18"
+__version__ = "1.0.10"
 
 import sys
 from shutil import which
