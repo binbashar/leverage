@@ -68,6 +68,7 @@ jobs:
           git push
 
       - uses: act10ns/slack@v1
+        if: always()
         with: 
           status: ${{ job.status }}
           channel: $SLACK_CI_CHANNEL
