@@ -1,8 +1,8 @@
 <a href="https://github.com/binbashar">
-    <img src="https://github.com/binbashar/le-ref-architecture-doc/blob/master/docs/assets/images/logos/binbash.png" width="250" align="left" alt="Binbash"/>
+    <img src="https://raw.githubusercontent.com/binbashar/le-ref-architecture-doc/master/docs/assets/images/logos/binbash.png" width="250" align="left" alt="Binbash"/>
 </a>
 <a href="https://leverage.binbash.com.ar/">
-    <img src="https://github.com/binbashar/le-ref-architecture-doc/blob/master/docs/assets/images/logos/binbash-leverage.png" width="130" align="right" alt="Leverage"/>
+    <img src="https://raw.githubusercontent.com/binbashar/le-ref-architecture-doc/master/docs/assets/images/logos/binbash-leverage.png" width="130" align="right" alt="Leverage"/>
 </a>
 <br clear="left"/>
 
