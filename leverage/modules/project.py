@@ -11,7 +11,6 @@ from subprocess import PIPE
 
 import click
 from click.exceptions import Exit
-import pkg_resources
 from ruamel.yaml import YAML
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
@@ -27,7 +26,9 @@ from leverage.modules.terraform import run as tfrun
 # NOTE: Should LEVERAGE_DIR be a bit more platform agnostic?
 LEVERAGE_DIR = Path.home() / ".leverage"
 TEMPLATE_DIR = LEVERAGE_DIR / "template"
+PROJECT_CONFIG_FILE = "project.yaml"
 TEMPLATE_PATTERN = "*.template"
+CONFIG_FILE_TEMPLATE = TEMPLATE_DIR / "le-resources" / PROJECT_CONFIG_FILE
 LEVERAGE_TEMPLATE_REPO = "https://github.com/binbashar/le-tf-infra-aws-template.git"
 IGNORE_PATTERNS = ignore_patterns(TEMPLATE_PATTERN, ".gitkeep")
 
@@ -36,7 +37,6 @@ try:
     PROJECT_ROOT = Path(get_root_path())
 except NotARepositoryError:
     PROJECT_ROOT = Path.cwd()
-PROJECT_CONFIG_FILE = "project.yaml"
 PROJECT_CONFIG = PROJECT_ROOT / PROJECT_CONFIG_FILE
 
 ROOT_DIRECTORIES = [
@@ -77,7 +77,7 @@ def init():
 
     # Application's directory
     if not LEVERAGE_DIR.exists():
-        logger.info("No [bold].leverage[/bold] directory found in user's home. Creating.")
+        logger.info("No [bold]Leverage[/bold] config directory found in user's home. Creating.")
         LEVERAGE_DIR.mkdir()
 
     # Leverage project template
@@ -96,10 +96,9 @@ def init():
 
     # Project configuration file
     if not PROJECT_CONFIG.exists():
-        logger.info("No project configuration file found. Creating an example config.")
-        # TODO: Add wizard for the configuration file
-        config_example = pkg_resources.resource_string(__name__, PROJECT_CONFIG_FILE)
-        PROJECT_CONFIG.write_text(config_example.decode("utf-8"))
+        logger.info(f"No project configuration file found. Dropping configuration template [bold]{PROJECT_CONFIG_FILE}[/bold].")
+        copy2(src=CONFIG_FILE_TEMPLATE,
+              dst=PROJECT_CONFIG_FILE)
 
     else:
         logger.warning(f"Project configuration file [bold]{PROJECT_CONFIG_FILE}[/bold] already exists in directory.")
