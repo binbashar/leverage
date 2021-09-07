@@ -1,11 +1,9 @@
-name: 
+name: Run unit tests 
 
-on: [pull_request, workflow_dispatch]
+on: [pull_request]
 
 jobs:
-
-  build:
-
+  run_unit_tests:
     runs-on: ubuntu-latest 
     steps:
       - uses: actions/checkout@v2
@@ -20,11 +18,3 @@ jobs:
           echo "[INFO] Running unit tests"
           make test-unit-no-cov
         shell: bash
-
-      - uses: act10ns/slack@v1
-        with: 
-          status: ${{ job.status }}
-          channel: $SLACK_CI_CHANNEL
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CI_CHANNEL: ${{ secrets.SLACK_CI_CHANNEL }}
