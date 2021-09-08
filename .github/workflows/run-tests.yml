@@ -1,0 +1,20 @@
+name: Run unit tests 
+
+on: [pull_request]
+
+jobs:
+  run_unit_tests:
+    runs-on: ubuntu-latest 
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+
+      - name: run_unit_tests
+        run: |
+          echo "[INFO] Building image"
+          make build-image
+
+          echo "[INFO] Running unit tests"
+          make test-unit-no-cov
+        shell: bash
