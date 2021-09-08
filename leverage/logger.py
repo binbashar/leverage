@@ -54,7 +54,7 @@ def get_verbosity(verbose):
 
 
 def _configure_logger(logger, show_level=True):
-    """ Provide the given logger with the most basic configuration possible to be used.
+    """ Provide the given logger with the most basic configuration possible to be used. Not.
 
     Args:
         logger (logging.Logger): Logger to be configured
