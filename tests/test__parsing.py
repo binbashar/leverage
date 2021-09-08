@@ -34,6 +34,7 @@ from leverage._parsing import DuplicateKeywordArgumentError
 def test__parse_args(arguments, expected_args, expected_kwargs):
     args, kwargs = parse_task_args(arguments=arguments)
 
+    assert False
     assert args == expected_args
     assert kwargs == expected_kwargs
 
