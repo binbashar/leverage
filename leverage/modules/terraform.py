@@ -143,9 +143,10 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     if not aws_credentials_directory.exists():
         aws_credentials_directory.mkdir(parents=True)
 
+    terraform_image_tag = env.get("TERRAFORM_IMAGE_TAG", "latest")
     ensure_image(docker_client=docker_client,
                  image=TERRAFORM_IMAGE,
-                 tag=env.get("TERRAFORM_IMAGE_TAG", "latest"))
+                 tag=terraform_image_tag)
 
     entrypoint = TERRAFORM_BINARY if entrypoint is None else entrypoint
 
@@ -193,7 +194,7 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     host_config = docker_client.api.create_host_config(mounts=mounts,
                                                        security_opt=["label:disable"])
     container_params = {
-        "image": f"{TERRAFORM_IMAGE}:{env.get('TERRAFORM_IMAGE_TAG')}",
+        "image": f"{TERRAFORM_IMAGE}:{terraform_image_tag}",
         "environment": environment,
         "entrypoint": entrypoint,
         "working_dir": WORKING_DIR,
