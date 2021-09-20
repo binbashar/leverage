@@ -129,7 +129,7 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     except:
         logger.error("Docker daemon doesn't seem to be responding. "
                      "Please check it is up and running correctly before re-running the command.")
-        return
+        raise Exit(1)
 
     env = conf.load()
     logger.debug(f"[bold cyan]Env config values:[/bold cyan]\n{json.dumps(env, indent=2)}")
@@ -137,7 +137,7 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     project = env.get("PROJECT", False)
     if not project:
         logger.error("Project name has not been set. Exiting.")
-        return
+        raise Exit(1)
 
     aws_credentials_directory = Path(HOME) / ".aws" / project
     if not aws_credentials_directory.exists():
@@ -205,7 +205,7 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
 
     except APIError as exc:
         logger.exception("Error creating container:", exc_info=exc)
-        return
+        raise Exit(1)
 
     logger.debug(f"[bold cyan]Container parameters:[/bold cyan]\n{json.dumps(container_params, indent=2)}")
 
