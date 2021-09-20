@@ -7,8 +7,8 @@ setup_file(){
 
 setup(){
     # Bats modules are installed globally
-    load "/usr/lib/node_modules/bats-support/load.bash"
-    load "/usr/lib/node_modules/bats-assert/load.bash"
+    load "/bats-support/load.bash"
+    load "/bats-assert/load.bash"
 
     # Store useful paths
     TESTS_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/.." >/dev/null 2>&1 && pwd )"

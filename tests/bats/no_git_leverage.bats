@@ -1,14 +1,18 @@
 # The name of the file was chosen as to avoid repetition of the leverage package installing step
 # in leverage.bats, since bats respects file name order to run the tests
 
-setup_file(){
+setup(){
+    # Bats modules are installed globally
+    load "/bats-support/load.bash"
+    load "/bats-assert/load.bash"
+
     # Uninstall git
-    apt-get remove -y git >/dev/null 2>&1
+    apk del git >/dev/null 2>&1
 }
 
 teardown_file(){
     # Reinstall git
-    apt-get install -y git >/dev/null 2>&1
+    apk add git >/dev/null 2>&1
 }
 
 setup(){
