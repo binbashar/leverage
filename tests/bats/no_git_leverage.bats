@@ -10,15 +10,9 @@ setup(){
     apk del git >/dev/null 2>&1
 }
 
-teardown_file(){
+teardown(){
     # Reinstall git
     apk add git >/dev/null 2>&1
-}
-
-setup(){
-    # Bats modules are installed globally
-    load "/usr/lib/node_modules/bats-support/load.bash"
-    load "/usr/lib/node_modules/bats-assert/load.bash"
 }
 
 @test "Does not run if git is not installed in the system" {

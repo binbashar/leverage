@@ -10,9 +10,6 @@ jobs:
 
       - name: run_unit_tests
         run: |
-          echo "[INFO] Building image"
-          make build-image
-
           echo "[INFO] Running unit tests"
           make test-unit-no-cov
         shell: bash

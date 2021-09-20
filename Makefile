@@ -7,7 +7,7 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf " - \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
 build-image: ## Build docker image
-	docker build . -t leverage-testing
+	docker build . -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG}
 
 test-unit: ## Run unit tests and create a coverage report
 	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} pytest --verbose
@@ -38,6 +38,3 @@ push: ## Push distributables to PyPi
 
 push-test: ## Push distributables to Pypi test
 	pipenv run twine upload --repository testpypi dist/*
-
-install-command: ## Command for installing leverage as a local package for development in a leverage ref arch project
-	@echo 'python3 -m pip3 install pipenv && pipenv install -e $(shell pwd)'
