@@ -1,6 +1,6 @@
 .PHONY: help build
 LEVERAGE_TESTING_IMAGE := binbash/leverage-cli-testing
-LEVERAGE_TESTING_TAG   := 1.0.0
+LEVERAGE_TESTING_TAG   := 2.0.0
 
 help:
 	@echo 'Available Commands:'
@@ -10,13 +10,13 @@ build-image: ## Build docker image
 	docker build . -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG}
 
 test-unit: ## Run unit tests and create a coverage report
-	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} -c "pytest --verbose"
+	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} pytest --verbose
 
 test-unit-no-cov: ## Run unit tests with no coverage report
-	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} -c "pytest --verbose --no-cov"
+	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} pytest --verbose --no-cov
 
 test-int: ## Run integration tests
-	docker run --rm --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} bats -r tests/bats
+	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} bash -c "pip3 install -e . > /dev/null && bats --verbose-run --show-output-of-passing-tests -p -r tests/bats"
 
 tests: test-unit-no-cov test-int ## Run full set of tests
 

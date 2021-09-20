@@ -8,10 +8,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/setup-python@v2
-
       - name: run_unit_tests
         run: |
           echo "[INFO] Running unit tests"
           make test-unit-no-cov
+        shell: bash
+      
+  integration_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: run_integration_tests
+        run: |
+          echo "[INFO] Running integration tests"
+          make test-int
         shell: bash

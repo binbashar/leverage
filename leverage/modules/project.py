@@ -23,7 +23,6 @@ from leverage.path import NotARepositoryError
 from leverage.modules.terraform import run as tfrun
 
 # Leverage related base definitions
-# NOTE: Should LEVERAGE_DIR be a bit more platform agnostic?
 LEVERAGE_DIR = Path.home() / ".leverage"
 TEMPLATE_DIR = LEVERAGE_DIR / "template"
 PROJECT_CONFIG_FILE = "project.yaml"
@@ -242,7 +241,6 @@ def load_project_config():
     if not PROJECT_CONFIG.exists():
         return {}
 
-    logger.info("Loading configuration file.")
     try:
         return YAML().load(PROJECT_CONFIG)
 
@@ -294,6 +292,9 @@ def render_file(file):
     if not config:
         return False
 
-    _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
+    try:
+        _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
+    except FileNotFoundError:
+        return False
 
     return True

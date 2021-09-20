@@ -1,14 +1,11 @@
 setup_file(){
-    # Install leverage as package
-    echo -e "Installing Leverage:\n" >&3 
-    pip3 install -e . >&3
-    echo -e "\nRunning tests:\n" >&3
+    echo "$(tput bold)========================== bats tests session starts ===========================" >&3
 }
 
 setup(){
     # Bats modules are installed globally
-    load "/usr/lib/node_modules/bats-support/load.bash"
-    load "/usr/lib/node_modules/bats-assert/load.bash"
+    load "/bats-support/load.bash"
+    load "/bats-assert/load.bash"
 
     # Store useful paths
     TESTS_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/.." >/dev/null 2>&1 && pwd )"

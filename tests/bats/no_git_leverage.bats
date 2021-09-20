@@ -3,16 +3,16 @@
 
 setup(){
     # Bats modules are installed globally
-    load "/usr/lib/node_modules/bats-support/load.bash"
-    load "/usr/lib/node_modules/bats-assert/load.bash"
+    load "/bats-support/load.bash"
+    load "/bats-assert/load.bash"
 
     # Uninstall git
-    apt-get remove -y git >/dev/null 2>&1
+    apk del git >/dev/null 2>&1
 }
 
 teardown(){
     # Reinstall git
-    apt-get install -y git >/dev/null 2>&1
+    apk add git >/dev/null 2>&1
 }
 
 @test "Does not run if git is not installed in the system" {
