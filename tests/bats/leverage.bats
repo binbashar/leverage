@@ -1,8 +1,5 @@
 setup_file(){
-    # Install leverage as package
-    echo -e "Installing Leverage:\n" >&3 
-    pip3 install -e . >&3
-    echo -e "\nRunning tests:\n" >&3
+    echo "$(tput bold)========================== bats tests session starts ===========================" >&3
 }
 
 setup(){
