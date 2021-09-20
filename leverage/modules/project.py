@@ -292,6 +292,9 @@ def render_file(file):
     if not config:
         return False
 
-    _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
+    try:
+        _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
+    except FileNotFoundError:
+        return False
 
     return True
