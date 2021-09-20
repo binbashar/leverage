@@ -242,7 +242,6 @@ def load_project_config():
     if not PROJECT_CONFIG.exists():
         return {}
 
-    logger.info("Loading configuration file.")
     try:
         return YAML().load(PROJECT_CONFIG)
 
