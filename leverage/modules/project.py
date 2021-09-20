@@ -23,7 +23,6 @@ from leverage.path import NotARepositoryError
 from leverage.modules.terraform import run as tfrun
 
 # Leverage related base definitions
-# NOTE: Should LEVERAGE_DIR be a bit more platform agnostic?
 LEVERAGE_DIR = Path.home() / ".leverage"
 TEMPLATE_DIR = LEVERAGE_DIR / "template"
 PROJECT_CONFIG_FILE = "project.yaml"
