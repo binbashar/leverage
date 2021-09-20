@@ -141,7 +141,7 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
 
     aws_credentials_directory = Path(HOME) / ".aws" / project
     if not aws_credentials_directory.exists():
-        aws_credentials_directory.mkdir()
+        aws_credentials_directory.mkdir(parents=True)
 
     ensure_image(docker_client=docker_client,
                  image=TERRAFORM_IMAGE,
