@@ -219,9 +219,9 @@ def _ask_for_credentials():
 @pass_state
 def credentials(state):
     """ Manage AWS cli credentials. """
+    logger.info("Loading configuration file.")
     state.project_config = load_project_config()
 
-    # NOTE: Workaround until we remove root build.env
     if not render_file("build.env"):
         raise Exit(1)
 
@@ -623,11 +623,8 @@ def update(state, profile, file, only_accounts_profiles):
         logger.info("Updating project configuration file.")
         YAML().dump(data=project_config, stream=PROJECT_CONFIG)
 
-        # Update common.tfvars if it exists
-        try:
-            render_file("config/common.tfvars")
-        except FileNotFoundError:
-            pass
+        # Update common.tfvars
+        render_file("config/common.tfvars")
 
     else:
         logger.info("No organization has been created yet or no accounts were found in project configuration file."
