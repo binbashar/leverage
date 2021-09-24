@@ -9,8 +9,6 @@ defaults:
 jobs:
   output_flag:
     runs-on: ubuntu-latest
-    permissions:
-      pull_requests: write
     outputs:
       myflag: ${{ steps.flagstep.outputs.myflag }} 
     steps:
@@ -21,7 +19,7 @@ jobs:
   publish_comment:
     runs-on: ubuntu-latest
     permissions:
-      pull_requests: write
+      pull-requests: write
     needs: output_flag
     steps:
       - uses: actions/checkout@v2
