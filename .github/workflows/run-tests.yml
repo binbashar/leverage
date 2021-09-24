@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - id: flagstep
-        run: echo "::set-output name=myflag::true"
+        run: echo "::set-output name=myflag::false"
   
   publish_comment:
     runs-on: ubuntu-latest
