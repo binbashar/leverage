@@ -13,8 +13,8 @@ jobs:
       myflag: ${{ steps.flagstep.outputs.myflag }} 
     steps:
       - uses: actions/checkout@v2
-      - name: flagstep
-        run: echo "::set-output name=myflag::1"
+      - id: flagstep
+        run: echo "::set-output name=myflag::true"
   
   publish_comment:
     runs-on: ubuntu-latest
@@ -24,14 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/github-script@v4
-        # if: ${{ needs.output_flag.outputs.myflag }}
+        if: needs.output_flag.outputs.myflag == "true"
         with:
           script: |
             github.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '🚀'
+              body: '🚀🚀'
             })
 
 #  unit_tests:
