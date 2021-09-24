@@ -2,25 +2,57 @@ name: Run tests
 
 on: [pull_request]
 
-jobs:
-  unit_tests:
-    runs-on: ubuntu-latest 
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: run_unit_tests
-        run: |
-          echo "[INFO] Running unit tests"
-          make test-unit-no-cov
-        shell: bash
-      
-  integration_tests:
+defaults:
+  run:
     runs-on: ubuntu-latest
+    shell: bash
+
+jobs:
+  output_flag:
+    permissions:
+      pull_requests: write
+    outputs:
+      myflag: ${{ steps.flagstep.outputs.myflag }} 
     steps:
       - uses: actions/checkout@v2
+      - name: flagstep
+        run: echo "::set-output name=myflag::1"
+  
+  publish_comment:
+    permissions:
+      pull_requests: write
+    needs: output_flag
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/github-script@v4
+        if: ${{ needs.output_flag.outputs.myflag }}
+        with:
+          script: |
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀'
+            })
 
-      - name: run_integration_tests
-        run: |
-          echo "[INFO] Running integration tests"
-          make test-int
-        shell: bash
+#  unit_tests:
+#    runs-on: ubuntu-latest 
+#    steps:
+#      - uses: actions/checkout@v2
+
+#      - name: run_unit_tests
+#        run: |
+#          echo "[INFO] Running unit tests"
+#          make test-unit-no-cov
+#        shell: bash
+#    
+#  integration_tests:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+
+#      - name: run_integration_tests
+#        run: |
+#          echo "[INFO] Running integration tests"
+#          make test-int
+#        shell: bash
