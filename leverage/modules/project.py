@@ -38,30 +38,39 @@ except NotARepositoryError:
     PROJECT_ROOT = Path.cwd()
 PROJECT_CONFIG = PROJECT_ROOT / PROJECT_CONFIG_FILE
 
-ROOT_DIRECTORIES = [
-    "config"
-]
+CONFIG_DIRECTORY = "config"
 
-DEFAULT_ACCOUNT_LAYERS = [
-    "config",
-    "base-tf-backend"
-]
 # TODO: Keep this structure in the project's directory
 PROJECT_STRUCTURE = {
-    "management": [
-        "base-identities",
-        "organizations",
-        "security-base"
-    ],
-    "security": [
-        "base-identities",
-        "security-base"
-    ],
-    "shared": [
-        "base-identities",
-        "security-base",
-        "base-network"
-    ]
+    "management": {
+        "global": [
+            "base-identities",
+            "organizations"
+        ],
+        "primary_region": [
+            "base-tf-backend",
+            "security-base"
+        ]
+    },
+    "security": {
+        "global": [
+            "base-identities"
+        ],
+        "primary_region": [
+            "base-tf-backend",
+            "security-base"
+        ]
+    },
+    "shared": {
+        "global": [
+            "base-identities"
+        ],
+        "primary_region": [
+            "base-network",
+            "base-tf-backend",
+            "security-base"
+        ]
+    }
 }
 
 
@@ -105,48 +114,50 @@ def init():
     logger.info("Project initialization finished.")
 
 
-def _copy_account(account):
+def _copy_account(account, primary_region):
     """ Copy account directory and all its files.
 
     Args:
         account (str): Account name.
+        primary_region (str): Projects primary region.
     """
-    account_layers = DEFAULT_ACCOUNT_LAYERS + PROJECT_STRUCTURE[account]
-
     (PROJECT_ROOT / account).mkdir()
 
-    for layer in account_layers:
-        copytree(src=TEMPLATE_DIR / account / layer,
-                 dst=PROJECT_ROOT / account / layer,
+    # Copy config directory
+    copytree(src=TEMPLATE_DIR / account / CONFIG_DIRECTORY,
+             dst=PROJECT_ROOT / account / CONFIG_DIRECTORY,
+             ignore=IGNORE_PATTERNS)
+    # Copy all global layers in account
+    for layer in PROJECT_STRUCTURE[account]["global"]:
+        copytree(src=TEMPLATE_DIR / account / "global" / layer,
+                 dst=PROJECT_ROOT / account / "global" / layer,
+                 ignore=IGNORE_PATTERNS)
+    # Copy all layers with a region in account
+    for layer in PROJECT_STRUCTURE[account]["primary_region"]:
+        copytree(src=TEMPLATE_DIR / account / "primary_region" / layer,
+                 dst=PROJECT_ROOT / account / primary_region / layer,
                  ignore=IGNORE_PATTERNS)
 
 
-def _copy_project_template():
+def _copy_project_template(config):
     """ Copy all files and directories from the Leverage project template to the project directory.
     It excludes al jinja templates as those will be rendered directly to their final location.
+
+    Args:
+        config (dict): Project configuration.
     """
     # TODO: Set the project template version (checkout the corresponding tag) based on the
     # project configuration file (under meta.version)
     logger.info("Creating project directory structure.")
 
-    # Copy root files and directories.
-    template_regex = re.compile(r".+\.template")
-    template_root_files = [file
-                           for file in TEMPLATE_DIR.glob("*")
-                           if file.is_file() and not template_regex.match(file.name)]
-
-    for directory in ROOT_DIRECTORIES:
-        copytree(src=TEMPLATE_DIR / directory,
-                 dst=PROJECT_ROOT / directory,
-                 ignore=IGNORE_PATTERNS)
-
-    for file in template_root_files:
-        copy2(src=file,
-              dst=PROJECT_ROOT / file.name)
+    # Root config directory
+    copytree(src=TEMPLATE_DIR / CONFIG_DIRECTORY,
+             dst=PROJECT_ROOT / CONFIG_DIRECTORY,
+             ignore=IGNORE_PATTERNS)
 
     # Accounts
     for account in PROJECT_STRUCTURE:
-        _copy_account(account=account)
+        _copy_account(account=account, primary_region=config["primary_region"])
 
     logger.info("Finished creating directory structure.")
 
@@ -183,12 +194,24 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
         destination (Path, optional): Destination where to render the templates. Defaults to PROJECT_ROOT.
     """
     for template_file in template_files:
+        logger.debug(f"Template: {template_file.as_posix()}")
         template_location = template_file.relative_to(source)
 
         template = JINJA_ENV.get_template(template_location.as_posix())
         rendered_template = template.render(config)
 
-        rendered_location = destination / template_location.with_suffix("")
+        if (template_location.parent.name == ""
+                or template_location.parent.name == CONFIG_DIRECTORY
+                or template_location.parent.parent.name == "global"):
+            rendered_location = destination / template_location
+
+        else:
+            region_name = template_location.parent.parent.name
+            template_location = template_location.as_posix().replace(region_name, config[region_name])
+            rendered_location = destination / Path(template_location)
+
+        rendered_location = rendered_location.with_suffix("")
+
         rendered_location.write_text(rendered_template)
 
 
@@ -196,24 +219,26 @@ def _render_account_templates(account, config, source=TEMPLATE_DIR):
     account_name = account["name"]
     logger.info(f"Account: Setting up [bold]{account_name}[/bold].")
     account_dir = source / account_name
-    account_layers = DEFAULT_ACCOUNT_LAYERS + PROJECT_STRUCTURE[account_name]
 
-    for layer in account_layers:
-        logger.info(f"\tLayer: Setting up [bold]{layer}[/bold].")
+    layers = [CONFIG_DIRECTORY]
+    for account_name, account_layers in PROJECT_STRUCTURE[account_name].items():
+        layers = layers + [f"{account_name}/{layer}" for layer in account_layers]
+
+    for layer in layers:
+        logger.info(f"\tLayer: Setting up [bold]{layer.split('/')[-1]}[/bold].")
         layer_dir = account_dir / layer
 
         layer_templates = layer_dir.glob(TEMPLATE_PATTERN)
         _render_templates(template_files=layer_templates,
-                           config=config,
-                           source=source)
+                          config=config,
+                          source=source)
 
 
 def _render_project_template(config, source=TEMPLATE_DIR):
     # Render base and non account related templates
     template_files = list(source.glob(TEMPLATE_PATTERN))
-    for directory in ROOT_DIRECTORIES:
-        directory_templates = list((source / directory).rglob(TEMPLATE_PATTERN))
-        template_files.extend(directory_templates)
+    config_templates = list((source / CONFIG_DIRECTORY).rglob(TEMPLATE_PATTERN))
+    template_files.extend(config_templates)
 
     logger.info("Setting up common base files.")
     _render_templates(template_files=template_files,
@@ -265,7 +290,7 @@ def create():
         return
 
     # Make project structure
-    _copy_project_template()
+    _copy_project_template(config=config)
 
     # Render project
     _render_project_template(config=config)
