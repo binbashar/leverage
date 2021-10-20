@@ -295,7 +295,7 @@ def destroy(args):
 @terraform.command()
 def version():
     """ Print version. """
-    run(command="version")
+    run(command="version", enable_mfa=False)
 
 
 @terraform.command()
