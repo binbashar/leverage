@@ -1,6 +1,8 @@
 """
     General use utilities.
 """
+from subprocess import run
+from subprocess import PIPE
 
 def clean_exception_traceback(exception):
     """ Delete special local variables from all frames of an exception's traceback
@@ -36,3 +38,15 @@ def clean_exception_traceback(exception):
         traceback = traceback.tb_next
 
     return exception
+
+
+def git(command):
+    """ Run the given git command.
+
+    Args:
+        command (str): Complete git command with or without the binary name.
+    """
+    command = command.split()
+    command = ["git"] + command if command[0] != "git" else command
+
+    run(command, stdout=PIPE, stderr=PIPE, check=True)

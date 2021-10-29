@@ -1,13 +1,10 @@
 """
     Module for managing Leverage projects.
 """
-import re
 from pathlib import Path
 from shutil import copy2
 from shutil import copytree
 from shutil import ignore_patterns
-from subprocess import run
-from subprocess import PIPE
 
 import click
 from click.exceptions import Exit
@@ -19,6 +16,7 @@ from leverage import logger
 from leverage.logger import console
 from leverage.path import get_root_path
 from leverage.path import NotARepositoryError
+from leverage._utils import git
 
 from leverage.modules.terraform import run as tfrun
 
@@ -94,13 +92,18 @@ def init():
 
     if not (TEMPLATE_DIR / ".git").exists():
         logger.info("No project template found. Cloning template.")
-        run(["git", "clone", LEVERAGE_TEMPLATE_REPO, TEMPLATE_DIR.as_posix()],
-            stdout=PIPE, stderr=PIPE, check=True)
+        git(f"clone {LEVERAGE_TEMPLATE_REPO} {TEMPLATE_DIR.as_posix()}")
         logger.info("Finished cloning template.")
+
+    else:
+        logger.info("Project template found. Updating.")
+        git(f"-C {TEMPLATE_DIR.as_posix()} checkout master")
+        git(f"-C {TEMPLATE_DIR.as_posix()} pull")
+        logger.info("Finished updating template.")
 
     # Leverage projects are git repositories too
     logger.info("Initializing git repository in project directory.")
-    run(["git", "init"], stdout=PIPE, stderr=PIPE, check=True)
+    git("init")
 
     # Project configuration file
     if not PROJECT_CONFIG.exists():
