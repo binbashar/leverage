@@ -20,7 +20,7 @@ WARNING = logging.getLevelName("WARNING")
 
 @pytest.mark.parametrize(
     "verbose, expected_value",
-    [(True, 2), (False, 1)]
+    [(True, 3), (False, 2)]
 )
 def test_get_mfa_script_log_level(click_context, verbose, expected_value):
     with click_context(verbose=verbose):
