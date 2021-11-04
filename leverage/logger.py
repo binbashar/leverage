@@ -24,17 +24,17 @@ console = Console()
 def get_mfa_script_log_level():
     """ Get the verbosity level from the application state and map it to the MFA script log level.
     Logging level in the MFA script is implemented as:
-        ERROR = 0
-        INFO = 1
-        DEBUG = 2
+        ERROR = 1
+        INFO = 2
+        DEBUG = 3
 
     Returns:
         int: Logging level as defined in the MFA script.
     """
     mfa_log_level = {
-        logging.ERROR: 0,
-        logging.INFO: 1,
-        logging.DEBUG: 2
+        logging.ERROR: 1,
+        logging.INFO: 2,
+        logging.DEBUG: 3
     }
 
     verbosity = get_current_context().obj.verbosity
