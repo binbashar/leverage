@@ -22,10 +22,11 @@ from leverage.modules.terraform import run as tfrun
 
 # Leverage related base definitions
 LEVERAGE_DIR = Path.home() / ".leverage"
-TEMPLATE_DIR = LEVERAGE_DIR / "template"
+TEMPLATES_REPO_DIR = LEVERAGE_DIR / "templates"
+TEMPLATE_DIR = TEMPLATES_REPO_DIR / "template"
 PROJECT_CONFIG_FILE = "project.yaml"
 TEMPLATE_PATTERN = "*.template"
-CONFIG_FILE_TEMPLATE = TEMPLATE_DIR / "le-resources" / PROJECT_CONFIG_FILE
+CONFIG_FILE_TEMPLATE = TEMPLATES_REPO_DIR / "le-resources" / PROJECT_CONFIG_FILE
 LEVERAGE_TEMPLATE_REPO = "https://github.com/binbashar/le-tf-infra-aws-template.git"
 IGNORE_PATTERNS = ignore_patterns(TEMPLATE_PATTERN, ".gitkeep")
 
@@ -86,19 +87,19 @@ def init():
         logger.info("No [bold]Leverage[/bold] config directory found in user's home. Creating.")
         LEVERAGE_DIR.mkdir()
 
-    # Leverage project template
-    if not TEMPLATE_DIR.exists():
-        TEMPLATE_DIR.mkdir()
+    # Leverage project templates
+    if not TEMPLATES_REPO_DIR.exists():
+        TEMPLATES_REPO_DIR.mkdir(parents=True)
 
-    if not (TEMPLATE_DIR / ".git").exists():
+    if not (TEMPLATES_REPO_DIR / ".git").exists():
         logger.info("No project template found. Cloning template.")
-        git(f"clone {LEVERAGE_TEMPLATE_REPO} {TEMPLATE_DIR.as_posix()}")
+        git(f"clone {LEVERAGE_TEMPLATE_REPO} {TEMPLATES_REPO_DIR.as_posix()}")
         logger.info("Finished cloning template.")
 
     else:
         logger.info("Project template found. Updating.")
-        git(f"-C {TEMPLATE_DIR.as_posix()} checkout master")
-        git(f"-C {TEMPLATE_DIR.as_posix()} pull")
+        git(f"-C {TEMPLATES_REPO_DIR.as_posix()} checkout master")
+        git(f"-C {TEMPLATES_REPO_DIR.as_posix()} pull")
         logger.info("Finished updating template.")
 
     # Leverage projects are git repositories too
@@ -149,9 +150,11 @@ def _copy_project_template(config):
     Args:
         config (dict): Project configuration.
     """
-    # TODO: Set the project template version (checkout the corresponding tag) based on the
-    # project configuration file (under meta.version)
     logger.info("Creating project directory structure.")
+
+    # Copy .gitignore file
+    copy2(src=TEMPLATE_DIR / ".gitignore",
+          dst=PROJECT_ROOT / ".gitignore")
 
     # Root config directory
     copytree(src=TEMPLATE_DIR / CONFIG_DIRECTORY,
@@ -180,7 +183,7 @@ def value(dictionary, key):
 
 
 # Jinja environment used for rendering the templates
-JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATE_DIR.as_posix()),
+JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()),
                         trim_blocks=False,
                         lstrip_blocks=False)
 JINJA_ENV.filters["value"] = value
@@ -197,21 +200,21 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
         destination (Path, optional): Destination where to render the templates. Defaults to PROJECT_ROOT.
     """
     for template_file in template_files:
-        logger.debug(f"Template: {template_file.as_posix()}")
-        template_location = template_file.relative_to(source)
+        template_location = template_file.relative_to(TEMPLATES_REPO_DIR)
 
         template = JINJA_ENV.get_template(template_location.as_posix())
         rendered_template = template.render(config)
 
-        if (template_location.parent.name == ""
-                or template_location.parent.name == CONFIG_DIRECTORY
-                or template_location.parent.parent.name == "global"):
-            rendered_location = destination / template_location
+        rendered_location = template_file.relative_to(source)
+        if (rendered_location.parent.name == ""
+                or rendered_location.parent.name == CONFIG_DIRECTORY
+                or rendered_location.parent.parent.name == "global"):
+            rendered_location = destination / rendered_location
 
         else:
             region_name = template_location.parent.parent.name
-            template_location = template_location.as_posix().replace(region_name, config[region_name])
-            rendered_location = destination / Path(template_location)
+            rendered_location = rendered_location.as_posix().replace(region_name, config[region_name])
+            rendered_location = destination / Path(rendered_location)
 
         rendered_location = rendered_location.with_suffix("")
 
