@@ -154,7 +154,9 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
-        Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind")
+        Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"),
+        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind"),
+        Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
         mounts.extend([
@@ -164,7 +166,13 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
 
     environment = {
         "AWS_SHARED_CREDENTIALS_FILE": f"/root/.aws/{project}/credentials",
-        "AWS_CONFIG_FILE": f"/root/.aws/{project}/config"
+        "AWS_CONFIG_FILE": f"/root/.aws/{project}/config",
+        "BACKEND_CONFIG_FILE": BACKEND_TFVARS,
+        "COMMON_CONFIG_FILE": COMMON_TFVARS,
+        "SRC_AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
+        "SRC_AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials",
+        "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
+        "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
     }
 
     enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
@@ -172,22 +180,6 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
         entrypoint = TERRAFORM_MFA_ENTRYPOINT
         if command:
             entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {TERRAFORM_BINARY}"
-
-        mounts.extend([
-            Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
-        ])
-
-        environment.update({
-            "BACKEND_CONFIG_FILE": BACKEND_TFVARS,
-            "COMMON_CONFIG_FILE": COMMON_TFVARS,
-            "SRC_AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
-            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials",
-            "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
-            "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
-        })
-
-    else:
-        mounts.append(Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind"))
 
     args = [] if args is None else args
     command = " ".join([command] + args)
