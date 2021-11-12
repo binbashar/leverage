@@ -177,14 +177,14 @@ def _ask_for_credentials_location():
             "message": "Path to access keys file:",
             "qmark": ">",
             "when": lambda qs: qs["input_type"] == "path",
-            "validate": lambda value: (Path(value).is_file() and Path(value).exists()) or "Path must be an existing file"
+            "validate": lambda value: (Path(value).expanduser().is_file() and Path(value).expanduser().exists()) or "Path must be an existing file"
         }
     ])
     if not location:
         return
 
     input_type = location.get("input_type")
-    return Path(location.get("path")) if input_type == "path" else input_type
+    return Path(location.get("path")).expanduser() if input_type == "path" else input_type
 
 
 @_exit_if_user_cancels_input
