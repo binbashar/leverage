@@ -436,7 +436,7 @@ def create(state, file, force):
     logger.info("Finished setting up [bold]bootstrap[/bold] credentials.")
 
 
-def _organization_is_created(profile):
+def _organization_is_created(profiles_prefix):
     """ Check if account is part of an organization.
     Output when negative:
         An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization
@@ -445,27 +445,33 @@ def _organization_is_created(profile):
         255
 
     Args:
-        profile (str): Name of profile to configure.
+        profiles_prefix (str): Profiles prefix for the project.
 
     Returns:
         bool: Whether the organization exists or not.
     """
-    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profile}")
+    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profiles_prefix}-management")
+
+    if exit_code:
+        exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profiles_prefix}-bootstrap")
 
     return not exit_code
 
 
-def _get_organization_accounts(profile, project_name):
+def _get_organization_accounts(profiles_prefix, project_name):
     """ Get organization accounts names and ids. Removing the prefixed project name from the account names.
 
     Args:
-        profile (str): Name of profile to configure.
+        profiles_prefix (str): Profiles prefix for the project.
         project_name (str): Name of the project.
 
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    _, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profile}")
+    exit_code, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profiles_prefix}-management")
+    if exit_code:
+        _, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profiles_prefix}-bootstrap")
+
     organization_accounts = json.loads(organization_accounts)["Accounts"]
 
     prefix = f"{project_name}-"
@@ -618,12 +624,12 @@ def update(state, profile, file, only_accounts_profiles):
                 return
 
     project_accounts = project_config.get("organization").get("accounts")
-    if _organization_is_created(profile=profile_name) and project_accounts:
+    if _organization_is_created(profiles_prefix=short_name) and project_accounts:
         logger.info("Configuring accounts' profiles.")
         project_name = project_config.get("project_name")
 
         logger.info("Fetching organization accounts.")
-        organization_accounts = _get_organization_accounts(profile=profile_name, project_name=project_name)
+        organization_accounts = _get_organization_accounts(profiles_prefix=short_name, project_name=project_name)
 
         configure_accounts_profiles(profile_name, region, organization_accounts, project_accounts)
         logger.info(f"[bold]Account profiles configured in:[/bold] {profiles_config.as_posix()}")
