@@ -2,6 +2,7 @@
     Credentials managing module.
 """
 import re
+import csv
 import json
 from pathlib import Path
 from functools import wraps
@@ -14,12 +15,16 @@ from ruamel.yaml import YAML
 
 from leverage import logger
 from leverage.path import get_home_path
+from leverage.path import get_global_config_path
 from leverage._internals import pass_state
 from leverage.modules.terraform import awscli
 from leverage.modules.terraform import run as tfrun
 from leverage.modules.project import render_file
 from leverage.modules.project import PROJECT_CONFIG
+from leverage.modules.project import TEMPLATES_REPO_DIR
 from leverage.modules.project import load_project_config
+from leverage.conf import ENV_CONFIG_FILE
+from leverage.conf import load as load_env_config
 
 
 # Regexes for general validation
@@ -32,9 +37,12 @@ REGION = (r"[a-z]{2}-[gov-]?"
           r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-3]")
 ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = fr"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
-CREDENTIALS_FILE = fr"Access key ID,Secret access key\s+(?P<key_id>{KEY_ID}),(?P<secret_key>{SECRET_KEY})"
+
+# Regex for extracting project short name
+TFVARS_SHORT_NAME = fr"\s*project\s*=\s*\"(?P<project_short>{PROJECT_SHORT})\"\s*"
 
 AWSCLI_CONFIG_DIR = Path(get_home_path()) / ".aws"
+PROJECT_COMMON_TFVARS = Path(get_global_config_path()) / "common.tfvars"
 
 PROFILES = {
     "bootstrap": {
@@ -89,7 +97,7 @@ def _ask_for_short_name():
         str: Project short name.
     """
     return questionary.text(
-        message="Short name:",
+        message="Project short name:",
         qmark=">",
         validate=lambda value: bool(re.fullmatch(PROJECT_SHORT, value)) or "The project short name should be a two letter lowercase word"
     ).ask()
@@ -105,6 +113,7 @@ def _ask_for_region():
     return questionary.text(
         message="Region:",
         qmark=">",
+        default="us-east-1",
         validate=lambda value: bool(re.fullmatch(REGION, value)) or "Invalid region."
     ).ask()
 
@@ -176,14 +185,14 @@ def _ask_for_credentials_location():
             "message": "Path to access keys file:",
             "qmark": ">",
             "when": lambda qs: qs["input_type"] == "path",
-            "validate": lambda value: (Path(value).is_file() and Path(value).exists()) or "Path must be an existing file"
+            "validate": lambda value: (Path(value).expanduser().is_file() and Path(value).expanduser().exists()) or "Path must be an existing file"
         }
     ])
     if not location:
         return
 
     input_type = location.get("input_type")
-    return Path(location.get("path")) if input_type == "path" else input_type
+    return Path(location.get("path")).expanduser() if input_type == "path" else input_type
 
 
 @_exit_if_user_cancels_input
@@ -215,16 +224,53 @@ def _ask_for_credentials():
     return list(credentials.values())
 
 
+def _extract_short_name_from_terraform_definition():
+    """ Extract the project short name from the `common.tfvars` file in the terraform definition.
+
+    Returns:
+        str: Project short name, None if not found or file doesn't exist.
+    """
+    if not PROJECT_COMMON_TFVARS.exists():
+        return None
+
+    logger.debug("Extracting project short name form Terraform configuration.")
+    for line in PROJECT_COMMON_TFVARS.read_text().splitlines():
+        match = re.match(TFVARS_SHORT_NAME, line)
+
+        if match:
+            return match.group("project_short")
+
+    return None
+
+
 @click.group()
 @pass_state
 def credentials(state):
     """ Manage AWS cli credentials. """
+    if not (TEMPLATES_REPO_DIR / ".git").exists():
+        logger.info("Please initialize the Leverage project before configuring the credentials.")
+        raise Exit(1)
+
     logger.info("Loading configuration file.")
     state.project_config = load_project_config()
 
-    if not render_file("build.env"):
-        raise Exit(1)
+    logger.info("Loading project environment configuration file.")
+    env_config = load_env_config()
 
+    if "short_name" not in state.project_config:
+        state.project_config["short_name"] = (env_config.get("PROJECT")
+                                                or _extract_short_name_from_terraform_definition()
+                                                or _ask_for_short_name())
+
+    if "primary_region" not in state.project_config:
+        state.project_config["primary_region"] = _ask_for_region()
+
+    render_file(file=ENV_CONFIG_FILE,
+                config={
+                    "short_name": state.project_config["short_name"],
+                    "mfa_enabled": env_config.get("MFA_ENABLED", "false"),
+                    "terraform_image_tag": env_config.get("TERRAFORM_IMAGE_TAG", "1.0.9")
+                })
 
 
 def _profile_is_configured(profile):
@@ -256,14 +302,27 @@ def _extract_credentials(file):
     Returns:
         str, str: Key ID, Secret Key
     """
-    match = re.match(pattern=fr"Access key ID,Secret access key\s+(?P<key_id>{KEY_ID}),(?P<secret_key>{SECRET_KEY})",
-                     string=file.read_text())
+    with open(file) as access_keys_file:
+        try:
+            keys = next(csv.DictReader(access_keys_file))
 
-    if not match:
-        click.echo("\nMalformed access keys file\n")
+        except csv.Error:
+            click.echo("\nMalformed access keys file\n")
+            raise Exit(1)
+
+    try:
+        access_key_id = keys["Access key ID"]
+        secret_access_key = keys["Secret access key"]
+
+    except KeyError:
+        click.echo("\nFields for keys not found in access keys file\n")
         raise Exit(1)
 
-    return match.groups()
+    if not re.match(KEY_ID, access_key_id) or not re.match(SECRET_KEY, secret_access_key):
+        click.echo("\nMalformed keys in access keys file\n")
+        raise Exit(1)
+
+    return access_key_id, secret_access_key
 
 
 def configure_default_profile(region):
@@ -379,8 +438,8 @@ def create(state, file, force):
     """
     project_config = state.project_config
 
-    short_name = project_config.get("short_name") or _ask_for_short_name()
-    region = project_config.get("primary_region") or _ask_for_region()
+    short_name = project_config.get("short_name")
+    region = project_config.get("primary_region")
     profile_name = f"{short_name}-bootstrap"
 
     credentials_dir = AWSCLI_CONFIG_DIR / short_name
@@ -410,7 +469,7 @@ def create(state, file, force):
         logger.error("Invalid bootstrap credentials. Please check the given keys.")
         return
 
-    accounts = project_config.get("organization").get("accounts")
+    accounts = project_config.get("organization", {}).get("accounts", [])
     management_account = next((account for account in accounts if account["name"] == "management"), None)
     if management_account:
         logger.info("Fetching management account id.")
@@ -422,7 +481,7 @@ def create(state, file, force):
     logger.info("Finished setting up [bold]bootstrap[/bold] credentials.")
 
 
-def _organization_is_created(profile):
+def _organization_is_created(profiles_prefix):
     """ Check if account is part of an organization.
     Output when negative:
         An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization
@@ -431,27 +490,33 @@ def _organization_is_created(profile):
         255
 
     Args:
-        profile (str): Name of profile to configure.
+        profiles_prefix (str): Profiles prefix for the project.
 
     Returns:
         bool: Whether the organization exists or not.
     """
-    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profile}")
+    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profiles_prefix}-management")
+
+    if exit_code:
+        exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profiles_prefix}-bootstrap")
 
     return not exit_code
 
 
-def _get_organization_accounts(profile, project_name):
+def _get_organization_accounts(profiles_prefix, project_name):
     """ Get organization accounts names and ids. Removing the prefixed project name from the account names.
 
     Args:
-        profile (str): Name of profile to configure.
+        profiles_prefix (str): Profiles prefix for the project.
         project_name (str): Name of the project.
 
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    _, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profile}")
+    exit_code, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profiles_prefix}-management")
+    if exit_code:
+        _, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profiles_prefix}-bootstrap")
+
     organization_accounts = json.loads(organization_accounts)["Accounts"]
 
     prefix = f"{project_name}-"
@@ -565,8 +630,8 @@ def update(state, profile, file, only_accounts_profiles):
     """
     project_config = state.project_config
 
-    short_name = project_config.get("short_name") or _ask_for_short_name()
-    region = project_config.get("primary_region") or _ask_for_region()
+    short_name = project_config.get("short_name")
+    region = project_config.get("primary_region")
 
     if not _profile_is_configured(profile=f"{short_name}-bootstrap"):
         logger.error("Credentials haven't been created yet, please run the credentials creation command first.")
@@ -603,13 +668,13 @@ def update(state, profile, file, only_accounts_profiles):
                 logger.error(f"Invalid {profile} credentials. Please check the given keys.")
                 return
 
-    project_accounts = project_config.get("organization").get("accounts")
-    if _organization_is_created(profile=profile_name) and project_accounts:
+    project_accounts = project_config.get("organization", {}).get("accounts", False)
+    if _organization_is_created(profiles_prefix=short_name) and project_accounts:
         logger.info("Configuring accounts' profiles.")
         project_name = project_config.get("project_name")
 
         logger.info("Fetching organization accounts.")
-        organization_accounts = _get_organization_accounts(profile=profile_name, project_name=project_name)
+        organization_accounts = _get_organization_accounts(profiles_prefix=short_name, project_name=project_name)
 
         configure_accounts_profiles(profile_name, region, organization_accounts, project_accounts)
         logger.info(f"[bold]Account profiles configured in:[/bold] {profiles_config.as_posix()}")
