@@ -282,7 +282,7 @@ def apply(args):
 @check_directory
 def output(args):
     """ Show all output variables of this layer. """
-    run(command="output", args=list(args), enable_mfa=False)
+    run(command="output", args=list(args))
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
