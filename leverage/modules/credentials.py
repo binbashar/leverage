@@ -2,6 +2,7 @@
     Credentials managing module.
 """
 import re
+import csv
 import json
 from pathlib import Path
 from functools import wraps
@@ -256,14 +257,27 @@ def _extract_credentials(file):
     Returns:
         str, str: Key ID, Secret Key
     """
-    match = re.match(pattern=fr"Access key ID,Secret access key\s+(?P<key_id>{KEY_ID}),(?P<secret_key>{SECRET_KEY})",
-                     string=file.read_text())
+    with open(file) as access_keys_file:
+        try:
+            keys = next(csv.DictReader(access_keys_file))
 
-    if not match:
-        click.echo("\nMalformed access keys file\n")
+        except csv.Error:
+            click.echo("\nMalformed access keys file\n")
+            raise Exit(1)
+
+    try:
+        access_key_id = keys["Access key ID"]
+        secret_access_key = keys["Secret access key"]
+
+    except KeyError:
+        click.echo("\nFields for keys not found in access keys file\n")
         raise Exit(1)
 
-    return match.groups()
+    if not re.match(KEY_ID, access_key_id) or not re.match(SECRET_KEY, secret_access_key):
+        click.echo("\nMalformed keys in access keys file\n")
+        raise Exit(1)
+
+    return access_key_id, secret_access_key
 
 
 def configure_default_profile(region):
