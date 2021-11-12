@@ -110,11 +110,11 @@ def ensure_image(docker_client, image, tag):
         logger.info(info)
 
 
-def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=True):
+def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, interactive=True):
     """ Run a command on a Leverage docker container.
 
     Args:
-        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image. Defaults to None.
+        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image. Defaults to `/bin/terraform`.
         command (str, optional): Command to run. Defaults to "".
         args (list(str)), optional): Command arguments. Defaults to None.
         enable_mfa (bool, optional): Whether to enable multi factor authentication. Defaults to True.
@@ -149,8 +149,6 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
                  image=TERRAFORM_IMAGE,
                  tag=terraform_image_tag)
 
-    entrypoint = TERRAFORM_BINARY if entrypoint is None else entrypoint
-
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
@@ -174,12 +172,17 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
         "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
         "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
     }
-
+    
     enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
     if enable_mfa:
-        entrypoint = TERRAFORM_MFA_ENTRYPOINT
-        if command:
-            entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {TERRAFORM_BINARY}"
+        if Path(CWD).parents[1] != Path(ACCOUNT):
+            logger.error("This command can only run at [bold]layer[/bold] level.")
+            raise Exit(1)
+
+        if command or entrypoint != TERRAFORM_BINARY:
+            entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {entrypoint}"
+        else:
+            entrypoint = TERRAFORM_MFA_ENTRYPOINT
 
     args = [] if args is None else args
     command = " ".join([command] + args)
