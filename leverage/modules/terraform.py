@@ -28,6 +28,7 @@ from leverage.path import NotARepositoryError
 
 # Terraform image definitions
 TERRAFORM_IMAGE = "binbash/terraform-awscli-slim"
+DEFAULT_IMAGE_TAG = "1.0.9"
 TERRAFORM_BINARY = "/bin/terraform"
 TERRAFORM_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 WORKING_DIR = "/go/src/project"
@@ -143,7 +144,7 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     if not aws_credentials_directory.exists():
         aws_credentials_directory.mkdir(parents=True)
 
-    terraform_image_tag = env.get("TERRAFORM_IMAGE_TAG", "latest")
+    terraform_image_tag = env.get("TERRAFORM_IMAGE_TAG", DEFAULT_IMAGE_TAG)
     ensure_image(docker_client=docker_client,
                  image=TERRAFORM_IMAGE,
                  tag=terraform_image_tag)
