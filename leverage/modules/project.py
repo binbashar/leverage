@@ -270,6 +270,7 @@ def load_project_config():
         dict:  Project configuration.
     """
     if not PROJECT_CONFIG.exists():
+        logger.debug("No project config file found.")
         return {}
 
     try:
@@ -309,19 +310,21 @@ def create():
     logger.info("Finished setting up project.")
 
 
-def render_file(file):
+def render_file(file, config=None):
     """ Utility to re-render specific files.
 
     Args:
         file (str): Relative path to file to render.
+        config (dict, optional): Config used to render file.
 
     Returns:
         bool: Whether the action succeeded or not
     """
-    # TODO: Make use of internal state
-    config = load_project_config()
     if not config:
-        return False
+        # TODO: Make use of internal state
+        config = load_project_config()
+        if not config:
+            return False
 
     try:
         _render_templates([TEMPLATE_DIR / f"{file}.template"], config=config)
