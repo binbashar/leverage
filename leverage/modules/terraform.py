@@ -28,6 +28,7 @@ from leverage.path import NotARepositoryError
 
 # Terraform image definitions
 TERRAFORM_IMAGE = "binbash/terraform-awscli-slim"
+DEFAULT_IMAGE_TAG = "1.0.9"
 TERRAFORM_BINARY = "/bin/terraform"
 TERRAFORM_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 WORKING_DIR = "/go/src/project"
@@ -109,11 +110,11 @@ def ensure_image(docker_client, image, tag):
         logger.info(info)
 
 
-def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=True):
+def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, interactive=True):
     """ Run a command on a Leverage docker container.
 
     Args:
-        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image. Defaults to None.
+        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image. Defaults to `/bin/terraform`.
         command (str, optional): Command to run. Defaults to "".
         args (list(str)), optional): Command arguments. Defaults to None.
         enable_mfa (bool, optional): Whether to enable multi factor authentication. Defaults to True.
@@ -143,17 +144,17 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
     if not aws_credentials_directory.exists():
         aws_credentials_directory.mkdir(parents=True)
 
-    terraform_image_tag = env.get("TERRAFORM_IMAGE_TAG", "latest")
+    terraform_image_tag = env.get("TERRAFORM_IMAGE_TAG", DEFAULT_IMAGE_TAG)
     ensure_image(docker_client=docker_client,
                  image=TERRAFORM_IMAGE,
                  tag=terraform_image_tag)
 
-    entrypoint = TERRAFORM_BINARY if entrypoint is None else entrypoint
-
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
-        Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind")
+        Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"),
+        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind"),
+        Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
         mounts.extend([
@@ -163,30 +164,25 @@ def run(entrypoint=None, command="", args=None, enable_mfa=True, interactive=Tru
 
     environment = {
         "AWS_SHARED_CREDENTIALS_FILE": f"/root/.aws/{project}/credentials",
-        "AWS_CONFIG_FILE": f"/root/.aws/{project}/config"
+        "AWS_CONFIG_FILE": f"/root/.aws/{project}/config",
+        "BACKEND_CONFIG_FILE": BACKEND_TFVARS,
+        "COMMON_CONFIG_FILE": COMMON_TFVARS,
+        "SRC_AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
+        "SRC_AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials",
+        "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
+        "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
     }
-
+    
     enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
     if enable_mfa:
-        entrypoint = TERRAFORM_MFA_ENTRYPOINT
-        if command:
-            entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {TERRAFORM_BINARY}"
+        if Path(CWD).parents[1] != Path(ACCOUNT):
+            logger.error("This command can only run at [bold]layer[/bold] level.")
+            raise Exit(1)
 
-        mounts.extend([
-            Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
-        ])
-
-        environment.update({
-            "BACKEND_CONFIG_FILE": BACKEND_TFVARS,
-            "COMMON_CONFIG_FILE": COMMON_TFVARS,
-            "SRC_AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
-            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials",
-            "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
-            "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
-        })
-
-    else:
-        mounts.append(Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind"))
+        if command or entrypoint != TERRAFORM_BINARY:
+            entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {entrypoint}"
+        else:
+            entrypoint = TERRAFORM_MFA_ENTRYPOINT
 
     args = [] if args is None else args
     command = " ".join([command] + args)
@@ -281,7 +277,7 @@ def apply(args):
 @check_directory
 def output(args):
     """ Show all output variables of this layer. """
-    run(command="output", args=list(args), enable_mfa=False)
+    run(command="output", args=list(args))
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
