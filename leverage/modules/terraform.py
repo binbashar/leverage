@@ -31,6 +31,7 @@ TERRAFORM_IMAGE = "binbash/terraform-awscli-slim"
 DEFAULT_IMAGE_TAG = "1.0.9"
 TERRAFORM_BINARY = "/bin/terraform"
 TERRAFORM_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
+TERRAFORM_NON_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-non-mfa-entrypoint.sh"
 WORKING_DIR = "/go/src/project"
 
 CWD = get_working_path()
@@ -153,8 +154,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
         Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"),
-        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind"),
-        Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind")
+        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
         mounts.extend([
@@ -167,6 +167,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         "AWS_CONFIG_FILE": f"/root/.aws/{project}/config",
         "BACKEND_CONFIG_FILE": BACKEND_TFVARS,
         "COMMON_CONFIG_FILE": COMMON_TFVARS,
+        "SRC_AWS_DIR": f"/root/tmp/{project}",
         "SRC_AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
         "SRC_AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials",
         "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
@@ -183,6 +184,9 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
             entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {entrypoint}"
         else:
             entrypoint = TERRAFORM_MFA_ENTRYPOINT
+    
+    else:
+        entrypoint = f"{TERRAFORM_NON_MFA_ENTRYPOINT} -- {entrypoint}"
 
     args = [] if args is None else args
     command = " ".join([command] + args)
