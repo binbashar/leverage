@@ -173,7 +173,9 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
     }
     
-    enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
+    if entrypoint == TERRAFORM_BINARY:
+        enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
+
     if enable_mfa:
         if Path(CWD).parents[1] != Path(ACCOUNT):
             logger.error("This command can only run at [bold]layer[/bold] level.")
@@ -328,11 +330,7 @@ def _import(address, _id):
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
-@click.option("--no-mfa",
-              is_flag=True,
-              default=False,
-              help="Disable MFA.")
 @click.argument("args", nargs=-1)
-def aws(no_mfa, args):
+def aws(args):
     """ Run a command in AWS cli. """
-    run(entrypoint="/usr/bin/aws", args=list(args), enable_mfa=not no_mfa)
+    run(entrypoint="/usr/bin/aws", args=list(args), enable_mfa=False)
