@@ -307,9 +307,13 @@ def version():
 
 
 @terraform.command()
-def shell():
+@click.option("--mfa",
+              is_flag=True,
+              default=False,
+              help="Enable Multi Factor Authentication upon launching shell.")
+def shell(mfa):
     """ Open a shell into the Terraform container in this layer. """
-    run(entrypoint="/bin/sh", enable_mfa=False)
+    run(entrypoint="/bin/sh", enable_mfa=mfa)
 
 
 @terraform.command("format")
