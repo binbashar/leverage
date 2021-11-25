@@ -214,6 +214,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         if interactive:
             dockerpty.start(client=docker_client.api,
                             container=container)
+            container_exit_code = docker_client.api.inspect_container(container)["State"]["ExitCode"]
         else:
             docker_client.api.start(container)
             container_exit_code = docker_client.api.wait(container)["StatusCode"]
@@ -255,7 +256,10 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 def init(no_backend, args):
     """ Initialize this layer. """
     backend_config = ["-backend=false" if no_backend else f"-backend-config={BACKEND_TFVARS}"]
-    run(command="init", args=backend_config + list(args))
+    exit_code, _ = run(command="init", args=backend_config + list(args))
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -263,7 +267,10 @@ def init(no_backend, args):
 @check_directory
 def plan(args):
     """ Generate an execution plan for this layer. """
-    run(command="plan", args=TF_DEFAULT_ARGS + list(args))
+    exit_code, _ = run(command="plan", args=TF_DEFAULT_ARGS + list(args))
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -271,7 +278,10 @@ def plan(args):
 @check_directory
 def apply(args):
     """ Build or change the infrastructure in this layer. """
-    run(command="apply", args=TF_DEFAULT_ARGS + list(args))
+    exit_code, _ = run(command="apply", args=TF_DEFAULT_ARGS + list(args))
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -326,7 +336,10 @@ def validate():
 @check_directory
 def _import(address, _id):
     """ Import a resource. """
-    run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
+    exit_code, _ = run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
