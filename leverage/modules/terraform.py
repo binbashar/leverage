@@ -153,8 +153,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
         Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"),
-        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind"),
-        Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind")
+        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
         mounts.extend([
@@ -185,6 +184,12 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
             entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {entrypoint}"
         else:
             entrypoint = TERRAFORM_MFA_ENTRYPOINT
+    
+    else:
+        environment.update({
+            "AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
+            "AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials"
+        })
 
     args = [] if args is None else args
     command = " ".join([command] + args)
