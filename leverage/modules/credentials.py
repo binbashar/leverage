@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from functools import wraps
 
+import hcl2
 import click
 from click.exceptions import Exit
 import questionary
@@ -17,7 +18,6 @@ from leverage import logger
 from leverage.path import get_home_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
-from leverage._internals import pass_state
 from leverage.modules.terraform import awscli
 from leverage.modules.terraform import run as tfrun
 from leverage.modules.project import render_file
@@ -38,9 +38,6 @@ REGION = (r"[a-z]{2}-[gov-]?"
           r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-3]")
 ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = fr"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
-
-# Regex for extracting project short name
-TFVARS_SHORT_NAME = fr"\s*project\s*=\s*\"(?P<project_short>{PROJECT_SHORT})\"\s*"
 
 # TODO: Remove these and get them into the global app state
 try:
@@ -116,7 +113,7 @@ def _ask_for_region():
         str: Region.
     """
     return questionary.text(
-        message="Region:",
+        message="Credentials default region:",
         qmark=">",
         default="us-east-1",
         validate=lambda value: bool(re.fullmatch(REGION, value)) or "Invalid region."
@@ -124,22 +121,8 @@ def _ask_for_region():
 
 
 @_exit_if_user_cancels_input
-def _ask_for_profile():
-    """ Prompt for profile selection.
-
-    Returns:
-        str : Profile to configure.
-    """
-    return questionary.select(
-        message="Select the credentials to set:",
-        qmark=">",
-        choices=[Choice(profile["choice_title"], value=name) for name, profile in PROFILES.items()]
-    ).ask()
-
-
-@_exit_if_user_cancels_input
 def _ask_for_credentials_overwrite(profile, skip_option_title, overwrite_option_title):
-    """ Prompt user with options regarding already existing credentials, whether to 
+    """ Prompt user with options regarding already existing credentials, whether to
     skip their configuration or overwrite them.
 
     Args:
@@ -229,53 +212,68 @@ def _ask_for_credentials():
     return list(credentials.values())
 
 
-def _extract_short_name_from_terraform_definition():
-    """ Extract the project short name from the `common.tfvars` file in the terraform definition.
+@click.group()
+def credentials():
+    """ Manage AWS cli credentials. """
+
+
+def _load_configs_for_credentials():
+    """ Load all required values to configure credentials.
+
+    Raises:
+        Exit: If no project has been already initialized in the system.
 
     Returns:
-        str: Project short name, None if not found or file doesn't exist.
+        dict: Values needed to configure a credential and update the files accordingly.
     """
-    if not PROJECT_COMMON_TFVARS.exists():
-        return None
-
-    logger.debug("Extracting project short name form Terraform configuration.")
-    for line in PROJECT_COMMON_TFVARS.read_text().splitlines():
-        match = re.match(TFVARS_SHORT_NAME, line)
-
-        if match:
-            return match.group("project_short")
-
-    return None
-
-
-@click.group()
-@pass_state
-def credentials(state):
-    """ Manage AWS cli credentials. """
-    if not (TEMPLATES_REPO_DIR / ".git").exists():
-        logger.info("Please initialize the Leverage project before configuring the credentials.")
-        raise Exit(1)
-
     logger.info("Loading configuration file.")
-    state.project_config = load_project_config()
+    project_config = load_project_config()
 
     logger.info("Loading project environment configuration file.")
     env_config = load_env_config()
 
-    if "short_name" not in state.project_config:
-        state.project_config["short_name"] = (env_config.get("PROJECT")
-                                                or _extract_short_name_from_terraform_definition()
-                                                or _ask_for_short_name())
+    terraform_config = {}
+    if PROJECT_COMMON_TFVARS.exists():
+        logger.info("Loading Terraform common configuration.")
+        terraform_config = hcl2.loads(PROJECT_COMMON_TFVARS.read_text())
 
-    if "primary_region" not in state.project_config:
-        state.project_config["primary_region"] = _ask_for_region()
+    config_values = {}
+    config_values["short_name"] = (project_config.get("short_name")
+                                       or env_config.get("PROJECT")
+                                       or terraform_config.get("project")
+                                       or _ask_for_short_name())
+    config_values["project_name"] = (project_config.get("project_name")
+                                         or terraform_config.get("project_long"))
 
-    render_file(file=ENV_CONFIG_FILE,
-                config={
-                    "short_name": state.project_config["short_name"],
-                    "mfa_enabled": env_config.get("MFA_ENABLED", "false"),
-                    "terraform_image_tag": env_config.get("TERRAFORM_IMAGE_TAG", "1.0.9")
-                })
+    config_values["primary_region"] = (project_config.get("primary_region")
+                                           or terraform_config.get("region_primary")
+                                           or _ask_for_region())
+    config_values["secondary_region"] = terraform_config.get("region_secondary")
+
+    config_values["organization"] = {"accounts": []}
+    # Accounts defined in Terraform code take priority
+    terraform_accounts = terraform_config.get("accounts", {})
+    if terraform_accounts:
+        config_values["organization"]["accounts"].extend([
+            {
+                "name": account_name,
+                "email": account_info.get("email"),
+                "id": account_info.get("id")
+            }
+            for account_name, account_info in terraform_accounts.items()
+        ])
+    # Add accounts not found in terraform code
+    project_accounts = [
+        account for account in project_config.get("organization", {}).get("accounts", [])
+        if account.get("name") not in terraform_accounts
+    ]
+    if project_accounts:
+        config_values["organization"]["accounts"].extend(project_accounts)
+
+    config_values["mfa_enabled"] = env_config.get("MFA_ENABLED", "false")
+    config_values["terraform_image_tag"] = env_config.get("TERRAFORM_IMAGE_TAG", "1.0.9")
+
+    return config_values
 
 
 def _profile_is_configured(profile):
@@ -328,21 +326,6 @@ def _extract_credentials(file):
         raise Exit(1)
 
     return access_key_id, secret_access_key
-
-
-def configure_default_profile(region):
-    """ Set default profile values.
-
-    Args:
-        region (str): Region.
-    """
-    default = {
-        "output": "json",
-        "region": region
-    }
-
-    for key, value in default.items():
-        awscli(f"configure set {key} {value}")
 
 
 def _backup_file(filename):
@@ -427,66 +410,7 @@ def _get_management_account_id(profile):
     return caller_identity["Account"]
 
 
-@credentials.command()
-@click.option("--file",
-              type=click.Path(exists=True, path_type=Path),
-              help="Path to AWS cli credentials file.")
-@click.option("--force",
-              is_flag=True,
-              help="Force credentials creation, even if they are already configured.")
-@pass_state
-def create(state, file, force):
-    """ Initialize credentials for the project.
-
-    Configure the required credentials for the bootstrap process and a default profile.
-    Fetch management account id and update project configuration file.
-    """
-    project_config = state.project_config
-
-    short_name = project_config.get("short_name")
-    region = project_config.get("primary_region")
-    profile_name = f"{short_name}-bootstrap"
-
-    credentials_dir = AWSCLI_CONFIG_DIR / short_name
-
-    if _profile_is_configured(profile=profile_name):
-        if not (force
-                    or _ask_for_credentials_overwrite(
-                        profile="bootstrap",
-                        skip_option_title="Skip credentials configuration.",
-                        overwrite_option_title="Overwrite current credentials."
-                    )
-                ):
-            logger.info("Exiting credentials configuration.")
-            return
-
-    logger.info("Configuring default profile information.")
-    configure_default_profile(region)
-    profiles_config = credentials_dir / "config"
-    logger.info(f"[bold]Default profile configured in:[/bold] {profiles_config.as_posix()}")
-
-    logger.info("Configuring [bold]bootstrap[/bold] credentials.")
-    configure_credentials(profile=profile_name, file=file)
-    credentials_config = credentials_dir / "credentials"
-    logger.info(f"[bold]Bootstrap credentials configured in:[/bold] {credentials_config.as_posix()}")
-
-    if not _credentials_are_valid(profile=profile_name):
-        logger.error("Invalid bootstrap credentials. Please check the given keys.")
-        return
-
-    accounts = project_config.get("organization", {}).get("accounts", [])
-    management_account = next((account for account in accounts if account["name"] == "management"), None)
-    if management_account:
-        logger.info("Fetching management account id.")
-        management_account["id"] = _get_management_account_id(profile=profile_name)
-
-        logger.info("Updating project configuration file.")
-        YAML().dump(data=project_config, stream=PROJECT_CONFIG)
-
-    logger.info("Finished setting up [bold]bootstrap[/bold] credentials.")
-
-
-def _organization_is_created(profiles_prefix):
+def _organization_is_created(profile):
     """ Check if account is part of an organization.
     Output when negative:
         An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization
@@ -495,32 +419,31 @@ def _organization_is_created(profiles_prefix):
         255
 
     Args:
-        profiles_prefix (str): Profiles prefix for the project.
+        profile (str): Credentials profile.
 
     Returns:
         bool: Whether the organization exists or not.
     """
-    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profiles_prefix}-management")
-
-    if exit_code:
-        exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profiles_prefix}-bootstrap")
+    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profile}")
 
     return not exit_code
 
 
-def _get_organization_accounts(profiles_prefix, project_name):
+def _get_organization_accounts(profile, project_name):
     """ Get organization accounts names and ids. Removing the prefixed project name from the account names.
 
     Args:
-        profiles_prefix (str): Profiles prefix for the project.
-        project_name (str): Name of the project.
+        profile (str): Credentials profile.
+        project_name (str): Full name of the project.
 
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    exit_code, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profiles_prefix}-management")
+    exit_code, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profile}")
+
     if exit_code:
-        _, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profiles_prefix}-bootstrap")
+        logger.error(f"Could not get organization accounts.\n {organization_accounts}")
+        raise Exit(1)
 
     organization_accounts = json.loads(organization_accounts)["Accounts"]
 
@@ -564,21 +487,21 @@ def configure_profile(profile, values):
         awscli(f"configure set {key} {value} --profile {profile}")
 
 
-def configure_accounts_profiles(profile_name, region, organization_accounts, project_accounts):
+def configure_accounts_profiles(profile, region, organization_accounts, project_accounts):
     """ Set up the required profiles for all accounts to be used with AWS cli. Backup previous profiles.
 
     Args:
-        profile_name (str): Name of the profile to configure.
+        profile(str): Name of the profile to configure.
         region (str): Region.
         organization_accounts (dict): Name and id of all accounts in the organization.
         project_accounts (dict): Name and email of all accounts in project configuration file.
     """
-    short_name, profile = profile_name.split("-")
+    short_name, type = profile.split("-")
 
     mfa_serial = None
-    if PROFILES[profile]["mfa"]:
+    if PROFILES[type]["mfa"]:
         logger.info("Fetching MFA device serial.")
-        mfa_serial = _get_mfa_serial(profile_name)
+        mfa_serial = _get_mfa_serial(profile)
         if not mfa_serial:
             logger.error("No MFA device found for user. Please set up a device before configuring the accounts profiles.")
             raise Exit(1)
@@ -594,14 +517,14 @@ def configure_accounts_profiles(profile_name, region, organization_accounts, pro
         account_profile = {
             "output": "json",
             "region": region,
-            "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[profile]['role']}",
-            "source_profile": profile_name
+            "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[type]['role']}",
+            "source_profile": profile
         }
         if mfa_serial:
             account_profile["mfa_serial"] = mfa_serial
 
         # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[profile]['profile_role']}"] = account_profile
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = account_profile
 
     logger.info("Backing up account profiles file.")
     _backup_file("config")
@@ -610,94 +533,148 @@ def configure_accounts_profiles(profile_name, region, organization_accounts, pro
         configure_profile(profile_identifier, profile_values)
 
 
+def mutually_exclusive(context, param, value):
+    """ Callback for command options --overwrite-existing-credentials and --skip-access-keys-setup mutual exclusivity verification. """
+    me_option = {
+        "overwrite_existing_credentials": "skip_access_keys_setup",
+        "skip_access_keys_setup": "overwrite_existing_credentials"
+    }
+
+    if value and context.params.get(me_option[param.name], False):
+        raise click.BadOptionUsage(option_name=param,
+                                   message=(f"Option {param.opts[0]} is mutually exclusive"
+                                            f" with option --{me_option[param.name].replace('_', '-')}."),
+                                   ctx=context)
+
+    return value
+
+
 @credentials.command()
-@click.option("--profile",
-              type=click.Choice(["bootstrap",
-                                 "management",
-                                 "security"],
+@click.option("--type",
+              type=click.Choice(["BOOTSTRAP",
+                                 "MANAGEMENT",
+                                 "SECURITY"],
                                 case_sensitive=False),
-              help="Profile credentials to set.")
-@click.option("--file",
+              required=True,
+              help="Type of credentials to set.")
+@click.option("--credentials-file",
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
-@click.option("--only-accounts-profiles",
+@click.option("--overwrite-existing-credentials",
               is_flag=True,
-              help="Only update accounts' profiles, don't change key/secret.")
-@pass_state
-def update(state, profile, file, only_accounts_profiles):
-    """ Update credentials for the given profile.
+              callback=mutually_exclusive,
+              help=("Overwrite existing credentials if already configured.\n"
+                    "Mutually exclusive with --skip-access-keys-setup."))
+@click.option("--skip-access-keys-setup",
+              is_flag=True,
+              callback=mutually_exclusive,
+              help=("Skip access keys configuration. Continue on with assumable roles setup.\n"
+                   "Mutually exclusive with --overwrite-existing-credentials."))
+@click.option("--skip-assumable-roles-setup",
+              is_flag=True,
+              help="Don't configure the accounts assumable roles.")
+def configure(type, credentials_file, overwrite_existing_credentials, skip_access_keys_setup, skip_assumable_roles_setup):
+    """ Configure credentials for the project.
 
-    Only to be run after having initialized the project credentials. Generate the profiles for all
-    accounts in the project attaching MFA serial if the credentials require so.
-
-    Backup previously existent credentials if necessary and update the project configuration file with
-    the ids for all accounts.
+    It can handle the credentials required for the initial deployment of the project (BOOTSTRAP),
+    a management user (MANAGEMENT) or a devops/secops user (SECURITY).
     """
-    project_config = state.project_config
-
-    short_name = project_config.get("short_name")
-    region = project_config.get("primary_region")
-
-    if not _profile_is_configured(profile=f"{short_name}-bootstrap"):
-        logger.error("Credentials haven't been created yet, please run the credentials creation command first.")
+    if skip_access_keys_setup and skip_assumable_roles_setup:
+        logger.info("Nothing to do. Exiting.")
         return
 
-    profile = profile or _ask_for_profile()
-    profile_name = f"{short_name}-{profile}"
+    # Without the project templates no file can be rendered
+    if not (TEMPLATES_REPO_DIR / ".git").exists():
+        logger.info("Please initialize the Leverage project before configuring the credentials.")
+        raise Exit(1)
 
-    credentials_dir = AWSCLI_CONFIG_DIR / short_name
-    credentials_config = credentials_dir / "credentials"
-    profiles_config = credentials_dir / "config"
+    config_values = _load_configs_for_credentials()
 
-    already_configured = _profile_is_configured(profile=profile_name)
+    # Environment configuration variables are needed for the Leverage docker container
+    render_file(file=ENV_CONFIG_FILE, config=config_values)
 
-    if only_accounts_profiles:
-        if not already_configured:
-            logger.error("Credentials for this profile haven't been configured yet.\n"
-                         "Please re-run the command without the [bold]--only-account-profiles[/bold] flag.")
+    type = type.lower()
+    short_name = config_values.get("short_name")
+    profile = f"{short_name}-{type}"
+
+    already_configured = _profile_is_configured(profile=profile)
+    if already_configured and not (skip_access_keys_setup or overwrite_existing_credentials):
+        title_extra = "" if skip_assumable_roles_setup else " Continue on with assumable roles setup."
+
+        overwrite_existing_credentials = _ask_for_credentials_overwrite(
+            profile=profile,
+            skip_option_title=f"Skip credentials configuration.{title_extra}",
+            overwrite_option_title="Overwrite current credentials. Backups will be made."
+        )
+
+    do_configure_credentials = False if skip_access_keys_setup else overwrite_existing_credentials or not already_configured
+
+    if do_configure_credentials:
+        logger.info(f"Configuring [bold]{type}[/bold] credentials.")
+        configure_credentials(profile, credentials_file, make_backup=already_configured)
+        logger.info(f"[bold]{type.capitalize()} credentials configured in:[/bold]"
+                    f" {(AWSCLI_CONFIG_DIR / short_name / 'credentials').as_posix()}")
+
+        if not _credentials_are_valid(profile):
+            logger.error(f"Invalid {profile} credentials. Please check the given keys.")
             return
 
-    else:
-        if (not already_configured
-                or _ask_for_credentials_overwrite(
-                    profile=profile,
-                    skip_option_title="Skip credentials setup. Only update accounts' profiles.",
-                    overwrite_option_title="Overwrite current credentials. Backups will be made."
-                )
-            ):
-            logger.info(f"Configuring [bold]{profile}[/bold] credentials.")
-            configure_credentials(profile_name, file, make_backup=already_configured)
-            logger.info(f"[bold]{profile.capitalize()} credentials configured in:[/bold] {credentials_config.as_posix()}")
+    accounts = config_values.get("organization", {}).get("accounts", False)
+    # First time configuring bootstrap credentials
+    if type == "bootstrap" and not already_configured:
+        management_account = next((account for account in accounts if account["name"] == "management"), None)
 
-            if not _credentials_are_valid(profile=profile_name):
-                logger.error(f"Invalid {profile} credentials. Please check the given keys.")
-                return
+        if management_account:
+            logger.info("Fetching management account id.")
+            management_account_id =_get_management_account_id(profile=profile)
+            management_account["id"] = management_account_id
 
-    project_accounts = project_config.get("organization", {}).get("accounts", False)
-    if _organization_is_created(profiles_prefix=short_name) and project_accounts:
-        logger.info("Configuring accounts' profiles.")
-        project_name = project_config.get("project_name")
+            project_config_file = load_project_config()
+            if project_config_file and "accounts" in project_config_file.get("organization", {}):
+                project_config_file["organization"]["accounts"] = accounts
 
-        logger.info("Fetching organization accounts.")
-        organization_accounts = _get_organization_accounts(profiles_prefix=short_name, project_name=project_name)
+                logger.info("Updating project configuration file.")
+                YAML().dump(data=project_config_file, stream=PROJECT_CONFIG)
 
-        configure_accounts_profiles(profile_name, region, organization_accounts, project_accounts)
-        logger.info(f"[bold]Account profiles configured in:[/bold] {profiles_config.as_posix()}")
+        skip_assumable_roles_setup = True
 
-        for account in project_accounts:
-            try: # Account in config file may not be already created
-                account["id"] = organization_accounts[account["name"]]
-            except KeyError:
-                continue
+    profile_for_organization = profile
+    # Security credentials don't have permission to access organization information
+    if type == "security":
+        skip_assumable_roles_setup = True
 
-        logger.info("Updating project configuration file.")
-        YAML().dump(data=project_config, stream=PROJECT_CONFIG)
+        for type_with_permission in ("management", "bootstrap"):
+            profile_for_organization = f"{short_name}-{type_with_permission}"
 
-        # Update common.tfvars
-        render_file("config/common.tfvars")
+            if _profile_is_configured(profile_for_organization):
+                skip_assumable_roles_setup = False
+                break
+
+    if skip_assumable_roles_setup:
+        logger.info("Skipping assumable roles configuration.")
 
     else:
-        logger.info("No organization has been created yet or no accounts were found in project configuration file."
-                    " Skipping accounts' profiles configuration.")
+        if _organization_is_created(profile_for_organization) and accounts:
+            logger.info("Configuring assumable roles.")
 
-    logger.info(f"Finished updating [bold]{profile}[/bold] credentials.")
+            logger.info("Fetching organization accounts.")
+            organization_accounts = _get_organization_accounts(profile_for_organization,
+                                                               config_values.get("project_name"))
+
+            configure_accounts_profiles(profile, config_values["primary_region"], organization_accounts, accounts)
+            logger.info(f"[bold]Account profiles configured in:[/bold]"
+                        f" {(AWSCLI_CONFIG_DIR / short_name / 'config').as_posix()}")
+
+            for account in accounts:
+                try: # Some account may not already be created
+                    account["id"] = organization_accounts[account["name"]]
+                except KeyError:
+                    continue
+
+        else:
+            logger.info("No organization has been created yet or no accounts were configured.\n"
+                        "Skipping assumable roles configuration.")
+
+    if PROJECT_COMMON_TFVARS.exists():
+        logger.info("Updating project's Terraform common configuration.")
+        render_file("config/common.tfvars", config=config_values)
