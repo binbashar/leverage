@@ -1,5 +1,5 @@
 pylint==2.8.3
-pytest==6.2.4
+pytest==6.2.5
 pytest-cov==2.12.1
 yaenv==1.4.1
 click==8.0.1
@@ -9,3 +9,4 @@ ruamel.yaml==0.17.10
 docker==5.0.0
 dockerpty==0.4.1
 questionary==1.9.0
+python-hcl2 == 3.0.1
