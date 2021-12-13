@@ -153,8 +153,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
         Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
         Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"),
-        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind"),
-        Mount(target=f"/root/.aws/{project}", source=f"{HOME}/.aws/{project}", type="bind")
+        Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
         mounts.extend([
@@ -173,7 +172,9 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
     }
     
-    enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
+    if entrypoint == TERRAFORM_BINARY:
+        enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
+
     if enable_mfa:
         if Path(CWD).parents[1] != Path(ACCOUNT):
             logger.error("This command can only run at [bold]layer[/bold] level.")
@@ -183,6 +184,12 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
             entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {entrypoint}"
         else:
             entrypoint = TERRAFORM_MFA_ENTRYPOINT
+    
+    else:
+        environment.update({
+            "AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
+            "AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials"
+        })
 
     args = [] if args is None else args
     command = " ".join([command] + args)
@@ -212,6 +219,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         if interactive:
             dockerpty.start(client=docker_client.api,
                             container=container)
+            container_exit_code = docker_client.api.inspect_container(container)["State"]["ExitCode"]
         else:
             docker_client.api.start(container)
             container_exit_code = docker_client.api.wait(container)["StatusCode"]
@@ -253,7 +261,10 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 def init(no_backend, args):
     """ Initialize this layer. """
     backend_config = ["-backend=false" if no_backend else f"-backend-config={BACKEND_TFVARS}"]
-    run(command="init", args=backend_config + list(args))
+    exit_code, _ = run(command="init", args=backend_config + list(args))
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -261,7 +272,10 @@ def init(no_backend, args):
 @check_directory
 def plan(args):
     """ Generate an execution plan for this layer. """
-    run(command="plan", args=TF_DEFAULT_ARGS + list(args))
+    exit_code, _ = run(command="plan", args=TF_DEFAULT_ARGS + list(args))
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -269,7 +283,10 @@ def plan(args):
 @check_directory
 def apply(args):
     """ Build or change the infrastructure in this layer. """
-    run(command="apply", args=TF_DEFAULT_ARGS + list(args))
+    exit_code, _ = run(command="apply", args=TF_DEFAULT_ARGS + list(args))
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -295,9 +312,13 @@ def version():
 
 
 @terraform.command()
-def shell():
+@click.option("--mfa",
+              is_flag=True,
+              default=False,
+              help="Enable Multi Factor Authentication upon launching shell.")
+def shell(mfa):
     """ Open a shell into the Terraform container in this layer. """
-    run(entrypoint="/bin/sh", enable_mfa=False)
+    run(entrypoint="/bin/sh", enable_mfa=mfa)
 
 
 @terraform.command("format")
@@ -324,15 +345,14 @@ def validate():
 @check_directory
 def _import(address, _id):
     """ Import a resource. """
-    run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
+    exit_code, _ = run(command="import", args=TF_DEFAULT_ARGS + [address, _id])
+
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
-@click.option("--no-mfa",
-              is_flag=True,
-              default=False,
-              help="Disable MFA.")
 @click.argument("args", nargs=-1)
-def aws(no_mfa, args):
+def aws(args):
     """ Run a command in AWS cli. """
-    run(entrypoint="/usr/bin/aws", args=list(args), enable_mfa=not no_mfa)
+    run(entrypoint="/usr/bin/aws", args=list(args), enable_mfa=False)
