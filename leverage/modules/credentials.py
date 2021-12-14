@@ -410,25 +410,6 @@ def _get_management_account_id(profile):
     return caller_identity["Account"]
 
 
-def _organization_is_created(profile):
-    """ Check if account is part of an organization.
-    Output when negative:
-        An error occurred (AWSOrganizationsNotInUseException) when calling the DescribeOrganization
-        operation: Your account is not a member of an organization.
-    Exit code when negative:
-        255
-
-    Args:
-        profile (str): Credentials profile.
-
-    Returns:
-        bool: Whether the organization exists or not.
-    """
-    exit_code, _ = awscli(f"--output json organizations describe-organization --profile {profile}")
-
-    return not exit_code
-
-
 def _get_organization_accounts(profile, project_name):
     """ Get organization accounts names and ids. Removing the prefixed project name from the account names.
 
@@ -442,8 +423,7 @@ def _get_organization_accounts(profile, project_name):
     exit_code, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profile}")
 
     if exit_code:
-        logger.error(f"Could not get organization accounts.\n {organization_accounts}")
-        raise Exit(1)
+        return {}
 
     organization_accounts = json.loads(organization_accounts)["Accounts"]
 
@@ -509,9 +489,13 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
     account_profiles = {}
     for account in project_accounts:
         account_name = account["name"]
-        try: # Account in config file may not be already created
-            account_id = organization_accounts[account_name]
-        except KeyError:
+        # DevOps roles do not have permission over management account
+        if "security" in profile and account_name == "management":
+            continue
+
+        # TODO: Add remaining profiles for remaining accounts declared in code if enough information is available
+        account_id = organization_accounts.get(account_name, account.get("id"))
+        if account_id is None:
             continue
 
         account_profile = {
@@ -573,6 +557,7 @@ def mutually_exclusive(context, param, value):
 @click.option("--skip-assumable-roles-setup",
               is_flag=True,
               help="Don't configure the accounts assumable roles.")
+# TODO: Add --override-role-name parameter for non-default roles in accounts
 def configure(type, credentials_file, overwrite_existing_credentials, skip_access_keys_setup, skip_assumable_roles_setup):
     """ Configure credentials for the project.
 
@@ -641,25 +626,24 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
     profile_for_organization = profile
     # Security credentials don't have permission to access organization information
     if type == "security":
-        skip_assumable_roles_setup = True
-
         for type_with_permission in ("management", "bootstrap"):
-            profile_for_organization = f"{short_name}-{type_with_permission}"
+            profile_to_check = f"{short_name}-{type_with_permission}"
 
-            if _profile_is_configured(profile_for_organization):
-                skip_assumable_roles_setup = False
+            if _profile_is_configured(profile_to_check):
+                profile_for_organization = profile_to_check
                 break
 
     if skip_assumable_roles_setup:
         logger.info("Skipping assumable roles configuration.")
 
     else:
-        if _organization_is_created(profile_for_organization) and accounts:
-            logger.info("Configuring assumable roles.")
+        logger.info("Attempting to fetch organization accounts.")
+        organization_accounts = _get_organization_accounts(profile_for_organization,
+                                                           config_values.get("project_name"))
+        logger.debug(f"Organization Accounts fetched: {organization_accounts}")
 
-            logger.info("Fetching organization accounts.")
-            organization_accounts = _get_organization_accounts(profile_for_organization,
-                                                               config_values.get("project_name"))
+        if organization_accounts or accounts:
+            logger.info("Configuring assumable roles.")
 
             configure_accounts_profiles(profile, config_values["primary_region"], organization_accounts, accounts)
             logger.info(f"[bold]Account profiles configured in:[/bold]"
