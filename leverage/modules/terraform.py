@@ -151,8 +151,8 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
 
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
-        Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"),
-        Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"),
+        # Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"), # SSH keys for Ansible
+        # Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"), # Git user configuration
         Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
@@ -171,7 +171,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
         "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
     }
-    
+
     if entrypoint == TERRAFORM_BINARY:
         enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
 
@@ -184,7 +184,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
             entrypoint = f"{TERRAFORM_MFA_ENTRYPOINT} -- {entrypoint}"
         else:
             entrypoint = TERRAFORM_MFA_ENTRYPOINT
-    
+
     else:
         environment.update({
             "AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
