@@ -32,11 +32,9 @@ Integration tests:
 bats -r tests/bats
 ```
 ### Using docker image
-A Dockerfile suited for running all tests is provided along with useful Makefile targets.
+A Docker image suitable for running all tests is provided and [available in DockerHub](https://hub.docker.com/r/binbash/leverage-cli-testing).
 
-To build such image run `make build-image`.
-
-To run all tests `make tests`. Alternatively `make test-unit` or `make test-int` for unit or integration tests respectively.
+To run all tests, run `make tests`. Alternatively `make test-unit` or `make test-int` for unit or integration tests respectively.
 
 ## Release Process
 * On every PR, a Github Action workflow is triggered to create/update a release draft.
