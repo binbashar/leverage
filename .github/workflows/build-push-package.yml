@@ -27,22 +27,10 @@ jobs:
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/v//)
           echo $RELEASE_VERSION
 
-          echo "[INFO] Get current version"
-          CURRENT_VERSION=$(cat $INIT_FILE | grep "__version__" | grep -oP "([0-9]*\.[0-9]*\.[0-9]*)")
-          echo $CURRENT_VERSION
-
-          echo "[INFO] Bump version"
+          echo "[INFO] Write version"
           sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
-
-          echo "[INFO] Commit and push"
-          git config user.name $GIT_USERNAME
-          git config user.email $GIT_EMAIL
-          git add $INIT_FILE
-          git commit -m "Bump version from $CURRENT_VERSION to $RELEASE_VERSION"
         env:
           INIT_FILE: leverage/__init__.py
-          GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
-          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
 
       - name: clean
         run: |
