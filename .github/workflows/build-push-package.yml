@@ -28,9 +28,10 @@ jobs:
           echo $RELEASE_VERSION
 
           echo "[INFO] Write version"
-          sed -i s/$CURRENT_VERSION/$RELEASE_VERSION/ $INIT_FILE
+          sed -i s/$PLACEHOLDER/$RELEASE_VERSION/ $INIT_FILE
         env:
           INIT_FILE: leverage/__init__.py
+          PLACEHOLDER: 0.0.0
 
       - name: clean
         run: |
