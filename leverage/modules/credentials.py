@@ -516,6 +516,50 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         configure_profile(profile_identifier, profile_values)
 
 
+def _update_account_ids(config):
+    """ Update accounts ids in global configuration file.
+    It updates both `[account name]_account_id` and `accounts` variables.
+    This last one maintaning the format:
+    ```
+    account = {
+      account_name = {
+        email = account_email,
+        id = account_id
+      }
+    }
+    ```
+
+    Args:
+        config (dict): Project configuration values.
+    """
+    if not PROJECT_COMMON_TFVARS.exists():
+        return
+
+    accs = []
+    for account in config["organization"]["accounts"]:
+        acc_name, acc_email, acc_id = account.values()
+
+        acc = [f"\n    email = \"{acc_email}\""]
+        if acc_id:
+            tfrun(entrypoint="hcledit",
+                command=f"-f /common-config/common.tfvars -u attribute set {acc_name}_account_id \"{acc_id}\"",
+                enable_mfa=False,
+                interactive=False)
+
+            acc.append(f"    id = {acc_id}")
+        acc = ",\n".join(acc)
+
+        accs.append(f"\n  {acc_name} = {{{acc}\n  }}")
+
+    accs = ",".join(accs)
+    accs = f"{{{accs}\n}}"
+
+    tfrun(entrypoint="hcledit",
+          command=f"-f /common-config/common.tfvars -u attribute set accounts '{accs}'",
+          enable_mfa=False,
+          interactive=False)
+
+
 def mutually_exclusive(context, param, value):
     """ Callback for command options --overwrite-existing-credentials and --skip-access-keys-setup mutual exclusivity verification. """
     me_option = {
@@ -653,3 +697,5 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
         else:
             logger.info("No organization has been created yet or no accounts were configured.\n"
                         "Skipping assumable roles configuration.")
+
+    _update_account_ids(config=config_values)
