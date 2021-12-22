@@ -20,9 +20,7 @@ from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
 from leverage.modules.terraform import awscli
 from leverage.modules.terraform import run as tfrun
-from leverage.modules.project import render_file
 from leverage.modules.project import PROJECT_CONFIG
-from leverage.modules.project import TEMPLATES_REPO_DIR
 from leverage.modules.project import load_project_config
 from leverage.conf import ENV_CONFIG_FILE
 from leverage.conf import load as load_env_config
@@ -572,15 +570,11 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
         logger.info("Nothing to do. Exiting.")
         return
 
-    # Without the project templates no file can be rendered
-    if not (TEMPLATES_REPO_DIR / ".git").exists():
-        logger.info("Please initialize the Leverage project before configuring the credentials.")
-        raise Exit(1)
-
     config_values = _load_configs_for_credentials()
 
     # Environment configuration variables are needed for the Leverage docker container
-    render_file(file=ENV_CONFIG_FILE, config=config_values)
+    if not PROJECT_ENV_CONFIG.exists():
+        PROJECT_ENV_CONFIG.write_text(f"PROJECT={config_values['short_name']}")
 
     type = type.lower()
     short_name = config_values.get("short_name")
@@ -662,7 +656,3 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
         else:
             logger.info("No organization has been created yet or no accounts were configured.\n"
                         "Skipping assumable roles configuration.")
-
-    if PROJECT_COMMON_TFVARS.exists():
-        logger.info("Updating project's Terraform common configuration.")
-        render_file("config/common.tfvars", config=config_values)
