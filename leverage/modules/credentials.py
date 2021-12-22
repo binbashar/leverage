@@ -15,7 +15,7 @@ from questionary import Choice
 from ruamel.yaml import YAML
 
 from leverage import logger
-from leverage.path import get_home_path
+from leverage.path import get_root_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
 from leverage.modules.terraform import awscli
@@ -41,10 +41,14 @@ MFA_SERIAL = fr"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 
 # TODO: Remove these and get them into the global app state
 try:
-    AWSCLI_CONFIG_DIR = Path(get_home_path()) / ".aws"
-    PROJECT_COMMON_TFVARS = Path(get_global_config_path()) / "common.tfvars"
+    PROJECT_COMMON_TFVARS = Path(get_global_config_path())
+    PROJECT_ENV = Path(get_root_path())
 except NotARepositoryError:
-    AWSCLI_CONFIG_DIR = PROJECT_COMMON_TFVARS = ""
+    PROJECT_COMMON_TFVARS = PROJECT_ENV = Path.cwd()
+
+PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / "common.tfvars"
+PROJECT_ENV_CONFIG = PROJECT_ENV / ENV_CONFIG_FILE
+AWSCLI_CONFIG_DIR = Path.home() / ".aws"
 
 PROFILES = {
     "bootstrap": {
