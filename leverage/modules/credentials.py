@@ -480,7 +480,7 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
     """
     short_name, type = profile.split("-")
 
-    mfa_serial = None
+    mfa_serial = ""
     if PROFILES[type]["mfa"]:
         logger.info("Fetching MFA device serial.")
         mfa_serial = _get_mfa_serial(profile)
@@ -500,17 +500,14 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         if account_id is None:
             continue
 
-        account_profile = {
+        # A profile identifier looks like `le-security-oaar`
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = {
             "output": "json",
             "region": region,
             "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[type]['role']}",
-            "source_profile": profile
+            "source_profile": profile,
+            "mfa_serial": mfa_serial
         }
-        if mfa_serial:
-            account_profile["mfa_serial"] = mfa_serial
-
-        # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = account_profile
 
     logger.info("Backing up account profiles file.")
     _backup_file("config")
