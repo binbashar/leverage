@@ -182,7 +182,8 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
 
     if enable_mfa:
-        if Path(CWD).parents[1] != Path(ACCOUNT):
+        # A layer is a directory with .tf files inside
+        if not list(Path(CWD).glob("*.tf")):
             logger.error("This command can only run at [bold]layer[/bold] level.")
             raise Exit(1)
 
