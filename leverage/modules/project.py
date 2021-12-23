@@ -304,6 +304,10 @@ def create():
 
     # Format the code correctly
     logger.info("Reformatting terraform configuration to the standard style.")
+    # NOTE: This is done just for the sake of making sure the docker image is already available,
+    # otherwise two animations try to stack on each other and rich does not support that.
+    # TODO: Modularize docker handling as to avoid this.
+    tfrun(command="echo \'pull image\'", enable_mfa=False, interactive=False)
     with console.status("Formatting..."):
         tfrun(command="fmt -recursive", enable_mfa=False, interactive=False)
 
