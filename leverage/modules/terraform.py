@@ -60,7 +60,7 @@ def terraform():
     counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
     """
-    if not all([ROOT, CONFIG, ACCOUNT, ACCOUNT]):
+    if not all((ROOT, CONFIG, ACCOUNT, ACCOUNT_CONFIG)):
         logger.error("Not running in a Leverage project. Exiting.")
         raise Exit(1)
 
@@ -69,11 +69,16 @@ def check_directory(command):
     """ Decorator to make sure the command is run exclusively in a layer directory. """
     @wraps(command)
     def checked(*args, **kwargs):
-        if CWD not in [ROOT, ACCOUNT]:
-            return command(*args, **kwargs)
+        if CWD in (CONFIG, ACCOUNT_CONFIG):
+            logger.error("Currently in a configuration directory, no Terraform command can be run here.")
+            return
 
-        logger.error("Terraform commands cannot run neither in the root of the project or in"
-                     " the root directory of an account.")
+        if CWD in (ROOT, ACCOUNT):
+            logger.error("Terraform commands cannot run neither in the root of the project or in"
+                        " the root directory of an account.")
+            return
+
+        return command(*args, **kwargs)
 
     return checked
 
@@ -114,7 +119,8 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
     """ Run a command on a Leverage docker container.
 
     Args:
-        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image. Defaults to `/bin/terraform`.
+        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image.
+            Defaults to `/bin/terraform`.
         command (str, optional): Command to run. Defaults to "".
         args (list(str)), optional): Command arguments. Defaults to None.
         enable_mfa (bool, optional): Whether to enable multi factor authentication. Defaults to True.
@@ -176,7 +182,8 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         enable_mfa = enable_mfa and env.get("MFA_ENABLED") == "true"
 
     if enable_mfa:
-        if Path(CWD).parents[1] != Path(ACCOUNT):
+        # A layer is a directory with .tf files inside
+        if not list(Path(CWD).glob("*.tf")):
             logger.error("This command can only run at [bold]layer[/bold] level.")
             raise Exit(1)
 
@@ -318,7 +325,8 @@ def version():
               help="Enable Multi Factor Authentication upon launching shell.")
 def shell(mfa):
     """ Open a shell into the Terraform container in this layer. """
-    run(entrypoint="/bin/sh", enable_mfa=mfa)
+    runshell = check_directory(run) if mfa else run
+    runshell(entrypoint="/bin/sh", enable_mfa=mfa)
 
 
 @terraform.command("format")
