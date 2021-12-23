@@ -324,7 +324,8 @@ def version():
               help="Enable Multi Factor Authentication upon launching shell.")
 def shell(mfa):
     """ Open a shell into the Terraform container in this layer. """
-    run(entrypoint="/bin/sh", enable_mfa=mfa)
+    runshell = check_directory(run) if mfa else run
+    runshell(entrypoint="/bin/sh", enable_mfa=mfa)
 
 
 @terraform.command("format")
