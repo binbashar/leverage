@@ -60,7 +60,7 @@ def terraform():
     counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
     """
-    if not all([ROOT, CONFIG, ACCOUNT, ACCOUNT]):
+    if not all((ROOT, CONFIG, ACCOUNT, ACCOUNT_CONFIG)):
         logger.error("Not running in a Leverage project. Exiting.")
         raise Exit(1)
 
@@ -69,11 +69,16 @@ def check_directory(command):
     """ Decorator to make sure the command is run exclusively in a layer directory. """
     @wraps(command)
     def checked(*args, **kwargs):
-        if CWD not in [ROOT, ACCOUNT]:
-            return command(*args, **kwargs)
+        if CWD in (CONFIG, ACCOUNT_CONFIG):
+            logger.error("Currently in a configuration directory, no Terraform command can be run here.")
+            return
 
-        logger.error("Terraform commands cannot run neither in the root of the project or in"
-                     " the root directory of an account.")
+        if CWD in (ROOT, ACCOUNT):
+            logger.error("Terraform commands cannot run neither in the root of the project or in"
+                        " the root directory of an account.")
+            return
+
+        return command(*args, **kwargs)
 
     return checked
 
