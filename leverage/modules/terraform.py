@@ -119,7 +119,8 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
     """ Run a command on a Leverage docker container.
 
     Args:
-        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image. Defaults to `/bin/terraform`.
+        entrypoint (str, optional): Entrypoint to use in the container, overrides the one defined in the image.
+            Defaults to `/bin/terraform`.
         command (str, optional): Command to run. Defaults to "".
         args (list(str)), optional): Command arguments. Defaults to None.
         enable_mfa (bool, optional): Whether to enable multi factor authentication. Defaults to True.
