@@ -15,14 +15,12 @@ from questionary import Choice
 from ruamel.yaml import YAML
 
 from leverage import logger
-from leverage.path import get_home_path
+from leverage.path import get_root_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
 from leverage.modules.terraform import awscli
 from leverage.modules.terraform import run as tfrun
-from leverage.modules.project import render_file
 from leverage.modules.project import PROJECT_CONFIG
-from leverage.modules.project import TEMPLATES_REPO_DIR
 from leverage.modules.project import load_project_config
 from leverage.conf import ENV_CONFIG_FILE
 from leverage.conf import load as load_env_config
@@ -41,10 +39,14 @@ MFA_SERIAL = fr"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 
 # TODO: Remove these and get them into the global app state
 try:
-    AWSCLI_CONFIG_DIR = Path(get_home_path()) / ".aws"
-    PROJECT_COMMON_TFVARS = Path(get_global_config_path()) / "common.tfvars"
+    PROJECT_COMMON_TFVARS = Path(get_global_config_path())
+    PROJECT_ENV = Path(get_root_path())
 except NotARepositoryError:
-    AWSCLI_CONFIG_DIR = PROJECT_COMMON_TFVARS = ""
+    PROJECT_COMMON_TFVARS = PROJECT_ENV = Path.cwd()
+
+PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / "common.tfvars"
+PROJECT_ENV_CONFIG = PROJECT_ENV / ENV_CONFIG_FILE
+AWSCLI_CONFIG_DIR = Path.home() / ".aws"
 
 PROFILES = {
     "bootstrap": {
@@ -478,7 +480,7 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
     """
     short_name, type = profile.split("-")
 
-    mfa_serial = None
+    mfa_serial = ""
     if PROFILES[type]["mfa"]:
         logger.info("Fetching MFA device serial.")
         mfa_serial = _get_mfa_serial(profile)
@@ -498,23 +500,64 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         if account_id is None:
             continue
 
-        account_profile = {
+        # A profile identifier looks like `le-security-oaar`
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = {
             "output": "json",
             "region": region,
             "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[type]['role']}",
-            "source_profile": profile
+            "source_profile": profile,
+            "mfa_serial": mfa_serial
         }
-        if mfa_serial:
-            account_profile["mfa_serial"] = mfa_serial
-
-        # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = account_profile
 
     logger.info("Backing up account profiles file.")
     _backup_file("config")
 
     for profile_identifier, profile_values in account_profiles.items():
         configure_profile(profile_identifier, profile_values)
+
+
+def _update_account_ids(config):
+    """ Update accounts ids in global configuration file.
+    It updates both `[account name]_account_id` and `accounts` variables.
+    This last one maintaning the format:
+    ```
+    account = {
+      account_name = {
+        email = account_email,
+        id = account_id
+      }
+    }
+    ```
+
+    Args:
+        config (dict): Project configuration values.
+    """
+    if not PROJECT_COMMON_TFVARS.exists():
+        return
+
+    accs = []
+    for account in config["organization"]["accounts"]:
+        acc_name, acc_email, acc_id = account.values()
+
+        acc = [f"\n    email = \"{acc_email}\""]
+        if acc_id:
+            tfrun(entrypoint="hcledit",
+                command=f"-f /common-config/common.tfvars -u attribute set {acc_name}_account_id \"{acc_id}\"",
+                enable_mfa=False,
+                interactive=False)
+
+            acc.append(f"    id = {acc_id}")
+        acc = ",\n".join(acc)
+
+        accs.append(f"\n  {acc_name} = {{{acc}\n  }}")
+
+    accs = ",".join(accs)
+    accs = f"{{{accs}\n}}"
+
+    tfrun(entrypoint="hcledit",
+          command=f"-f /common-config/common.tfvars -u attribute set accounts '{accs}'",
+          enable_mfa=False,
+          interactive=False)
 
 
 def mutually_exclusive(context, param, value):
@@ -568,15 +611,11 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
         logger.info("Nothing to do. Exiting.")
         return
 
-    # Without the project templates no file can be rendered
-    if not (TEMPLATES_REPO_DIR / ".git").exists():
-        logger.info("Please initialize the Leverage project before configuring the credentials.")
-        raise Exit(1)
-
     config_values = _load_configs_for_credentials()
 
     # Environment configuration variables are needed for the Leverage docker container
-    render_file(file=ENV_CONFIG_FILE, config=config_values)
+    if not PROJECT_ENV_CONFIG.exists():
+        PROJECT_ENV_CONFIG.write_text(f"PROJECT={config_values['short_name']}")
 
     type = type.lower()
     short_name = config_values.get("short_name")
@@ -659,6 +698,4 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
             logger.info("No organization has been created yet or no accounts were configured.\n"
                         "Skipping assumable roles configuration.")
 
-    if PROJECT_COMMON_TFVARS.exists():
-        logger.info("Updating project's Terraform common configuration.")
-        render_file("config/common.tfvars", config=config_values)
+    _update_account_ids(config=config_values)
