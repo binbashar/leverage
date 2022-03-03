@@ -157,8 +157,8 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
 
     mounts = [
         Mount(target=WORKING_DIR, source=CWD, type="bind"),
-        # Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"), # SSH keys for Ansible
-        # Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"), # Git user configuration
+        Mount(target="/root/.ssh", source=f"{HOME}/.ssh", type="bind"), # SSH keys for Ansible
+        Mount(target="/etc/gitconfig", source=f"{HOME}/.gitconfig", type="bind"), # Git user configuration
         Mount(target=f"/root/tmp/{project}", source=f"{HOME}/.aws/{project}", type="bind")
     ]
     if Path(str(CONFIG)).exists() and Path(str(ACCOUNT_CONFIG)).exists():
