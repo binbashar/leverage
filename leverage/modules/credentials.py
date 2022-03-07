@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from functools import wraps
 
-import hcl2
 import click
 from click.exceptions import Exit
 import questionary
@@ -18,12 +17,10 @@ from leverage import logger
 from leverage.path import get_root_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
-from leverage.modules.terraform import awscli
-from leverage.modules.terraform import run as tfrun
-from leverage.modules.project import PROJECT_CONFIG
-from leverage.modules.project import load_project_config
 from leverage.conf import ENV_CONFIG_FILE
-from leverage.conf import load as load_env_config
+from leverage._internals import pass_state
+from leverage.container import get_docker_client
+from leverage.container import AWSCLIContainer
 
 
 # Regexes for general validation
@@ -40,12 +37,13 @@ MFA_SERIAL = fr"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 # TODO: Remove these and get them into the global app state
 try:
     PROJECT_COMMON_TFVARS = Path(get_global_config_path())
-    PROJECT_ENV = Path(get_root_path())
+    PROJECT_ROOT = Path(get_root_path())
 except NotARepositoryError:
-    PROJECT_COMMON_TFVARS = PROJECT_ENV = Path.cwd()
+    PROJECT_COMMON_TFVARS = PROJECT_ROOT = Path.cwd()
 
 PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / "common.tfvars"
-PROJECT_ENV_CONFIG = PROJECT_ENV / ENV_CONFIG_FILE
+PROJECT_ENV_CONFIG = PROJECT_ROOT / ENV_CONFIG_FILE
+PROJECT_CONFIG = PROJECT_ROOT / "project.yaml"
 AWSCLI_CONFIG_DIR = Path.home() / ".aws"
 
 PROFILES = {
@@ -214,9 +212,33 @@ def _ask_for_credentials():
     return list(credentials.values())
 
 
+AWSCLI = None
+
+
 @click.group()
-def credentials():
+@pass_state
+def credentials(state):
     """ Manage AWS cli credentials. """
+    state.container = AWSCLIContainer(get_docker_client())
+    state.container.ensure_image()
+
+    global AWSCLI
+    AWSCLI = state.container
+
+
+def _load_project_yaml():
+    """ Load project.yaml file contents. """
+    if not PROJECT_CONFIG.exists():
+        logger.debug("No project config file found.")
+        return {}
+
+    try:
+        return YAML().load(PROJECT_CONFIG)
+
+    except Exception as exc:
+        exc.__traceback__ = None
+        logger.exception(message="Error loading configuration file.", exc_info=exc)
+        raise Exit(1)
 
 
 def _load_configs_for_credentials():
@@ -229,15 +251,14 @@ def _load_configs_for_credentials():
         dict: Values needed to configure a credential and update the files accordingly.
     """
     logger.info("Loading configuration file.")
-    project_config = load_project_config()
+    project_config = _load_project_yaml()
 
     logger.info("Loading project environment configuration file.")
-    env_config = load_env_config()
+    env_config = AWSCLI.env_conf
 
     terraform_config = {}
-    if PROJECT_COMMON_TFVARS.exists():
-        logger.info("Loading Terraform common configuration.")
-        terraform_config = hcl2.loads(PROJECT_COMMON_TFVARS.read_text())
+    logger.info("Loading Terraform common configuration.")
+    terraform_config = AWSCLI.common_conf
 
     config_values = {}
     config_values["short_name"] = (project_config.get("short_name")
@@ -287,7 +308,7 @@ def _profile_is_configured(profile):
     Returns:
         bool: Whether the profile was already configured or not.
     """
-    exit_code, _ = awscli(f"configure list --profile {profile}")
+    exit_code, _ = AWSCLI.exec("configure list", profile)
 
     return not exit_code
 
@@ -342,10 +363,7 @@ def _backup_file(filename):
     }
     env_var = credential_files_env_vars.get(filename)
 
-    tfrun(entrypoint="/bin/sh -c",
-          command=f"'cp ${env_var} \"${{{env_var}}}.bkp\"'",
-          enable_mfa=False,
-          interactive=False)
+    AWSCLI.system_exec(f"sh -c 'cp ${env_var} \"${{{env_var}}}.bkp\"'")
 
 
 def configure_credentials(profile, file=None, make_backup=False):
@@ -374,7 +392,10 @@ def configure_credentials(profile, file=None, make_backup=False):
     }
 
     for key, value in values.items():
-        awscli(f"configure set {key} {value} --profile {profile}")
+        exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
+        if exit_code:
+            logger.error(f"AWS CLI error: {output}")
+            raise Exit(exit_code)
 
 
 def _credentials_are_valid(profile):
@@ -392,7 +413,7 @@ def _credentials_are_valid(profile):
     Returns:
         bool: Whether the credentials are valid.
     """
-    error_code, output = awscli(f"sts get-caller-identity --profile {profile}")
+    error_code, output = AWSCLI.exec("sts get-caller-identity", profile)
 
     return error_code != 255 and "InvalidClientTokenId" not in output
 
@@ -406,7 +427,10 @@ def _get_management_account_id(profile):
     Returns:
         str: Management account id.
     """
-    _, caller_identity = awscli(f"--output json sts get-caller-identity --profile {profile}")
+    exit_code, caller_identity = AWSCLI.exec("--output json sts get-caller-identity", profile)
+    if exit_code:
+        logger.error(f"AWS CLI error: {caller_identity}")
+        raise Exit(exit_code)
 
     caller_identity = json.loads(caller_identity)
     return caller_identity["Account"]
@@ -422,7 +446,7 @@ def _get_organization_accounts(profile, project_name):
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    exit_code, organization_accounts = awscli(f"--output json organizations list-accounts --profile {profile}")
+    exit_code, organization_accounts = AWSCLI.exec("--output json organizations list-accounts", profile)
 
     if exit_code:
         return {}
@@ -448,7 +472,10 @@ def _get_mfa_serial(profile):
     Returns:
         str: MFA device serial.
     """
-    _, mfa_devices = awscli(f"--output json iam list-mfa-devices --profile {profile}")
+    exit_code, mfa_devices = AWSCLI.exec("--output json iam list-mfa-devices", profile)
+    if exit_code:
+        logger.error(f"AWS CLI error: {mfa_devices}")
+        raise Exit(exit_code)
     mfa_devices = json.loads(mfa_devices)
 
     # Either zero or one MFA device should be configured for either `management` or `security` accounts users.
@@ -466,7 +493,10 @@ def configure_profile(profile, values):
     """
     logger.info(f"\tConfiguring profile [bold]{profile}[/bold]")
     for key, value in values.items():
-        awscli(f"configure set {key} {value} --profile {profile}")
+        exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
+        if exit_code:
+            logger.error(f"AWS CLI error: {output}")
+            raise Exit(exit_code)
 
 
 def configure_accounts_profiles(profile, region, organization_accounts, project_accounts):
@@ -541,10 +571,9 @@ def _update_account_ids(config):
 
         acc = [f"\n    email = \"{acc_email}\""]
         if acc_id:
-            tfrun(entrypoint="hcledit",
-                command=f"-f /common-config/common.tfvars -u attribute set {acc_name}_account_id \"{acc_id}\"",
-                enable_mfa=False,
-                interactive=False)
+            AWSCLI.system_exec("hcledit "
+                               "-f /common-config/common.tfvars -u"
+                               f" attribute set {acc_name}_account_id \"{acc_id}\"")
 
             acc.append(f"    id = {acc_id}")
         acc = ",\n".join(acc)
@@ -554,10 +583,9 @@ def _update_account_ids(config):
     accs = ",".join(accs)
     accs = f"{{{accs}\n}}"
 
-    tfrun(entrypoint="hcledit",
-          command=f"-f /common-config/common.tfvars -u attribute set accounts '{accs}'",
-          enable_mfa=False,
-          interactive=False)
+    AWSCLI.system_exec("hcledit "
+                       "-f /common-config/common.tfvars -u"
+                       f" attribute set accounts '{accs}'")
 
 
 def mutually_exclusive(context, param, value):
@@ -653,7 +681,7 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
             management_account_id =_get_management_account_id(profile=profile)
             management_account["id"] = management_account_id
 
-            project_config_file = load_project_config()
+            project_config_file = _load_project_yaml()
             if project_config_file and "accounts" in project_config_file.get("organization", {}):
                 project_config_file["organization"]["accounts"] = accounts
 
