@@ -1,6 +1,8 @@
 """
 	Definitions for internal use of the cli.
 """
+from functools import wraps
+
 import click
 
 from leverage.logger import get_verbosity
@@ -24,7 +26,7 @@ class State:
     def __init__(self):
         self._verbosity = None
         self.module = Module()
-        self.project_config = {}
+        self.container = None
 
     @property
     def verbosity(self):
@@ -36,3 +38,14 @@ class State:
 
 
 pass_state =  click.make_pass_decorator(State, ensure=True)
+
+
+def pass_container(command):
+    """ Decorator to pass the current container to the command. """
+    @wraps(command)
+    def new_command(*args, **kwargs):
+        ctx = click.get_current_context()
+
+        return command(ctx.obj.container, *args, **kwargs)
+
+    return new_command
