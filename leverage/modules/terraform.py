@@ -16,7 +16,7 @@ from docker.errors import APIError
 from leverage import conf
 from leverage import logger
 from leverage.logger import console
-from leverage.logger import get_mfa_script_log_level
+from leverage.logger import get_script_log_level
 from leverage.path import get_working_path
 from leverage.path import get_home_path
 from leverage.path import get_root_path
@@ -175,7 +175,7 @@ def run(entrypoint=TERRAFORM_BINARY, command="", args=None, enable_mfa=True, int
         "SRC_AWS_CONFIG_FILE": f"/root/tmp/{project}/config",
         "SRC_AWS_SHARED_CREDENTIALS_FILE": f"/root/tmp/{project}/credentials",
         "AWS_CACHE_DIR": f"/root/tmp/{project}/cache",
-        "MFA_SCRIPT_LOG_LEVEL": get_mfa_script_log_level()
+        "MFA_SCRIPT_LOG_LEVEL": get_script_log_level()
     }
 
     if entrypoint == TERRAFORM_BINARY:

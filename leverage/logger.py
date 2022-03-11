@@ -18,27 +18,28 @@ _leverage_logger = logging.getLogger("leverage")
 
 # Use the same console for the logging handler and any other special cases like
 # spinners, tables or progress bars.
+# TODO: Deprecate in favor of using rich's global console.
 console = Console()
 
 
-def get_mfa_script_log_level():
-    """ Get the verbosity level from the application state and map it to the MFA script log level.
-    Logging level in the MFA script is implemented as:
+def get_script_log_level():
+    """ Get the verbosity level from the application state and map it to the Leverage scripts log level.
+    Logging level in the Leverage scripts is implemented as:
         ERROR = 1
         INFO = 2
         DEBUG = 3
 
     Returns:
-        int: Logging level as defined in the MFA script.
+        int: Logging level as defined in the Leverage scripts.
     """
-    mfa_log_level = {
+    log_level = {
         logging.ERROR: 1,
         logging.INFO: 2,
         logging.DEBUG: 3
     }
 
     verbosity = get_current_context().obj.verbosity
-    return mfa_log_level[verbosity]
+    return log_level[verbosity]
 
 
 def get_verbosity(verbose):

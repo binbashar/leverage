@@ -17,8 +17,8 @@ from leverage.logger import console
 from leverage.path import get_root_path
 from leverage.path import NotARepositoryError
 from leverage._utils import git
-
-from leverage.modules.terraform import run as tfrun
+from leverage.container import get_docker_client
+from leverage.container import TerraformContainer
 
 # Leverage related base definitions
 LEVERAGE_DIR = Path.home() / ".leverage"
@@ -304,12 +304,12 @@ def create():
 
     # Format the code correctly
     logger.info("Reformatting terraform configuration to the standard style.")
-    # NOTE: This is done just for the sake of making sure the docker image is already available,
-    # otherwise two animations try to stack on each other and rich does not support that.
-    # TODO: Modularize docker handling as to avoid this.
-    tfrun(entrypoint="/bin/sh -c", command="'echo \"pull image\"'", enable_mfa=False, interactive=False)
+
+    terraform = TerraformContainer(get_docker_client())
+    terraform.ensure_image()
+    terraform.disable_authentication()
     with console.status("Formatting..."):
-        tfrun(command="fmt -recursive", enable_mfa=False, interactive=False)
+        terraform.start("fmt", "-recursive")
 
     logger.info("Finished setting up project.")
 

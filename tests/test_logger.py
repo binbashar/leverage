@@ -3,7 +3,7 @@ import logging
 import pytest
 from rich.logging import RichHandler
 
-from leverage.logger import get_mfa_script_log_level
+from leverage.logger import get_script_log_level
 from leverage.logger import get_verbosity
 from leverage.logger import _configure_logger
 from leverage.logger import initialize_logger
@@ -22,11 +22,11 @@ WARNING = logging.getLevelName("WARNING")
     "verbose, expected_value",
     [(True, 3), (False, 2)]
 )
-def test_get_mfa_script_log_level(click_context, verbose, expected_value):
+def test_get_script_log_level(click_context, verbose, expected_value):
     with click_context(verbose=verbose):
-        mfa_log_level = get_mfa_script_log_level()
+        log_level = get_script_log_level()
 
-    assert mfa_log_level == expected_value
+    assert log_level == expected_value
 
 
 def test_get_verbosity():
