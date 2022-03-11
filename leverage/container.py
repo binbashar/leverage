@@ -156,8 +156,8 @@ class LeverageContainer:
 
         logger.info("Required Docker image not found.")
 
-        stream = self.client.api.pull(repository=self.image, tag=self.image.tag, stream=True, decode=True)
-        logger.info(next(stream)["Status"])
+        stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
+        logger.info(next(stream)["status"])
 
         imageinfo = []
         with console.status("Pulling image..."):

@@ -8,6 +8,7 @@ from leverage.tasks import load_tasks
 from leverage.tasks import list_tasks as _list_tasks
 from leverage._internals import pass_state
 
+from leverage.modules import aws
 from leverage.modules import run
 from leverage.modules import project
 from leverage.modules import terraform
@@ -57,3 +58,4 @@ leverage.add_command(project)
 leverage.add_command(terraform)
 leverage.add_command(terraform, name="tf")
 leverage.add_command(credentials)
+leverage.add_command(aws)
