@@ -30,7 +30,7 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 @pass_container
 def init(tf, no_backend, args):
     """ Initialize this layer. """
-    backend_config = ["-backend=false" if no_backend else f"-backend-config={tf.BACKEND_TFVARS}"]
+    backend_config = ["-backend=false" if no_backend else f"-backend-config={tf.TF_BACKEND_TFVARS}"]
     args = backend_config + list(args)
     exit_code = tf.start_in_layer("init", *args)
 
