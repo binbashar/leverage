@@ -76,21 +76,44 @@ def _sso(context, cli):
         logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
         raise Exit(1)
 
+    default_region = cli.common_conf.get("region_primary", cli.common_conf.get("sso_region"))
+    if default_region is None:
+        logger.error("No primary region configured in global config file.")
+        raise Exit(1)
+
     logger.info("Configuring default profile.")
     default_profile = {
-        "region": cli.common_conf.get("region_primary"),
+        "region": default_region,
         "output": "json"
     }
     for key, value in default_profile.items():
         cli.exec(f"configure set {key} {value}", profile="default")
 
-    logger.info(f"Configuring [bold]{cli.project}-sso[/bold] profile.")
+    if not all(sso_key in cli.common_conf for sso_key in ("sso_start_url", "sso_region")):
+        logger.error("Missing configuration values for SSO in global config file.")
+        raise Exit(1)
+
+    sso_role = cli.account_conf.get("sso_role")
+    if not sso_role:
+        logger.error("Missing SSO role in account config file.")
+        raise Exit(1)
+
     current_account = cli.account_conf.get("environment")
+    try:
+        account_id = cli.common_conf.get("accounts").get(current_account).get("id")
+    except AttributeError:
+        logger.error("Missing environment configuration in global config file.")
+        raise Exit(1)
+    if not account_id:
+        logger.error(f"Missing id for account [bold]{current_account}[/bold].")
+        raise Exit(1)
+
+    logger.info(f"Configuring [bold]{cli.project}-sso[/bold] profile.")
     sso_profile = {
         "sso_start_url": cli.common_conf.get("sso_start_url"),
         "sso_region": cli.common_conf.get("sso_region", cli.common_conf.get("region_primary")),
-        "sso_account_id": cli.common_conf.get("accounts").get(current_account).get("id"),
-        "sso_role_name": cli.account_conf.get("sso_role")
+        "sso_account_id": account_id,
+        "sso_role_name": sso_role
     }
     for key, value in sso_profile.items():
         cli.exec(f"configure set {key} {value}", profile=f"{cli.project}-sso")
@@ -98,7 +121,7 @@ def _sso(context, cli):
     context.invoke(login)
 
     logger.info("Storing account information.")
-    exit_code= cli.system_start(cli.AWS_SSO_CONFIGURE_SCRIPT)
+    exit_code = cli.system_start(cli.AWS_SSO_CONFIGURE_SCRIPT)
     if exit_code:
         raise Exit(exit_code)
 
@@ -133,8 +156,12 @@ def login(cli):
         logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
         raise Exit(1)
 
-    region = cli.common_conf.get("sso_region", cli.common_conf.get("region_primary"))
-    webbrowser.open_new_tab(cli.SSO_LOGIN_URL.format(region=region))
+    exit_code, region = cli.exec(f"configure get sso_region --profile {cli.project}-sso")
+    if exit_code:
+        logger.error(f"Region configuration for [bold]{cli.project}-sso[/bold] profile not found.")
+        raise Exit(1)
+
+    webbrowser.open_new_tab(cli.SSO_LOGIN_URL.format(region=region.strip()))
     exit_code = cli.system_start(cli.AWS_SSO_LOGIN_SCRIPT)
     if exit_code:
         raise Exit(exit_code)
