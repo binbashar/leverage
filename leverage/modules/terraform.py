@@ -73,7 +73,7 @@ def output(tf, args):
 @pass_container
 def destroy(tf, args):
     """ Destroy infrastructure in this layer. """
-    exit_code = tf.start_in_layer("destroy", *tf.TF_DEFAULTS_ARGS, *args)
+    exit_code = tf.start_in_layer("destroy", *tf.TF_DEFAULT_ARGS, *args)
 
     if exit_code:
         raise Exit(exit_code)
