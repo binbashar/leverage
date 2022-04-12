@@ -83,7 +83,8 @@ class LeverageContainer:
             self.common_config_dir = Path(get_global_config_path())
             self.account_config_dir = Path(get_account_config_path())
         except NotARepositoryError:
-            self.root_dir = self.account_dir = self.common_config_dir = self.account_config_dir = self.cwd
+            logger.error("Out of Leverage project context. Please cd into a Leverage project directory first.")
+            raise Exit(1)
 
         # Load configs
         self.env_conf = load_env()
@@ -358,7 +359,7 @@ class TerraformContainer(LeverageContainer):
 
         # Set authentication methods
         self.sso_enabled = self.common_conf.get("sso_enabled", False)
-        self.mfa_enabled = self.env_conf.get("MFA_ENABLED", False)
+        self.mfa_enabled = self.env_conf.get("MFA_ENABLED", "false") == "true" # TODO: Convert values to bool upon loading
 
         aws_credentials_dir = self.AWS_CREDENTIALS_DIR.format(project=self.project)
         self.environment = {
