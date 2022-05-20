@@ -119,12 +119,12 @@ def shell(tf, mfa, sso):
     tf.start_shell()
 
 
-@terraform.command()
+@terraform.command("format")
 @click.option("--check",
               is_flag=True,
               help="Only perform format checking, do not rewrite the files.")
 @pass_container
-def fmt(tf, check):
+def _format(tf, check):
     """ Check if all files meet the canonical format and rewrite them accordingly. """
     args = ["-recursive"]
     if check:
