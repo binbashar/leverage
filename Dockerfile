@@ -17,6 +17,7 @@ RUN mkdir /root/.ssh
 RUN touch /root/.gitconfig
 
 WORKDIR /leverage
+RUN git config --global --add safe.directory /leverage
 # Install requirements for running unit tests
 COPY ./dev-requirements.txt .
 RUN pip install -r dev-requirements.txt
