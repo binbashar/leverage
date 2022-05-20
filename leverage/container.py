@@ -195,6 +195,8 @@ class LeverageContainer:
             return self.client.api.create_container(**self.container_config)
 
         except APIError as exc:
+            exc.__traceback__ = None
+            exc.__context__.__traceback__ = None
             logger.exception("Error creating container:", exc_info=exc)
             raise Exit(1)
 
@@ -212,6 +214,8 @@ class LeverageContainer:
             return run_func(self.client, container)
 
         except APIError as exc:
+            exc.__traceback__ = None
+            exc.__context__.__traceback__ = None
             logger.exception("Error during container execution:", exc_info=exc)
 
         finally:
