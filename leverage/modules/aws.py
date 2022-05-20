@@ -11,7 +11,7 @@ from leverage.container import AWSCLIContainer
 
 
 def _handle_subcommand(context, cli_container, args, caller_name=None):
-    """ Decide if command corresponds to a hijacked one or not and run accordingly.
+    """ Decide if command corresponds to a wrapped one or not and run accordingly.
 
     Args:
         context (click.context): Current context
@@ -24,11 +24,11 @@ def _handle_subcommand(context, cli_container, args, caller_name=None):
     """
     caller_pos = args.index(caller_name) if caller_name is not None else 0
 
-    # Find if one of the hijacked subcommand was invoked
-    hijacked_subcommands = context.command.commands.keys()
+    # Find if one of the wrapped subcommand was invoked
+    wrapped_subcommands = context.command.commands.keys()
     subcommand = next((arg
                        for arg in args[caller_pos:]
-                       if arg in hijacked_subcommands), None)
+                       if arg in wrapped_subcommands), None)
 
     if subcommand is None:
         # Pass command to aws cli directly
@@ -37,7 +37,7 @@ def _handle_subcommand(context, cli_container, args, caller_name=None):
             raise Exit(exit_code)
 
     else:
-        # Invoke hijacked command
+        # Invoke wrapped command
         subcommand = context.command.commands.get(subcommand)
         if not subcommand.params:
             context.invoke(subcommand)
