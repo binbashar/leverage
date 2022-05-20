@@ -1,7 +1,6 @@
 """
     Utilities to obtain relevant files' and directories' locations
 """
-import sys
 from pathlib import Path
 from subprocess import run
 from subprocess import PIPE
@@ -49,9 +48,6 @@ def get_root_path():
     except CalledProcessError as exc:
         if "fatal: not a git repository" in exc.stderr:
             raise NotARepositoryError("Not running in a git repository.")
-        else:
-            print(exc.stderr)
-            sys.exit()
 
     return root.strip()
 
