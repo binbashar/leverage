@@ -38,7 +38,10 @@ CONTEXT_SETTINGS = {
 @click.pass_context
 def init(context, tf, no_backend, args):
     """ Initialize this layer. """
-    context.invoke(validate_layout) # Validate layout before attempting to initialize Terraform
+    is_layout_valid = context.invoke(validate_layout) # Validate layout before attempting to initialize Terraform
+    if not is_layout_valid:
+        logger.error("Layer configuration is not valid. Exiting.")
+        raise Exit(1)
 
     backend_config = ["-backend=false" if no_backend else f"-backend-config={tf.TF_BACKEND_TFVARS}"]
     args = backend_config + list(args)
@@ -154,7 +157,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         list: Backend bucket key parts
     """
     layer_path = cwd.relative_to(account_dir)
-    layer_path = layer_path.as_posix().split("/")    
+    layer_path = layer_path.as_posix().split("/")
     # Remove region directory
     layer_path = layer_path[1:] if re.match(REGION, layer_path[0]) else layer_path
     # Remove layer name prefix
@@ -194,6 +197,9 @@ def validate_layout(tf):
         logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
         raise Exit(1)
 
+    # Flag to report layout validity
+    valid_layout = True
+
     # Check backend bucket key
     expected_backend_key = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
     logger.info(f"Checking if backend key matches '{'/'.join(expected_backend_key)}/terraform.tfstate'...")
@@ -201,6 +207,7 @@ def validate_layout(tf):
         logger.info("[green]✔ OK[/green]\n")
     else:
         logger.error("[red]✘ FAILED[/red]\n")
+        valid_layout = False
 
     backend_tfvars = tf.account_config_dir / tf.BACKEND_TFVARS
     backend_tfvars = hcl2.loads(backend_tfvars.read_text()) if backend_tfvars.exists() else {}
@@ -215,8 +222,9 @@ def validate_layout(tf):
             logger.info("[green]✔ OK[/green]\n")
         else:
             logger.error("[red]✘ FAILED[/red]\n")
+            valid_layout = False
 
-    logger.info("Done.")
+    return valid_layout
 
 
 @terraform.command("import")
