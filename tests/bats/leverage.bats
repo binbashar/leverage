@@ -89,7 +89,7 @@ teardown(){
     
     # .env file in root directory with USE_VERBOSE_HELLO=false
     cp "$BUILD_SCRIPTS/load_env_build.py" "$ROOT_DIR/build.py"
-    echo "USE_VERBOSE_HELLO=false" > "$ROOT_DIR/build.env"
+    echo "USE_VERBOSE_HELLO=false" >> "$ROOT_DIR/build.env"
     cd "$ROOT_DIR/account"
 
     run leverage run confhello
@@ -104,7 +104,7 @@ teardown(){
     # .env file in root directory with USE_VERBOSE_HELLO=false
     # .env file in account directory with USE_VERBOSE_HELLO=true (should override root .env)
     cp "$BUILD_SCRIPTS/load_env_build.py" "$ROOT_DIR/build.py"
-    echo "USE_VERBOSE_HELLO=false" > "$ROOT_DIR/build.env"
+    echo "USE_VERBOSE_HELLO=false" >> "$ROOT_DIR/build.env"
     echo "USE_VERBOSE_HELLO=true" > "$ACC_DIR/build.env"
     cd "$ACC_DIR"
 

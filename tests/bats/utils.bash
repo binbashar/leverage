@@ -8,6 +8,7 @@ _create_directory_structure(){
         And print the root path
     "
     ROOT_DIR=$(mktemp -d -t tmpXXXXXX)
+    printf "PROJECT=ts\nTERRAFORM_IMAGE_TAG=%s\n" "$LEVERAGE_IMAGE_TAG" > $ROOT_DIR/"build.env"
     mkdir -p "$ROOT_DIR/config"
     mkdir -p "$ROOT_DIR/account"
     echo $ROOT_DIR

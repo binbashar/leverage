@@ -32,7 +32,7 @@ Integration tests:
 bats -r tests/bats
 ```
 ### Using docker image
-A Docker image suitable for running all tests is provided and [available in DockerHub](https://hub.docker.com/r/binbash/leverage-cli-testing).
+A Docker image suitable for running all tests can be crafted by running `make build-image`. After crafting the image all tests can be executed.
 
 To run all tests, run `make tests`. Alternatively `make test-unit` or `make test-int` for unit or integration tests respectively.
 
