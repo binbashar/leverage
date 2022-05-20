@@ -18,7 +18,6 @@ teardown(){
     ROOT_DIR=$(_create_leverage_directory_structure)
 
     # Create required build.env in root directory and go there
-    echo "PROJECT=ts" > "$ROOT_DIR/build.env"
     cd "$ROOT_DIR"
 
     run leverage terraform version
