@@ -6,7 +6,7 @@ jobs:
   unit_tests:
     runs-on: ubuntu-latest 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: build_image
         run: |
@@ -23,7 +23,7 @@ jobs:
   integration_tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: build_image
         run: |
