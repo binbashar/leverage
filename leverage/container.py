@@ -97,7 +97,10 @@ class LeverageContainer:
 
         # Set image to use
         self.image = self.env_conf.get("TERRAFORM_IMAGE", self.LEVERAGE_IMAGE)
-        self.image_tag = self.env_conf.get("TERRAFORM_IMAGE_TAG", self.DEFAULT_IMAGE_TAG)
+        self.image_tag = self.env_conf.get("TERRAFORM_IMAGE_TAG")
+        if not self.image_tag:
+            logger.error("No docker image tag defined.\n"
+                         "Please set `TERRAFORM_IMAGE_TAG` variable before running a Leverage command.")
 
         # Get project name
         self.project = self.env_conf.get("PROJECT", self.common_conf.get("project", False))
@@ -192,6 +195,8 @@ class LeverageContainer:
             return self.client.api.create_container(**self.container_config)
 
         except APIError as exc:
+            exc.__traceback__ = None
+            exc.__context__.__traceback__ = None
             logger.exception("Error creating container:", exc_info=exc)
             raise Exit(1)
 
@@ -209,6 +214,8 @@ class LeverageContainer:
             return run_func(self.client, container)
 
         except APIError as exc:
+            exc.__traceback__ = None
+            exc.__context__.__traceback__ = None
             logger.exception("Error during container execution:", exc_info=exc)
 
         finally:
