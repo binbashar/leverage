@@ -15,12 +15,7 @@ from leverage.modules import terraform
 from leverage.modules import credentials
 
 
-CONTEXT_SETTINGS = {
-    "help_option_names": ["-h", "--help"]
-}
-
-
-@click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
+@click.group(invoke_without_command=True)
 @click.option("--filename", "-f",
               default="build.py",
               show_default=True,

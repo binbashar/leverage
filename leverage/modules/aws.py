@@ -10,10 +10,49 @@ from leverage.container import get_docker_client
 from leverage.container import AWSCLIContainer
 
 
-CONTEXT_SETTINGS={"ignore_unknown_options": True}
+def _handle_subcommand(context, cli_container, args, caller_name=None):
+    """ Decide if command corresponds to a wrapped one or not and run accordingly.
+
+    Args:
+        context (click.context): Current context
+        cli_container (AWSCLIContainer): Container where commands will be executed
+        args (tuple(str)): Arguments received by Leverage
+        caller_name (str, optional): Calling command. Defaults to None.
+
+    Raises:
+        Exit: Whenever container execution returns a non zero exit code
+    """
+    caller_pos = args.index(caller_name) if caller_name is not None else 0
+
+    # Find if one of the wrapped subcommand was invoked
+    wrapped_subcommands = context.command.commands.keys()
+    subcommand = next((arg
+                       for arg in args[caller_pos:]
+                       if arg in wrapped_subcommands), None)
+
+    if subcommand is None:
+        # Pass command to aws cli directly
+        exit_code = cli_container.start(" ".join(args))
+        if not exit_code:
+            raise Exit(exit_code)
+
+    else:
+        # Invoke wrapped command
+        subcommand = context.command.commands.get(subcommand)
+        if not subcommand.params:
+            context.invoke(subcommand)
+        else:
+            context.forward(subcommand)
 
 
-@click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
+CONTEXT_SETTINGS={
+    "ignore_unknown_options": True
+}
+
+
+@click.group(invoke_without_command=True,
+             add_help_option=False,
+             context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @pass_state
 @click.pass_context
@@ -23,46 +62,18 @@ def aws(context, state, args):
     state.container = cli
     state.container.ensure_image()
 
-    if not args:
-        click.echo(context.get_help())
-        return
-
-    # Find if one of the hijacked commands was invoked
-    index = None
-    for command in context.command.commands.keys():
-        if command in args:
-            index = args.index(command)
-            break
-
-    if index is None:
-        exit_code = cli.start(" ".join(list(args)))
-        if not exit_code:
-            raise Exit(exit_code)
-        return
-
-    # Invoke hijacked command
-    command = context.command.commands.get(args[index])
-    context.invoke(command, args=(*args[index+1:], *args[:index]))
+    _handle_subcommand(context=context, cli_container=cli, args=args)
 
 
-@aws.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
+@aws.group(invoke_without_command=True,
+           add_help_option=False,
+           context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @pass_container
 @click.pass_context
 def configure(context, cli, args):
     """ configure """
-    if not args:
-        click.echo(context.get_help())
-        return
-
-    command = context.command.commands.get(args[0])
-    if command is not None:
-        context.invoke(command)
-        return
-
-    exit_code = cli.start(" ".join(["configure"] + list(args)))
-    if not exit_code:
-        raise Exit(exit_code)
+    _handle_subcommand(context=context, cli_container=cli, args=args, caller_name="configure")
 
 
 @configure.command("sso")
@@ -126,24 +137,15 @@ def _sso(context, cli):
         raise Exit(exit_code)
 
 
-@aws.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
+@aws.group(invoke_without_command=True,
+           add_help_option=False,
+           context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @pass_container
 @click.pass_context
 def sso(context, cli, args):
-    """ SSO """
-    if not args:
-        click.echo(context.get_help())
-        return
-
-    command = context.command.commands.get(args[0])
-    if command is not None:
-        context.invoke(command)
-        return
-
-    exit_code = cli.start(" ".join(["sso"] + list(args)))
-    if not exit_code:
-        raise Exit(exit_code)
+    """ sso """
+    _handle_subcommand(context=context, cli_container=cli, args=args, caller_name="sso")
 
 
 @sso.command()
