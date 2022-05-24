@@ -309,7 +309,7 @@ def create():
     terraform.ensure_image()
     terraform.disable_authentication()
     with console.status("Formatting..."):
-        terraform.start("fmt", "-recursive")
+        terraform.exec("fmt", "-recursive")
 
     logger.info("Finished setting up project.")
 
