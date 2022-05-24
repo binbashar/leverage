@@ -457,7 +457,7 @@ class TerraformContainer(LeverageContainer):
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
 
-    def _check_for_layer_location(self):
+    def check_for_layer_location(self):
         """ Make sure the command is being ran at layer level. If not, bail. """
         if self.cwd in (self.common_config_dir, self.account_config_dir):
             logger.error("Currently in a configuration directory, no Terraform command can be run here.")
@@ -479,7 +479,7 @@ class TerraformContainer(LeverageContainer):
 
     def start_in_layer(self, command, *arguments):
         """ Run a command that can only be performed in layer level. """
-        self._check_for_layer_location()
+        self.check_for_layer_location()
 
         return self.start(command, *arguments)
 
