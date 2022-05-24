@@ -50,22 +50,12 @@ class LeverageContainer:
     NOTE: An aggregation approach to this design should be considered instead of the current inheritance approach.
     """
     LEVERAGE_IMAGE = "binbash/terraform-awscli-slim"
-    DEFAULT_IMAGE_TAG = "1.0.9"
-    WORKING_DIR = "/project/"
 
-    AWS_CREDENTIALS_DIR = "/root/tmp/{project}"
     SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com"
-
-    TF_COMMON_CONFIG_DIR = "/common-config"
-    TF_ACCOUNT_CONFIG_DIR = "/config"
 
     COMMON_TFVARS = "common.tfvars"
     ACCOUNT_TFVARS = "account.tfvars"
     BACKEND_TFVARS = "backend.tfvars"
-
-    TF_COMMON_TFVARS = f"{TF_COMMON_CONFIG_DIR}/{COMMON_TFVARS}"
-    TF_ACCOUNT_TFVARS = f"{TF_ACCOUNT_CONFIG_DIR}/{ACCOUNT_TFVARS}"
-    TF_BACKEND_TFVARS = f"{TF_ACCOUNT_CONFIG_DIR}/{BACKEND_TFVARS}"
 
     def __init__(self, client):
         """ Project related paths are determined and stored. Project configuration is loaded.
@@ -101,12 +91,16 @@ class LeverageContainer:
         if not self.image_tag:
             logger.error("No docker image tag defined.\n"
                          "Please set `TERRAFORM_IMAGE_TAG` variable before running a Leverage command.")
+            raise Exit(1)
 
         # Get project name
-        self.project = self.env_conf.get("PROJECT", self.common_conf.get("project", False))
+        self.project = self.common_conf.get("project", self.env_conf.get("PROJECT", False))
         if not self.project:
             logger.error("Project name has not been set. Exiting.")
             raise Exit(1)
+
+        # Project mount location
+        self.guest_base_path = f"/{self.common_conf.get('project_long', 'project')}"
 
         # Ensure credentials directory
         self.host_aws_credentials_dir = self.home / ".aws" / self.project
@@ -124,7 +118,7 @@ class LeverageContainer:
             "stdin_open": True,
             "environment": {},
             "entrypoint": "",
-            "working_dir": self.WORKING_DIR,
+            "working_dir": f"{self.guest_base_path}/{self.cwd.relative_to(self.root_dir).as_posix()}",
             "host_config": self.host_config
         }
 
@@ -151,6 +145,26 @@ class LeverageContainer:
     @mounts.setter
     def mounts(self, value):
         self.container_config["host_config"]["Mounts"] = value
+
+    @property
+    def guest_account_base_path(self):
+        return f"{self.guest_base_path}/{self.account_dir.relative_to(self.root_dir).as_posix()}"
+
+    @property
+    def common_tfvars(self):
+        return f"{self.guest_base_path}/config/{self.COMMON_TFVARS}"
+
+    @property
+    def account_tfvars(self):
+        return f"{self.guest_account_base_path}/config/{self.ACCOUNT_TFVARS}"
+
+    @property
+    def backend_tfvars(self):
+        return f"{self.guest_account_base_path}/config/{self.BACKEND_TFVARS}"
+
+    @property
+    def guest_aws_credentials_dir(self):
+        return f"/root/tmp/{self.project}"
 
     def ensure_image(self):
         """ Make sure the required Docker image is available in the system. If not, pull it from registry. """
@@ -292,30 +306,20 @@ class AWSCLIContainer(LeverageContainer):
     def __init__(self, client):
         super().__init__(client)
 
-        aws_credentials_dir = self.AWS_CREDENTIALS_DIR.format(project=self.project)
         self.environment = {
-            "COMMON_CONFIG_FILE": self.TF_COMMON_TFVARS,
-            "ACCOUNT_CONFIG_FILE": self.TF_ACCOUNT_TFVARS,
-            "BACKEND_CONFIG_FILE": self.TF_BACKEND_TFVARS,
-            "AWS_SHARED_CREDENTIALS_FILE": f"{aws_credentials_dir}/credentials",
-            "AWS_CONFIG_FILE": f"{aws_credentials_dir}/config",
-            "SSO_CACHE_DIR": f"{aws_credentials_dir}/sso/cache",
+            "COMMON_CONFIG_FILE": self.common_tfvars,
+            "ACCOUNT_CONFIG_FILE": self.account_tfvars,
+            "BACKEND_CONFIG_FILE": self.backend_tfvars,
+            "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
+            "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
+            "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level()
         }
         self.entrypoint = self.AWS_CLI_BINARY
         self.mounts = [
-            Mount(source=self.cwd.as_posix(), target=self.WORKING_DIR, type="bind"),
-            Mount(source=self.host_aws_credentials_dir.as_posix(), target=aws_credentials_dir, type="bind")
+            Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
+            Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind")
         ]
-        # We have to guard against some situations in which these directories won't exist.
-        if self.common_config_dir.parent == self.root_dir and self.common_config_dir.exists():
-            self.mounts.append(
-                Mount(source=self.common_config_dir.as_posix(), target=self.TF_COMMON_CONFIG_DIR, type="bind")
-            )
-        if self.account_dir.parent == self.root_dir and self.account_config_dir.exists():
-            self.mounts.append(
-                Mount(source=self.account_config_dir.as_posix(), target=self.TF_ACCOUNT_CONFIG_DIR, type="bind")
-            )
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
@@ -352,11 +356,6 @@ class TerraformContainer(LeverageContainer):
     TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
     TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
 
-    TF_DEFAULT_ARGS = [f"-var-file={var}"
-                       for var in (LeverageContainer.TF_COMMON_TFVARS,
-                                   LeverageContainer.TF_ACCOUNT_TFVARS,
-                                   LeverageContainer.TF_BACKEND_TFVARS)]
-
     def __init__(self, client):
         super().__init__(client)
 
@@ -368,34 +367,59 @@ class TerraformContainer(LeverageContainer):
         self.sso_enabled = self.common_conf.get("sso_enabled", False)
         self.mfa_enabled = self.env_conf.get("MFA_ENABLED", "false") == "true" # TODO: Convert values to bool upon loading
 
-        aws_credentials_dir = self.AWS_CREDENTIALS_DIR.format(project=self.project)
         self.environment = {
-            "COMMON_CONFIG_FILE": self.TF_COMMON_TFVARS,
-            "ACCOUNT_CONFIG_FILE": self.TF_ACCOUNT_TFVARS,
-            "BACKEND_CONFIG_FILE": self.TF_BACKEND_TFVARS,
-            "AWS_SHARED_CREDENTIALS_FILE": f"{aws_credentials_dir}/credentials",
-            "AWS_CONFIG_FILE": f"{aws_credentials_dir}/config",
-            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{aws_credentials_dir}/credentials", # Legacy?
-            "SRC_AWS_CONFIG_FILE": f"{aws_credentials_dir}/config", # Legacy?
-            "AWS_CACHE_DIR": f"{aws_credentials_dir}/cache",
-            "SSO_CACHE_DIR": f"{aws_credentials_dir}/sso/cache",
+            "COMMON_CONFIG_FILE": self.common_tfvars,
+            "ACCOUNT_CONFIG_FILE": self.account_tfvars,
+            "BACKEND_CONFIG_FILE": self.backend_tfvars,
+            "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
+            "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
+            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials", # Legacy?
+            "SRC_AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config", # Legacy?
+            "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
+            "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
             "MFA_SCRIPT_LOG_LEVEL": get_script_log_level() # Legacy
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
-            Mount(source=self.cwd.as_posix(), target=self.WORKING_DIR, type="bind"),
-            Mount(source=self.host_aws_credentials_dir.as_posix(), target=aws_credentials_dir, type="bind"),
-            Mount(source=self.common_config_dir.as_posix(), target=self.TF_COMMON_CONFIG_DIR, type="bind"),
+            Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
+            Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
             Mount(source=(self.home / ".ssh").as_posix(), target="/root/.ssh", type="bind"),
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind")
         ]
-        if self.account_dir.parent == self.root_dir and self.account_config_dir.exists():
-            self.mounts.append(
-               Mount(source=self.account_config_dir.as_posix(), target=self.TF_ACCOUNT_CONFIG_DIR, type="bind")
-            )
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
+
+    def _guest_config_file(self, file):
+        """ Map config file in host to location in guest.
+
+        Args:
+            file (pathlib.Path): File in host to map
+
+        Raises:
+            Exit: If file is not contained in any valid config directory
+
+        Returns:
+            str: Path in guest to config file
+        """
+        file_name = file.name
+
+        if file.parent == self.account_config_dir:
+            return f"{self.guest_account_base_path}/config/{file_name}"
+        if file.parent == self.common_config_dir:
+            return f"{self.guest_base_path}/config/{file_name}"
+
+        logger.error("File is not part of any config directory.")
+        raise Exit(1)
+
+    @property
+    def tf_default_args(self):
+        """ Array of strings containing all valid config files for layer as parameters for Terraform """
+        common_config_files = [f"-var-file={self._guest_config_file(common_file)}"
+                               for common_file in self.common_config_dir.glob("*.tfvars")]
+        account_config_files = [f"-var-file={self._guest_config_file(account_file)}"
+                                for account_file in self.account_config_dir.glob("*.tfvars")]
+        return common_config_files + account_config_files
 
     def enable_mfa(self):
         """ Enable Multi-Factor Authentication. """
