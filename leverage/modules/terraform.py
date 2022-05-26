@@ -43,7 +43,7 @@ def init(context, tf, no_backend, args):
         logger.error("Layer configuration is not valid. Exiting.")
         raise Exit(1)
 
-    backend_config = ["-backend=false" if no_backend else f"-backend-config={tf.TF_BACKEND_TFVARS}"]
+    backend_config = ["-backend=false" if no_backend else f"-backend-config={tf.backend_tfvars}"]
     args = backend_config + list(args)
     exit_code = tf.start_in_layer("init", *args)
 
@@ -56,7 +56,7 @@ def init(context, tf, no_backend, args):
 @pass_container
 def plan(tf, args):
     """ Generate an execution plan for this layer. """
-    exit_code = tf.start_in_layer("plan", *tf.TF_DEFAULT_ARGS, *args)
+    exit_code = tf.start_in_layer("plan", *tf.tf_default_args, *args)
 
     if exit_code:
         raise Exit(exit_code)
@@ -67,7 +67,7 @@ def plan(tf, args):
 @pass_container
 def apply(tf, args):
     """ Build or change the infrastructure in this layer. """
-    exit_code = tf.start_in_layer("apply", *tf.TF_DEFAULT_ARGS, *args)
+    exit_code = tf.start_in_layer("apply", *tf.tf_default_args, *args)
 
     if exit_code:
         raise Exit(exit_code)
@@ -86,7 +86,7 @@ def output(tf, args):
 @pass_container
 def destroy(tf, args):
     """ Destroy infrastructure in this layer. """
-    exit_code = tf.start_in_layer("destroy", *tf.TF_DEFAULT_ARGS, *args)
+    exit_code = tf.start_in_layer("destroy", *tf.tf_default_args, *args)
 
     if exit_code:
         raise Exit(exit_code)
@@ -131,7 +131,7 @@ def _format(tf, check):
     """ Check if all files meet the canonical format and rewrite them accordingly. """
     args = ["-recursive"]
     if check:
-        args.extend(["-check", tf.WORKING_DIR])
+        args.extend(["-check", tf.cwd.as_posix()])
 
     tf.disable_authentication()
     tf.start("fmt", *args)
@@ -233,7 +233,7 @@ def validate_layout(tf):
 @pass_container
 def _import(tf, address, _id):
     """ Import a resource. """
-    exit_code = tf.start_in_layer("import", *tf.TF_DEFAULT_ARGS, address, _id)
+    exit_code = tf.start_in_layer("import", *tf.tf_default_args, address, _id)
 
     if exit_code:
         raise Exit(exit_code)
