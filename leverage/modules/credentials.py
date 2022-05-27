@@ -17,14 +17,13 @@ from leverage import logger
 from leverage.path import get_root_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
-from leverage.conf import ENV_CONFIG_FILE
 from leverage._internals import pass_state
 from leverage.container import get_docker_client
 from leverage.container import AWSCLIContainer
 
 
 # Regexes for general validation
-PROJECT_SHORT = r"[a-z]{2}"
+PROJECT_SHORT = r"[a-z]{2,4}"
 USERNAME = r"[a-zA-Z0-9\+,=\.@\-_]{1,64}" # https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html#id_users_create_console
                                           # https://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateUser.html#API_CreateUser_RequestParameters
 KEY_ID = r"[A-Z0-9]{20}"
@@ -42,7 +41,6 @@ except NotARepositoryError:
     PROJECT_COMMON_TFVARS = PROJECT_ROOT = Path.cwd()
 
 PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / "common.tfvars"
-PROJECT_ENV_CONFIG = PROJECT_ROOT / ENV_CONFIG_FILE
 PROJECT_CONFIG = PROJECT_ROOT / "project.yaml"
 AWSCLI_CONFIG_DIR = Path.home() / ".aws"
 
@@ -51,19 +49,16 @@ PROFILES = {
         "choice_title": "Bootstrap credentials (temporary)",
         "profile_role": "oaar",
         "role": "OrganizationAccountAccessRole",
-        "mfa": False
     },
     "management": {
         "choice_title": "Management credentials",
         "profile_role": "oaar",
         "role": "OrganizationAccountAccessRole",
-        "mfa": True
     },
     "security": {
         "choice_title": "DevOps credentials",
         "profile_role": "devops",
         "role": "DevOps",
-        "mfa": True
     }
 }
 
@@ -294,7 +289,6 @@ def _load_configs_for_credentials():
         config_values["organization"]["accounts"].extend(project_accounts)
 
     config_values["mfa_enabled"] = env_config.get("MFA_ENABLED", "false")
-    config_values["terraform_image_tag"] = env_config.get("TERRAFORM_IMAGE_TAG", "1.0.9")
 
     return config_values
 
@@ -499,7 +493,7 @@ def configure_profile(profile, values):
             raise Exit(exit_code)
 
 
-def configure_accounts_profiles(profile, region, organization_accounts, project_accounts):
+def configure_accounts_profiles(profile, region, organization_accounts, project_accounts, fetch_mfa_device):
     """ Set up the required profiles for all accounts to be used with AWS cli. Backup previous profiles.
 
     Args:
@@ -507,15 +501,16 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         region (str): Region.
         organization_accounts (dict): Name and id of all accounts in the organization.
         project_accounts (dict): Name and email of all accounts in project configuration file.
+        fetch_mfa_device (bool): Whether to fetch MFA device for profiles.
     """
     short_name, type = profile.split("-")
 
     mfa_serial = ""
-    if PROFILES[type]["mfa"]:
+    if fetch_mfa_device:
         logger.info("Fetching MFA device serial.")
         mfa_serial = _get_mfa_serial(profile)
         if not mfa_serial:
-            logger.error("No MFA device found for user. Please set up a device before configuring the accounts profiles.")
+            logger.error("No MFA device found for user.")
             raise Exit(1)
 
     account_profiles = {}
@@ -530,14 +525,16 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         if account_id is None:
             continue
 
-        # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = {
+        account_profile = {
             "output": "json",
             "region": region,
             "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[type]['role']}",
-            "source_profile": profile,
-            "mfa_serial": mfa_serial
+            "source_profile": profile
         }
+        if mfa_serial:
+            account_profile["mfa_serial"] = mfa_serial
+        # A profile identifier looks like `le-security-oaar`
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = account_profile   
 
     logger.info("Backing up account profiles file.")
     _backup_file("config")
@@ -615,6 +612,9 @@ def mutually_exclusive(context, param, value):
 @click.option("--credentials-file",
               type=click.Path(exists=True, path_type=Path),
               help="Path to AWS cli credentials file.")
+@click.option("--fetch-mfa-device",
+              is_flag=True,
+              help="Fetch MFA device configured for user.")
 @click.option("--overwrite-existing-credentials",
               is_flag=True,
               callback=mutually_exclusive,
@@ -624,12 +624,12 @@ def mutually_exclusive(context, param, value):
               is_flag=True,
               callback=mutually_exclusive,
               help=("Skip access keys configuration. Continue on with assumable roles setup.\n"
-                   "Mutually exclusive with --overwrite-existing-credentials."))
+                    "Mutually exclusive with --overwrite-existing-credentials."))
 @click.option("--skip-assumable-roles-setup",
               is_flag=True,
               help="Don't configure the accounts assumable roles.")
 # TODO: Add --override-role-name parameter for non-default roles in accounts
-def configure(type, credentials_file, overwrite_existing_credentials, skip_access_keys_setup, skip_assumable_roles_setup):
+def configure(type, credentials_file, fetch_mfa_device, overwrite_existing_credentials, skip_access_keys_setup, skip_assumable_roles_setup):
     """ Configure credentials for the project.
 
     It can handle the credentials required for the initial deployment of the project (BOOTSTRAP),
@@ -640,10 +640,6 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
         return
 
     config_values = _load_configs_for_credentials()
-
-    # Environment configuration variables are needed for the Leverage docker container
-    if not PROJECT_ENV_CONFIG.exists():
-        PROJECT_ENV_CONFIG.write_text(f"PROJECT={config_values['short_name']}")
 
     type = type.lower()
     short_name = config_values.get("short_name")
@@ -712,7 +708,7 @@ def configure(type, credentials_file, overwrite_existing_credentials, skip_acces
         if organization_accounts or accounts:
             logger.info("Configuring assumable roles.")
 
-            configure_accounts_profiles(profile, config_values["primary_region"], organization_accounts, accounts)
+            configure_accounts_profiles(profile, config_values["primary_region"], organization_accounts, accounts, fetch_mfa_device)
             logger.info(f"[bold]Account profiles configured in:[/bold]"
                         f" {(AWSCLI_CONFIG_DIR / short_name / 'config').as_posix()}")
 
