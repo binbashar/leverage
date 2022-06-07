@@ -1,5 +1,6 @@
 import re
 from time import sleep
+
 import hcl2
 import click
 from click.exceptions import Exit
