@@ -1,4 +1,5 @@
 import re
+from time import sleep
 import hcl2
 import click
 from click.exceptions import Exit
@@ -31,20 +32,19 @@ CONTEXT_SETTINGS = {
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
-@click.option("--no-backend",
-              is_flag=True)
 @click.argument("args", nargs=-1)
 @pass_container
 @click.pass_context
-def init(context, tf, no_backend, args):
+def init(context, tf, args):
     """ Initialize this layer. """
     is_layout_valid = context.invoke(validate_layout) # Validate layout before attempting to initialize Terraform
     if not is_layout_valid:
-        logger.error("Layer configuration is not valid. Exiting.")
-        raise Exit(1)
+        logger.warning("[yellow]‼[/yellow] Layer configuration doesn't seem valid. Proceed with caution.\n")
+        sleep(1) # Give the user a little more time to cancel
 
-    backend_config = ["-backend=false" if no_backend else f"-backend-config={tf.backend_tfvars}"]
-    args = backend_config + list(args)
+    args = [arg for index, arg in enumerate(args)
+            if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
+    args.append(f"-backend-config={tf.backend_tfvars}")
     exit_code = tf.start_in_layer("init", *args)
 
     if exit_code:
@@ -122,17 +122,12 @@ def shell(tf, mfa, sso):
     tf.start_shell()
 
 
-@terraform.command("format")
-@click.option("--check",
-              is_flag=True,
-              help="Only perform format checking, do not rewrite the files.")
+@terraform.command("format", context_settings=CONTEXT_SETTINGS)
+@click.argument("args", nargs=-1)
 @pass_container
-def _format(tf, check):
+def _format(tf, args):
     """ Check if all files meet the canonical format and rewrite them accordingly. """
-    args = ["-recursive"]
-    if check:
-        args.extend(["-check", tf.cwd.as_posix()])
-
+    args = args if "-recursive" in args else (*args, "-recursive")
     tf.disable_authentication()
     tf.start("fmt", *args)
 
@@ -202,10 +197,15 @@ def validate_layout(tf):
 
     # Check backend bucket key
     expected_backend_key = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
-    logger.info(f"Checking if backend key matches '{'/'.join(expected_backend_key)}/terraform.tfstate'...")
-    if backend_key[:-1] == expected_backend_key:
+    logger.info(f"Checking backend key...")
+    logger.info(f"Found: '{'/'.join(backend_key)}'")
+    backend_key = backend_key[:-1]
+    if backend_key == expected_backend_key:
         logger.info("[green]✔ OK[/green]\n")
+    elif backend_key == [expected_backend_key[0], f"{expected_backend_key[1]}-dr", *expected_backend_key[2:]]:
+        logger.info("[green]✔ OK[/green] (Seems to be a disaster recovery layer.)\n")
     else:
+        logger.info(f"Expected: '{'/'.join(expected_backend_key)}/terraform.tfstate'")
         logger.error("[red]✘ FAILED[/red]\n")
         valid_layout = False
 
