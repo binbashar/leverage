@@ -33,15 +33,19 @@ CONTEXT_SETTINGS = {
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.option("-skip-validation",
+              is_flag=True,
+              help="Skip layout validation.")
 @click.argument("args", nargs=-1)
 @pass_container
 @click.pass_context
-def init(context, tf, args):
+def init(context, tf, skip_validation, args):
     """ Initialize this layer. """
-    is_layout_valid = context.invoke(validate_layout) # Validate layout before attempting to initialize Terraform
-    if not is_layout_valid:
-        logger.warning("[yellow]‼[/yellow] Layer configuration doesn't seem valid. Proceed with caution.\n")
-        sleep(1) # Give the user a little more time to cancel
+    if not skip_validation:
+        is_layout_valid = context.invoke(validate_layout) # Validate layout before attempting to initialize Terraform
+        if not is_layout_valid:
+            logger.error("Layer configuration is not valid. Exiting.")
+            raise Exit(1)
 
     args = [arg for index, arg in enumerate(args)
             if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
