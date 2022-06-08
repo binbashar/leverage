@@ -515,7 +515,7 @@ class TerraformContainer(LeverageContainer):
     def start_shell(self):
         """ Launch a shell in the container. """
         if self.mfa_enabled or self.sso_enabled:
-            self._check_for_layer_location()
+            self.check_for_layer_location()
 
         self.entrypoint = ""
         self._prepare_container()
