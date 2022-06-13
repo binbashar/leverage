@@ -43,7 +43,7 @@ def init(context, tf, skip_validation, args):
     # Validate layout before attempting to initialize Terraform
     if not skip_validation and not context.invoke(validate_layout):
         logger.error("Layer configuration doesn't seem to be valid. Exiting.\n"
-                     "If you are sure your configuration is actually correct, "
+                     "If you are sure your configuration is actually correct "
                      "you may skip this validation using the --skip-validation flag.")
         raise Exit(1)
 
