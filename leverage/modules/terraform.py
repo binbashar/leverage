@@ -1,5 +1,4 @@
 import re
-from time import sleep
 
 import hcl2
 import click
@@ -33,7 +32,7 @@ CONTEXT_SETTINGS = {
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
-@click.option("-skip-validation",
+@click.option("--skip-validation",
               is_flag=True,
               help="Skip layout validation.")
 @click.argument("args", nargs=-1)
@@ -41,11 +40,12 @@ CONTEXT_SETTINGS = {
 @click.pass_context
 def init(context, tf, skip_validation, args):
     """ Initialize this layer. """
-    if not skip_validation:
-        is_layout_valid = context.invoke(validate_layout) # Validate layout before attempting to initialize Terraform
-        if not is_layout_valid:
-            logger.error("Layer configuration is not valid. Exiting.")
-            raise Exit(1)
+    # Validate layout before attempting to initialize Terraform
+    if not skip_validation and not context.invoke(validate_layout):
+        logger.error("Layer configuration is not valid. Exiting.\n"
+                     "If you are sure your configuration is actually correct, "
+                     "you may skip this validation using the --skip-validation flag.")
+        raise Exit(1)
 
     args = [arg for index, arg in enumerate(args)
             if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
@@ -202,7 +202,7 @@ def validate_layout(tf):
 
     # Check backend bucket key
     expected_backend_key = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
-    logger.info(f"Checking backend key...")
+    logger.info("Checking backend key...")
     logger.info(f"Found: '{'/'.join(backend_key)}'")
     backend_key = backend_key[:-1]
     if backend_key == expected_backend_key:
