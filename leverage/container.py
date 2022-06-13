@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 from datetime import datetime
@@ -9,7 +10,6 @@ import dockerpty
 from docker import DockerClient
 from docker.errors import APIError
 from docker.types import Mount
-
 from leverage import logger
 from leverage.logger import console
 from leverage.logger import get_script_log_level
@@ -293,6 +293,12 @@ class LeverageContainer:
             int, str: Execution exit code and output/
         """
         return self._exec(command, *arguments)
+    
+    def _change_credentials_ownership(self):
+        entrypoint = self.entrypoint
+        self.entrypoint = ""
+        self.exec(f"chown -R {os.getuid()}:{os.getgid()} {self.guest_aws_credentials_dir}")
+        self.entrypoint = entrypoint
 
 
 class AWSCLIContainer(LeverageContainer):
