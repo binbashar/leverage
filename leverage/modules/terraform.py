@@ -191,8 +191,7 @@ def validate_layout(tf):
         config_tf = hcl2.loads(config_tf.read_text()) if config_tf.exists() else {}
         backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"].split("/")
     except (KeyError, IndexError):
-        logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
-        raise Exit(1)
+        backend_key = None
     except:
         logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
         raise Exit(1)
@@ -200,19 +199,20 @@ def validate_layout(tf):
     # Flag to report layout validity
     valid_layout = True
 
-    # Check backend bucket key
-    expected_backend_key = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
-    logger.info("Checking backend key...")
-    logger.info(f"Found: '{'/'.join(backend_key)}'")
-    backend_key = backend_key[:-1]
-    if backend_key == expected_backend_key:
-        logger.info("[green]✔ OK[/green]\n")
-    elif backend_key == [expected_backend_key[0], f"{expected_backend_key[1]}-dr", *expected_backend_key[2:]]:
-        logger.info("[green]✔ OK[/green] (Seems to be a disaster recovery layer.)\n")
-    else:
-        logger.info(f"Expected: '{'/'.join(expected_backend_key)}/terraform.tfstate'")
-        logger.error("[red]✘ FAILED[/red]\n")
-        valid_layout = False
+    if backend_key is not None:
+        # Check backend bucket key
+        expected_backend_key = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
+        logger.info("Checking backend key...")
+        logger.info(f"Found: '{'/'.join(backend_key)}'")
+        backend_key = backend_key[:-1]
+        if backend_key == expected_backend_key:
+            logger.info("[green]✔ OK[/green]\n")
+        elif backend_key == [expected_backend_key[0], f"{expected_backend_key[1]}-dr", *expected_backend_key[2:]]:
+            logger.info("[green]✔ OK[/green] (Seems to be a disaster recovery layer.)\n")
+        else:
+            logger.info(f"Expected: '{'/'.join(expected_backend_key)}/terraform.tfstate'")
+            logger.error("[red]✘ FAILED[/red]\n")
+            valid_layout = False
 
     backend_tfvars = tf.account_config_dir / tf.BACKEND_TFVARS
     backend_tfvars = hcl2.loads(backend_tfvars.read_text()) if backend_tfvars.exists() else {}
