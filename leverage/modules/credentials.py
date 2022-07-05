@@ -210,17 +210,6 @@ def _ask_for_credentials():
 AWSCLI = None
 
 
-@click.group()
-@pass_state
-def credentials(state):
-    """ Manage AWS cli credentials. """
-    state.container = AWSCLIContainer(get_docker_client())
-    state.container.ensure_image()
-
-    global AWSCLI
-    AWSCLI = state.container
-
-
 def _load_project_yaml():
     """ Load project.yaml file contents. """
     if not PROJECT_CONFIG.exists():
@@ -234,6 +223,28 @@ def _load_project_yaml():
         exc.__traceback__ = None
         logger.exception(message="Error loading configuration file.", exc_info=exc)
         raise Exit(1)
+
+
+@click.group()
+@pass_state
+def credentials(state):
+    """ Manage AWS cli credentials. """
+
+    project_config =  _load_project_yaml()
+    short_name = project_config.get("short_name")
+    if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
+        logger.error("Invalid or missing project short name in project.yaml file.")
+        raise Exit(1)
+
+    build_env = Path("build.env")
+    if not build_env.exists():
+        build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG=1.1.9")
+
+    state.container = AWSCLIContainer(get_docker_client())
+    state.container.ensure_image()
+
+    global AWSCLI
+    AWSCLI = state.container
 
 
 def _load_configs_for_credentials():
