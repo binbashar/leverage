@@ -40,7 +40,8 @@ try:
 except NotARepositoryError:
     PROJECT_COMMON_TFVARS = PROJECT_ROOT = Path.cwd()
 
-PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / "common.tfvars"
+PROJECT_COMMON_TFVARS_FILE = "common.tfvars"
+PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / PROJECT_COMMON_TFVARS_FILE
 PROJECT_CONFIG = PROJECT_ROOT / "project.yaml"
 AWSCLI_CONFIG_DIR = Path.home() / ".aws"
 
@@ -230,22 +231,65 @@ def _load_project_yaml():
 def credentials(state):
     """ Manage AWS cli credentials. """
 
-    project_config =  _load_project_yaml()
-    short_name = project_config.get("short_name")
-    if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
-        logger.error("Invalid or missing project short name in project.yaml file.")
-        raise Exit(1)
+    """
+    Scenarios on project.yaml, build.env and common.tfvars files:
+    - if project is new project.yaml exists and build.env/common.tfvars don't
+    - if project is already started is likely project.yaml won't exist but build.env or common.tfvars do
 
-    build_env = Path("build.env")
-    if not build_env.exists():
-        build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG=1.1.9")
+    In any case one of them should exist. E.g.
+
+    if project.yaml exists:
+        create build.env with the short_name got from project.yaml
+    else:
+        if build.env exists:
+            continue
+        else:
+            if common.tfvars
+            raise an exception
+
+    If we reached the only common.tfvars scenario, we have no project name nor TERRAFORM_IMAGE_TAG.
+    So the best chance is to read the common.tfvars directly without a conatiner, e.g. with sed or grep
+    """
+    project_config =  _load_project_yaml()
+    build_env = Path(f"{PROJECT_ROOT}/build.env")
+
+    if project_config != {}:
+        logger.info('Reading info from project.yaml')
+        # project_config is not empty
+        short_name = project_config.get("short_name")
+        if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
+            logger.error("Invalid or missing project short name in project.yaml file.")
+            raise Exit(1)
+        if not build_env.exists():
+            build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG=1.1.9")
+    elif not build_env.exists():
+        # project_config is not empty
+        # and build.env does not exist
+        # trying common.tfvars
+        try:
+            found = False
+            with open(PROJECT_COMMON_TFVARS,"r") as file:
+                r=r'project = "(.+)"'
+                for line in file:
+                    g = re.search(r, line)
+                    if g:
+                        found = True
+                        logger.info('Reading info from common.tfvars')
+                        build_env.write_text(f"PROJECT={g[1]}\nTERRAFORM_IMAGE_TAG=1.1.9")
+                        break
+            if not found:
+                raise Exception('Config file not found')
+        except Exception as e:
+            logger.error(f"Neither project.yaml nor build.env nor common.tfvars files were found. {e}")
+            raise Exit(1)
+    else:
+        logger.info('Reading info from build.env')
+
 
     state.container = AWSCLIContainer(get_docker_client())
     state.container.ensure_image()
-
     global AWSCLI
     AWSCLI = state.container
-
 
 def _load_configs_for_credentials():
     """ Load all required values to configure credentials.
@@ -573,6 +617,9 @@ def _update_account_ids(config):
     if not PROJECT_COMMON_TFVARS.exists():
         return
 
+    container_base_dir = f"/{config['project_name']}/config"
+    container_common_tfvars_file = f"{container_base_dir}/{PROJECT_COMMON_TFVARS_FILE}"
+
     accs = []
     for account in config["organization"]["accounts"]:
         acc_name, acc_email, acc_id = account.values()
@@ -580,10 +627,10 @@ def _update_account_ids(config):
         acc = [f"\n    email = \"{acc_email}\""]
         if acc_id:
             AWSCLI.system_exec("hcledit "
-                               "-f /common-config/common.tfvars -u"
-                               f" attribute set {acc_name}_account_id \"{acc_id}\"")
+                               f"-f {container_common_tfvars_file} -u"
+                               f" attribute set {acc_name}_account_id \"\\\"{acc_id}\\\"\"")
 
-            acc.append(f"    id = {acc_id}")
+            acc.append(f"    id = \"{acc_id}\"")
         acc = ",\n".join(acc)
 
         accs.append(f"\n  {acc_name} = {{{acc}\n  }}")
@@ -592,7 +639,7 @@ def _update_account_ids(config):
     accs = f"{{{accs}\n}}"
 
     AWSCLI.system_exec("hcledit "
-                       "-f /common-config/common.tfvars -u"
+                       f"-f {container_common_tfvars_file} -u"
                        f" attribute set accounts '{accs}'")
 
 
