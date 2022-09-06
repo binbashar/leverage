@@ -1,28 +1,30 @@
 name: Release Management
 
 on:
-  # push:
+  push:
   #   # branches to consider in the event; optional, defaults to all
-  #   branches:
-  #     - master
+    branches:
+      - master
   # pull_request event is required only for autolabeler
   pull_request:
     # Only following types are handled by the action, but one can default to all as well
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
+permissions:
+  contents: read
+  
 jobs:
   update_release_draft:
+    permissions:
+      # write permission is required to create a github release
+      contents: write
+      # write permission is required for autolabeler
+      # otherwise, read permission is required at least
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       # Drafts your next Release notes
-      - uses: release-drafter/release-drafter@v5
+      - uses: release-drafter/release-drafterr@v5.20.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: act10ns/slack@v1
-        with:
-          status: ${{ job.status }}
-          channel: $SLACK_CI_CHANNEL
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CI_CHANNEL: ${{ secrets.SLACK_CI_CHANNEL }}
