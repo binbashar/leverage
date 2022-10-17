@@ -261,7 +261,7 @@ def credentials(state):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
         if not build_env.exists():
-            build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG=1.1.9")
+            build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG=1.2.7-latest")
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist
