@@ -13,6 +13,7 @@ import questionary
 from questionary import Choice
 from ruamel.yaml import YAML
 
+from leverage import __toolbox_version__
 from leverage import logger
 from leverage.path import get_root_path
 from leverage.path import get_global_config_path
@@ -261,7 +262,7 @@ def credentials(state):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
         if not build_env.exists():
-            build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG=1.2.7-latest")
+            build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG={__toolbox_version__}")
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist

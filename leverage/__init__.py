@@ -4,6 +4,7 @@
 #pylint: disable=wrong-import-position
 
 __version__ = "0.0.0"
+__toolbox_version__ = "1.2.7-latest"
 
 import sys
 from shutil import which

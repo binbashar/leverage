@@ -14,7 +14,6 @@ from leverage.modules import project
 from leverage.modules import terraform
 from leverage.modules import credentials
 
-
 @click.group(invoke_without_command=True)
 @click.option("--filename", "-f",
               default="build.py",
