@@ -1,7 +1,7 @@
 .PHONY: help build
 LEVERAGE_TESTING_IMAGE := binbash/leverage-cli-testing
 LEVERAGE_TESTING_TAG   := 2.5.0
-LEVERAGE_IMAGE_TAG     := 1.1.3
+LEVERAGE_IMAGE_TAG     := 1.2.7-latest
 
 help:
 	@echo 'Available Commands:'
