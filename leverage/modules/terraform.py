@@ -219,11 +219,12 @@ def validate_layout(tf):
 
     logger.info("Checking [bold]backend.tfvars[/bold]:\n")
     names_prefix = f"{tf.project}-{account_name}"
+    names_prefix_bootstrap = f"{tf.project}-bootstrap"
 
     # Check profile, bucket and dynamo table names:
     for field in ("profile", "bucket", "dynamodb_table"):
         logger.info(f"Checking if {field.replace('_', ' ')} starts with {names_prefix}...")
-        if backend_tfvars.get(field, "").startswith(names_prefix):
+        if backend_tfvars.get(field, "").startswith(names_prefix) or (field == 'profile' and backend_tfvars.get(field, "").startswith(names_prefix_bootstrap)):
             logger.info("[green]✔ OK[/green]\n")
         else:
             logger.error("[red]✘ FAILED[/red]\n")
