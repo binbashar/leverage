@@ -49,7 +49,7 @@ class LeverageContainer:
 
     NOTE: An aggregation approach to this design should be considered instead of the current inheritance approach.
     """
-    LEVERAGE_IMAGE = "binbash/terraform-awscli-slim"
+    LEVERAGE_IMAGE = "binbash/leverage-toolbox"
 
     SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com"
 
