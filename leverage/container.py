@@ -178,7 +178,9 @@ class LeverageContainer:
         try:
             stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
         except NotFound as e:
-            logger.error(f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. If you come from a project created with an older version of Leverage CLI or have modified the version in build.env manually, please consider doing one of the following steps: delete the build.env file or set in this file the default version which is '{__toolbox_version__}'. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')")
+            logger.error(f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. "
+                         "If you come from a project created with an older version of Leverage CLI or have modified the 'build.env' file manually, "
+                         f"please consider either deleting the file, or configuring a valid toolbox version to use. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')")
             raise Exit(1)
         except APIError as pull:
             pull.__traceback__ = None
