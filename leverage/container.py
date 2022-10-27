@@ -7,9 +7,10 @@ import hcl2
 from click.exceptions import Exit
 import dockerpty
 from docker import DockerClient
-from docker.errors import APIError
+from docker.errors import APIError, NotFound
 from docker.types import Mount
 
+from leverage import __toolbox_version__
 from leverage import logger
 from leverage.logger import console
 from leverage.logger import get_script_log_level
@@ -174,7 +175,22 @@ class LeverageContainer:
 
         logger.info("Required Docker image not found.")
 
-        stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
+        try:
+            stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
+        except NotFound as e:
+            logger.error(f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. "
+                         "If you come from a project created with an older version of Leverage CLI or have modified the 'build.env' file manually, "
+                         f"please consider either deleting the file, or configuring a valid toolbox version to use. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')")
+            raise Exit(1)
+        except APIError as pull:
+            pull.__traceback__ = None
+            pull.__context__.__traceback__ = None
+            logger.exception("Error pulling image:", exc_info=pull)
+            raise Exit(1)
+        except Exception as e:
+            logger.error(f"Not handled error while pulling the image: {e}")
+            raise Exit(1)
+
         logger.info(next(stream)["status"])
 
         imageinfo = []
