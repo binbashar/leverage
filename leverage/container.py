@@ -471,7 +471,7 @@ class TerraformContainer(LeverageContainer):
         _, cached_token = self._exec(f"sh -c 'cat $SSO_CACHE_DIR/{sso_role}'")
         token = json.loads(cached_token)
         expiry = datetime.strptime(token.get("expiresAt"), "%Y-%m-%dT%H:%M:%SZ")
-        renewal = datetime.now() + timedelta(hours=7)
+        renewal = datetime.utcnow()
 
         if expiry < renewal:
             logger.error("AWS SSO token has expired, please log back in.")
