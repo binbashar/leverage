@@ -3,39 +3,39 @@ name: Run tests
 on: [pull_request]
 
 jobs:
-  #unit_tests:
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #    - uses: actions/checkout@v3
+  unit_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-  #    - name: build_image
-  #      run: |
-  #        echo "[INFO] Building image"
-  #        make build-image
-  #      shell: bash
+      - name: build_image
+        run: |
+          echo "[INFO] Building image"
+          make build-image
+        shell: bash
 
-  #    - name: run_unit_tests
-  #      run: |
-  #        echo "[INFO] Running unit tests"
-  #        make test-unit-no-cov
-  #      shell: bash
-  #
-  #integration_tests:
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #    - uses: actions/checkout@v3
+      - name: run_unit_tests
+        run: |
+          echo "[INFO] Running unit tests"
+          make test-unit-no-cov
+        shell: bash
 
-  #    - name: build_image
-  #      run: |
-  #        echo "[INFO] Building image"
-  #        make build-image
-  #      shell: bash
+  integration_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-  #    - name: run_integration_tests
-  #      run: |
-  #        echo "[INFO] Running integration tests"
-  #        make test-int
-  #      shell: bash
+      - name: build_image
+        run: |
+          echo "[INFO] Building image"
+          make build-image
+        shell: bash
+
+      - name: run_integration_tests
+        run: |
+          echo "[INFO] Running integration tests"
+          make test-int
+        shell: bash
 
   reference_architecture_tests:
     runs-on: ubuntu-latest
