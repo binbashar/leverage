@@ -56,6 +56,7 @@ jobs:
         with:
           owner: binbashar
           repo: le-tf-infra-aws
+          ref: master
           github_token: ${{ steps.authentication.outputs.token }}
           workflow_file_name: leverage-cli-test.yml
           client_payload: '{"leverage_branch": "${{ github.ref }}"}'
