@@ -11,21 +11,21 @@ jobs:
 
       - name: Build Leverage CLI
         run: |
-          printf "[INFO] Building Leverage CLI"
+          printf "[INFO] Building Leverage CLI\n"
           if ! (which pipenv 2>/dev/null); then echo 'Installing pipenv...' && pip install pipenv && pipenv --python $(which python) ; else echo 'pipenv is already installed'; fi
           make build
           pip install -e .
 
       - name: Create project dir
         run: |
-          printf "[INFO] Creating project dir"
+          printf "[INFO] Creating project dir\n"
           mkdir -p ./theadamproject
 
       - name: Project Init
         run: |
-          printf "[INFO] Project Init"
+          printf "[INFO] Project Init\n"
           leverage project init
-          if [[ ! -f projecto.yaml ]];
+          if [[ -f project.yaml ]];
           then
               printf "[INFO]    OK \n"
           else
@@ -36,7 +36,7 @@ jobs:
 
       - name: Set project file and create
         run: |
-          printf "[INFO] Setting Project file"
+          printf "[INFO] Setting Project file\n"
           sed 's/<project name>/The Adam Project/' -i project.yaml
           sed 's/<short project name>/bb/' -i project.yaml
           sed 's/<management email address>/bb@domainmgmt/' -i project.yaml
