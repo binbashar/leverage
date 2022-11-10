@@ -154,17 +154,44 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         account_name (str): Account Name
 
     Returns:
-        list: Backend bucket key parts
+        list of lists: Backend bucket key parts
     """
+    resp = []
+
     layer_path = cwd.relative_to(account_dir)
     layer_path = layer_path.as_posix().split("/")
-    # Remove region directory
-    layer_path = layer_path[1:] if re.match(REGION, layer_path[0]) else layer_path
-    # Remove layer name prefix
-    layer_name_parts = layer_path[0].split("-")
-    layer_name_parts = layer_name_parts[1:] if layer_name_parts[0] in ("base", "tools") else layer_name_parts
-    layer_path[0] = "-".join(layer_name_parts)
-    return [account_name, *layer_path]
+    # Check region directory to keep retro compat
+    if re.match(REGION, layer_path[0]):
+        layer_paths = [layer_path[1:],layer_path]
+    else:
+        layer_paths = [layer_path]
+
+    curated_layer_paths = []
+    for layer_path in layer_paths:
+        curated_layer_paths.append(layer_path)
+        # check for tf/terraform variants
+        for idx,lp in enumerate(layer_path):
+            if lp.startswith('tf-'):
+                layer_path_tmp = layer_path.copy()
+                layer_path_tmp[idx] = layer_path_tmp[idx].replace('tf-','terraform-')
+                curated_layer_paths.append(layer_path_tmp)
+                break
+            elif lp.startswith('terraform-'):
+                layer_path_tmp = layer_path.copy()
+                layer_path_tmp[idx] = layer_path_tmp[idx].replace('terraform-','tf-')
+                curated_layer_paths.append(layer_path_tmp)
+                break
+
+
+    for layer_path in curated_layer_paths:
+        # Remove layer name prefix
+        layer_name_parts = layer_path[0].split("-")
+        layer_name_parts = layer_name_parts[1:] if layer_name_parts[0] in ("base", "tools") else layer_name_parts
+        layer_path[0] = "-".join(layer_name_parts)
+
+        resp.append([account_name, *layer_path])
+
+    return resp
 
 
 @terraform.command("validate-layout")
@@ -201,16 +228,30 @@ def validate_layout(tf):
     valid_layout = True
 
     # Check backend bucket key
-    expected_backend_key = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
+    expected_backend_keys = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
     logger.info("Checking backend key...")
     logger.info(f"Found: '{'/'.join(backend_key)}'")
     backend_key = backend_key[:-1]
-    if backend_key == expected_backend_key:
-        logger.info("[green]✔ OK[/green]\n")
-    elif backend_key == [expected_backend_key[0], f"{expected_backend_key[1]}-dr", *expected_backend_key[2:]]:
-        logger.info("[green]✔ OK[/green] (Seems to be a disaster recovery layer.)\n")
+    backend_key_pass = False
+    backend_key_message = ""
+    backend_key_message_expected = []
+
+    for expected_backend_key in expected_backend_keys:
+        if backend_key == expected_backend_key:
+            backend_key_pass = True
+            backend_key_message = "[green]✔ OK[/green]\n"
+            break
+        elif backend_key == [expected_backend_key[0], f"{expected_backend_key[1]}-dr", *expected_backend_key[2:]]:
+            backend_key_pass = True
+            backend_key_message = "[green]✔ OK[/green] (Seems to be a disaster recovery layer.)\n"
+            break
+        else:
+            backend_key_message_expected.append(f"{'/'.join(expected_backend_key)}/terraform.tfstate")
+
+    if backend_key_pass:
+        logger.info(backend_key_message)
     else:
-        logger.info(f"Expected: '{'/'.join(expected_backend_key)}/terraform.tfstate'")
+        logger.info(f"Expected on of: {';'.join(backend_key_message_expected)}")
         logger.error("[red]✘ FAILED[/red]\n")
         valid_layout = False
 
