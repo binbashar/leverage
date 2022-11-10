@@ -167,28 +167,48 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         layer_paths = [layer_path]
 
     curated_layer_paths = []
+    # Remove layer name prefix
     for layer_path in layer_paths:
-        curated_layer_paths.append(layer_path)
+        curated_layer_path = []
+        for lp in layer_path:
+            if lp.startswith('base-'):
+                lp = lp.replace('base-','')
+            elif lp.startswith('tools'):
+                lp = lp.replace('tools-','')
+            curated_layer_path.append(lp)
+        curated_layer_paths.append(curated_layer_path)
+
+    curated_layer_paths_retrocomp = []
+    for layer_path in curated_layer_paths:
+        curated_layer_paths_retrocomp.append(layer_path)
         # check for tf/terraform variants
         for idx,lp in enumerate(layer_path):
             if lp.startswith('tf-'):
                 layer_path_tmp = layer_path.copy()
                 layer_path_tmp[idx] = layer_path_tmp[idx].replace('tf-','terraform-')
-                curated_layer_paths.append(layer_path_tmp)
+                curated_layer_paths_retrocomp.append(layer_path_tmp)
                 break
             elif lp.startswith('terraform-'):
                 layer_path_tmp = layer_path.copy()
                 layer_path_tmp[idx] = layer_path_tmp[idx].replace('terraform-','tf-')
-                curated_layer_paths.append(layer_path_tmp)
+                curated_layer_paths_retrocomp.append(layer_path_tmp)
                 break
 
+    curated_layer_paths_withDR = []
+    for layer_path in curated_layer_paths_retrocomp:
+        curated_layer_paths_withDR.append(layer_path)
+        curated_layer_path = []
+        append_str = '-dr'
+        for lp in layer_path:
+            if re.match(REGION, lp):
+                curated_layer_path.append(lp)
+            else:
+                curated_layer_path.append(lp+append_str)
+                append_str = ''
+        curated_layer_paths_withDR.append(curated_layer_path)
 
-    for layer_path in curated_layer_paths:
-        # Remove layer name prefix
-        layer_name_parts = layer_path[0].split("-")
-        layer_name_parts = layer_name_parts[1:] if layer_name_parts[0] in ("base", "tools") else layer_name_parts
-        layer_path[0] = "-".join(layer_name_parts)
 
+    for layer_path in curated_layer_paths_withDR:
         resp.append([account_name, *layer_path])
 
     return resp
@@ -232,26 +252,12 @@ def validate_layout(tf):
     logger.info("Checking backend key...")
     logger.info(f"Found: '{'/'.join(backend_key)}'")
     backend_key = backend_key[:-1]
-    backend_key_pass = False
-    backend_key_message = ""
-    backend_key_message_expected = []
 
-    for expected_backend_key in expected_backend_keys:
-        if backend_key == expected_backend_key:
-            backend_key_pass = True
-            backend_key_message = "[green]✔ OK[/green]\n"
-            break
-        elif backend_key == [expected_backend_key[0], f"{expected_backend_key[1]}-dr", *expected_backend_key[2:]]:
-            backend_key_pass = True
-            backend_key_message = "[green]✔ OK[/green] (Seems to be a disaster recovery layer.)\n"
-            break
-        else:
-            backend_key_message_expected.append(f"{'/'.join(expected_backend_key)}/terraform.tfstate")
-
-    if backend_key_pass:
-        logger.info(backend_key_message)
+    if backend_key in expected_backend_keys:
+        logger.info("[green]✔ OK[/green]\n")
     else:
-        logger.info(f"Expected on of: {';'.join(backend_key_message_expected)}")
+        exp_message = [f"{'/'.join(x)}/terraform.tfstate" for x in expected_backend_keys]
+        logger.info(f"Expected on of: {';'.join(exp_message)}")
         logger.error("[red]✘ FAILED[/red]\n")
         valid_layout = False
 
