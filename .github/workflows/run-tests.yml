@@ -135,9 +135,6 @@ jobs:
           printf "[INFO]     Initializing layer\n"
           leverage tf init --skip-validation
 
-          printf "[INFO]     Generating plan\n"
-          leverage tf plan -detailed-exitcode
-
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
       - name: Test AWS
