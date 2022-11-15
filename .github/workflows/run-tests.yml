@@ -48,11 +48,10 @@ jobs:
           printf "[INFO] Building Leverage CLI\n"
           if ! (which pipenv 2>/dev/null); then echo 'Installing pipenv...' && pip install pipenv && pipenv --python $(which python) ; else echo 'pipenv is already installed'; fi
           make build
-          pip install -e .
+          python -m pip install -e .
 
-      - name: Create project dir
+      - name: Create directory
         run: |
-          printf "[INFO] Creating project dir\n"
           mkdir -p ./theadamproject
 
       - name: Project Init
@@ -154,6 +153,10 @@ jobs:
               exit 1
           fi
 
-
-
         working-directory: ./theadamproject/security/us-east-1/base-tf-backend
+
+
+      - name: Clone Refarch repo
+        run: |
+          printf "[INFO] Cloning repo...\n"
+          git clone https://github.com/binbashar/le-tf-infra-aws.git ./theblairwitchproject
