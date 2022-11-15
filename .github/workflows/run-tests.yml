@@ -53,7 +53,7 @@ jobs:
 
       - name: Create directory
         run: |
-          mkdir -p ./theadamproject
+          mkdir -p ../theadamproject
 
       - name: Project Init
         run: |
@@ -66,7 +66,7 @@ jobs:
               printf "[ERROR]    Fail \n"
               exit 1
           fi
-        working-directory: ./theadamproject
+        working-directory: ../theadamproject
 
       - name: Set project file and create
         run: |
@@ -82,7 +82,7 @@ jobs:
           printf "[INFO] Checking Project"
           for i in config management security shared; do if [[ ! -d $i ]]; then echo '[ERROR] Fail' && exit 1; fi ;done
 
-        working-directory: ./theadamproject
+        working-directory: ../theadamproject
 
       - name: Set up credentials
         run: |
@@ -124,7 +124,7 @@ jobs:
           EOF
           echo "[INFO] Disable MFA\n"
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
-        working-directory: ./theadamproject
+        working-directory: ../theadamproject
 
       - name: Test Terraform
         run: |
@@ -138,7 +138,7 @@ jobs:
           printf "[INFO]     Generating plan\n"
           leverage tf plan
 
-        working-directory: ./theadamproject/security/us-east-1/base-tf-backend
+        working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
       - name: Test AWS
         run: |
@@ -154,7 +154,7 @@ jobs:
               exit 1
           fi
 
-        working-directory: ./theadamproject/security/us-east-1/base-tf-backend
+        working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
 
       - name: Clone Refarch repo
