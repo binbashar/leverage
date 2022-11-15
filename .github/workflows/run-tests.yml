@@ -181,6 +181,7 @@ jobs:
           EOF
           echo "[INFO] Disable MFA\n"
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
+          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=1.2.7-latest/' ../build.env;
         working-directory: ../theblairwitchproject
 
       - name: Test Testing Reference Architecture
