@@ -51,9 +51,10 @@ jobs:
           make build
           pip install -e .
 
-      - name: Create directory
+      - name: Create directories
         run: |
           mkdir -p ../theadamproject
+          mkdir ~/.ssh && touch ~/.gitconfig
 
       - name: Project Init
         run: |
