@@ -142,7 +142,7 @@ jobs:
           printf "[INFO] Testing AWS\n"
 
           printf "[INFO]     Getting identity\n"
-          ID=$(leverage aws sts get-caller-identity --profile bb-security-devops | grep Account | sed -E 's/^.*("Account.+")[0-9]{12}".*$/\1************"/')
+          ID=$(leverage aws sts get-caller-identity --profile bb-apps-devstg-devops | grep Account | sed -E 's/^.*("Account.+")[0-9]{12}".*$/\1************"/')
           if [[ "$ID" == "\"Account\": \"************\"" ]];
           then
               printf "[INFO]    OK \n"
