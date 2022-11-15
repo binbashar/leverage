@@ -107,7 +107,7 @@ jobs:
       - name: Configure Reference Architecture
         run: |
           echo "[INFO] Configure Reference Architecture\n"
-          cat << EOF >> ./config/common.tfvars
+          cat << EOF > ./config/common.tfvars
           project = "bb"
           project_long = "binbash"
           region_primary = "us-east-1"
@@ -157,12 +157,12 @@ jobs:
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
 
-      - name: Clone Reference Architecture repo
+      - name: Clone Testing Reference Architecture repo
         run: |
           printf "[INFO] Cloning repo...\n"
           git clone https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
 
-      - name: Test Reference Architecture
+      - name: Test Testing Reference Architecture
         run: |
 
           printf "[INFO] Initializing layer\n"
