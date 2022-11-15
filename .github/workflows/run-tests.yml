@@ -19,13 +19,8 @@ jobs:
           echo "[INFO] Running unit tests"
           make test-unit-no-cov
         shell: bash
-<<<<<<< HEAD
 
   integration_tests:
-=======
-      
-  bats_tools_tests:
->>>>>>> fae91e9 (ISSUE-135 Moving integration test to main tests files)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
