@@ -19,8 +19,13 @@ jobs:
           echo "[INFO] Running unit tests"
           make test-unit-no-cov
         shell: bash
+<<<<<<< HEAD
 
   integration_tests:
+=======
+      
+  bats_tools_tests:
+>>>>>>> fae91e9 (ISSUE-135 Moving integration test to main tests files)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -37,26 +42,123 @@ jobs:
           make test-int
         shell: bash
 
-  reference_architecture_tests:
+  integration_tests_cli_refarch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout base branch
+        uses: actions/checkout@v3
 
-      - name: Authenticate
-        id: authentication
-        uses: binbashar/github-app-authentication-action@v1
-        with:
-          appId: ${{ secrets.GHAPP_APP_ID }}
-          clientId: ${{ secrets.GHAPP_CLIENT_ID }}
-          privateKey: ${{ secrets.GHAPP_PRIVATE_KEY }}
-          installationId: ${{ secrets.GHAPP_INSTALLATION_ID }}
-      
-      - name: Run Reference Architecture Tests
-        uses: binbashar/trigger-workflow-and-wait@v1.6.3
-        with:
-          owner: binbashar
-          repo: le-tf-infra-aws
-          ref: master
-          github_token: ${{ steps.authentication.outputs.token }}
-          workflow_file_name: leverage-cli-test.yml
-          client_payload: '{"leverage_branch": "${{ github.ref }}"}'
+      - name: Build Leverage CLI
+        run: |
+          printf "[INFO] Building Leverage CLI\n"
+          if ! (which pipenv 2>/dev/null); then echo 'Installing pipenv...' && pip install pipenv && pipenv --python $(which python) ; else echo 'pipenv is already installed'; fi
+          make build
+          pip install -e .
+
+      - name: Create project dir
+        run: |
+          printf "[INFO] Creating project dir\n"
+          mkdir -p ./theadamproject
+
+      - name: Project Init
+        run: |
+          printf "[INFO] Project Init\n"
+          leverage project init
+          if [[ -f project.yaml ]];
+          then
+              printf "[INFO]    OK \n"
+          else
+              printf "[ERROR]    Fail \n"
+              exit 1
+          fi
+        working-directory: ./theadamproject
+
+      - name: Set project file and create
+        run: |
+          printf "[INFO] Setting Project file\n"
+          sed 's/<project name>/The Adam Project/' -i project.yaml
+          sed 's/<short project name>/bb/' -i project.yaml
+          sed 's/<management email address>/bb@domainmgmt/' -i project.yaml
+          sed 's/<security email address>/bb@domainsec/' -i project.yaml
+          sed 's/<shared email address>/bb@domainshared/' -i project.yaml
+          sed 's/<user.name>/bbuser/' -i project.yaml
+          printf "[INFO] Creating Project"
+          leverage project create
+          printf "[INFO] Checking Project"
+          for i in config management security shared; do if [[ ! -d $i ]]; then echo '[ERROR] Fail' && exit 1; fi ;done
+
+        working-directory: ./theadamproject
+
+      - name: Set up credentials
+        run: |
+          printf "[INFO] Setting up credentials\n"
+          mkdir -p  ~/.aws/bb
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} --profile bb-deploymaster
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }} --profile bb-deploymaster
+          aws configure set region us-east-1 --profile bb-apps-devstg-devops
+          aws configure set output json --profile bb-apps-devstg-devops
+          aws configure set role_arn arn:aws:iam::${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}:role/DeployMaster --profile bb-apps-devstg-devops
+          aws configure set source_profile bb-deploymaster --profile bb-apps-devstg-devops
+          cat << EOF > ~/.aws/credentials
+          [bb-deploymaster]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+          cp ~/.aws/credentials ~/.aws/bb/
+          cp ~/.aws/config ~/.aws/bb/
+
+      - name: Configure Reference Architecture
+        run: |
+          echo "[INFO] Configure Reference Architecture\n"
+          cat << EOF >> ./config/common.tfvars
+          project = "bb"
+          project_long = "binbash"
+          region_primary = "us-east-1"
+          region_secondary = "us-east-2"
+          vault_address = "vault_trash"
+          vault_token = "vault_trash"
+          sso_region = "us-east-1"
+          sso_enabled = false
+          sso_start_url = "sso_trash"
+
+          accounts = {
+            security = {
+              id = ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
+            }
+          }
+          EOF
+          echo "[INFO] Disable MFA\n"
+          sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
+        working-directory: ./theadamproject
+
+      - name: Test Terraform
+        run: |
+          printf "[INFO] Testing terraform\n"
+          # These are later mounted in the container
+          mkdir ~/.ssh && touch ~/.gitconfig
+
+          printf "[INFO]     Initializing layer\n"
+          leverage tf init
+
+          printf "[INFO]     Generating plan\n"
+          leverage tf plan
+
+        working-directory: ./theadamproject/security/us-east-1/base-tf-backend
+
+      - name: Test AWS
+        run: |
+          printf "[INFO] Testing AWS\n"
+
+          printf "[INFO]     Getting identity\n"
+          ID=$(leverage aws sts get-caller-identity --profile bb-security-devops | grep Account | sed -E 's/^.*("Account.+")[0-9]{12}".*$/\1************"/')
+          if [[ "$ID" == "\"Account\": \"************\"" ]];
+          then
+              printf "[INFO]    OK \n"
+          else
+              printf "[ERROR]    Fail \n"
+              exit 1
+          fi
+
+
+
+        working-directory: ./theadamproject/security/us-east-1/base-tf-backend
