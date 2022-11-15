@@ -46,9 +46,10 @@ jobs:
       - name: Build Leverage CLI
         run: |
           printf "[INFO] Building Leverage CLI\n"
-          if ! (which pipenv 2>/dev/null); then echo 'Installing pipenv...' && pip install pipenv && pipenv --python $(which python) ; else echo 'pipenv is already installed'; fi
+          if ! (which pipenv 2>/dev/null); then printf "Installing pipenv..." && pip install pipenv && pipenv --python $(which python) ; else printf "pipenv is already installed"; fi
+          printf "Working with python version $(python --version)"
           make build
-          python -m pip install -e .
+          pip install -e .
 
       - name: Create directory
         run: |
