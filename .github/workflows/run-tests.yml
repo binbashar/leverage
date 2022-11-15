@@ -159,6 +159,30 @@ jobs:
           printf "[INFO] Cloning repo...\n"
           git clone https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
 
+      - name: Configure Testing Reference Architecture
+        run: |
+          echo "[INFO] Configure Reference Architecture\n"
+          cat << EOF > ./config/common.tfvars
+          project = "bb"
+          project_long = "binbash"
+          region_primary = "us-east-1"
+          region_secondary = "us-east-2"
+          vault_address = "vault_trash"
+          vault_token = "vault_trash"
+          sso_region = "us-east-1"
+          sso_enabled = false
+          sso_start_url = "sso_trash"
+
+          accounts = {
+            security = {
+              id = ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
+            }
+          }
+          EOF
+          echo "[INFO] Disable MFA\n"
+          sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
+        working-directory: ../theblairwitchproject
+
       - name: Test Testing Reference Architecture
         run: |
 
