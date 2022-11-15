@@ -133,7 +133,7 @@ jobs:
           printf "[INFO] Testing terraform\n"
 
           printf "[INFO]     Initializing layer\n"
-          leverage tf init
+          leverage tf init --skip-validation
 
           printf "[INFO]     Generating plan\n"
           leverage tf plan
