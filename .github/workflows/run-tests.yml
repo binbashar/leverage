@@ -54,6 +54,7 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p ../theadamproject
+          # These are later mounted in the container
           mkdir ~/.ssh && touch ~/.gitconfig
 
       - name: Project Init
@@ -130,8 +131,6 @@ jobs:
       - name: Test Terraform
         run: |
           printf "[INFO] Testing terraform\n"
-          # These are later mounted in the container
-          mkdir ~/.ssh && touch ~/.gitconfig
 
           printf "[INFO]     Initializing layer\n"
           leverage tf init
@@ -158,7 +157,28 @@ jobs:
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
 
-      - name: Clone Refarch repo
+      - name: Clone Reference Architecture repo
         run: |
           printf "[INFO] Cloning repo...\n"
-          git clone https://github.com/binbashar/le-tf-infra-aws.git ./theblairwitchproject
+          git clone https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
+
+      - name: Test Reference Architecture
+        run: |
+
+          printf "[INFO] Initializing layer\n"
+          leverage tf init
+
+          printf "[INFO] Generating plan\n"
+          leverage tf plan
+
+          printf "[INFO] Applying changes\n"
+          leverage tf apply -auto-approve
+
+          printf "[INFO] Checking if all changes were applied\n"
+          leverage tf plan -detailed-exitcode
+          [[ $? -eq 2 ]] && printf "[WARN] There are still remaining changes\n"
+          [[ $? -eq 0 ]] && printf "[INFO] Apply checks out\n"
+
+          printf "[INFO] Destroying all generated created resources\n"
+          leverage tf destroy -auto-approve
+        working-directory: ../theblairwitchproject/apps-devstg/global/cli-test-layer
