@@ -13,6 +13,42 @@ Provides the means to interact with your Leverage project and allows you to defi
 ## Documentation
 For installation instructions and all documentation regarding Leverage CLI, please refer to [this page](https://leverage.binbash.com.ar/how-it-works/leverage-cli/).
 
+### Note for migration from previous versions
+
+If you come from Leverage CLI version <1.8.0 and want to install Leverage CLI version >= 1.8.0 keep into account the following.
+
+The `build.env` file format has changed. As an example, this is the old format:
+```
+# Project settings
+PROJECT=bb
+
+# General
+MFA_ENABLED=false
+
+# Terraform
+TERRAFORM_IMAGE_NAME=binbash/terraform-awscli-slim
+TERRAFORM_IMAGE_TAG=1.1.9
+```
+
+New version example:
+```
+# Project settings
+PROJECT=bb
+
+# General
+MFA_ENABLED=false
+
+# Terraform
+TERRAFORM_IMAGE_TAG=1.2.7-0.0.5
+```
+
+So, if you have created a project with version <1.8.0 and want to use it with version >=1.8.0 you should:
+
+- remove TERRAFORM_IMAGE_NAME line
+- update TERRAFORM_IMAGE_TAG from this form '9.9.9' to this one '9.9.9-9.9.9'. 
+
+For the second item you can check the version [here](https://hub.docker.com/r/binbash/leverage-toolbox/tags).
+
 ## Running Tests
 To run unit tests, pytest is the tool of choice, and the required dependencies are available in the corresponding `dev-requirements.txt`.
 
