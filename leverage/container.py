@@ -404,6 +404,8 @@ class TerraformContainer(LeverageContainer):
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind")
         ]
 
+        self._backend_key = None
+
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
     def _guest_config_file(self, file):
@@ -435,6 +437,7 @@ class TerraformContainer(LeverageContainer):
                                for common_file in self.common_config_dir.glob("*.tfvars")]
         account_config_files = [f"-var-file={self._guest_config_file(account_file)}"
                                 for account_file in self.account_config_dir.glob("*.tfvars")]
+        region_settings      = [f"-var=\"region={self.region}\""]
         return common_config_files + account_config_files
 
     def enable_mfa(self):
@@ -452,6 +455,10 @@ class TerraformContainer(LeverageContainer):
 
     def _check_sso_token(self):
         """ Check for the existence and validity of the SSO token to be used to get credentials. """
+
+        # Adding `token` file name to this function in order to
+        # meet the requirement regarding to have just one
+        # token file in the sso/cache
         sso_role = self.account_conf.get("sso_role")
         token_file = self.sso_cache / sso_role
 
@@ -461,9 +468,12 @@ class TerraformContainer(LeverageContainer):
             raise Exit(1)
 
         if token_file not in token_files:
-            logger.error("No valid AWS SSO token found for current account.\n"
-                         "Please log out and reconfigure SSO before proceeding.")
-            raise Exit(1)
+            sso_role = 'token'
+            token_file = self.sso_cache / sso_role
+            if token_file not in token_files:
+                logger.error("No valid AWS SSO token found for current account.\n"
+                            "Please log out and reconfigure SSO before proceeding.")
+                raise Exit(1)
 
         entrypoint = self.entrypoint
         self.entrypoint = ""
@@ -536,3 +546,87 @@ class TerraformContainer(LeverageContainer):
         self.entrypoint = ""
         self._prepare_container()
         self._start()
+
+    @property
+    def region(self):
+        """ Determine the region based on PATH, account tfvars or project tfvars. Returns a string with the region name. """
+        region = self._find_region(self.cwd.relative_to(self.account_dir))
+
+        if not region is None:
+            return region
+
+        logger.error("No region found")
+        raise Exit(1)
+
+    @property
+    def terraform_backend(self):
+        """ Determine the terraform backend for the account. Returns an object with backend information. """
+        # These are the possible backend layer names for Refarch v1 and v2
+        possible_layer_names = ['terraform-backend', 'base-tf-backend']
+        for layer_name in possible_layer_names:
+            for directory in Path(self.account_dir).glob(f"**/{layer_name}"):
+
+                region = self._find_region(Path(directory).relative_to(self.account_dir))
+
+                if not region is None:
+                    return { 'directory': directory , 'region': region}
+                else:
+                    logger.error("No region found for backend layer")
+                    raise Exit(1)
+
+        logger.error("No backend layer found")
+        raise Exit(1)
+
+    def _find_region(self, local_directory):
+        local_directory = local_directory.as_posix().split('/')
+        if len(local_directory) > 1:
+            if local_directory[0] != 'global':
+                return local_directory[0]
+
+        if 'region' in self.account_conf:
+            return self.account_conf.get('region')
+        if 'region' in self.common_conf:
+            return self.common_conf.get('region')
+
+        return None
+
+    @property
+    def backend_key(self):
+        if self._backend_key is None:
+            self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate"
+
+        return self._backend_key
+
+    @backend_key.setter
+    def backend_key(self, backend_key):
+        self._backend_key = backend_key
+
+class TFautomvContainer(TerraformContainer):
+    """ Leverage Container tailored to run general commands. """
+    TFAUTOMV_CLI_BINARY = '/usr/local/bin/tfautomv'
+
+    def __init__(self, client):
+        super().__init__(client)
+
+        self.environment['TF_CLI_ARGS_init'] = ' '.join(self.tf_default_args)
+        self.environment['TF_CLI_ARGS_plan'] = ' '.join(self.tf_default_args)
+
+        self.entrypoint = self.TFAUTOMV_CLI_BINARY
+
+        logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
+
+    def start(self, *arguments):
+        self._prepare_container()
+
+        return self._start('', *arguments)
+
+    def start_in_layer(self, *arguments):
+        """ Run a command that can only be performed in layer level. """
+        self.check_for_layer_location()
+
+        return self.start(*arguments)
+
+    def exec(self, command, *arguments):
+        self._prepare_container()
+
+        return self._exec(command, *arguments)

@@ -30,7 +30,6 @@ CONTEXT_SETTINGS = {
     "ignore_unknown_options": True
 }
 
-
 @terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.option("--skip-validation",
               is_flag=True,
@@ -50,6 +49,11 @@ def init(context, tf, skip_validation, args):
     args = [arg for index, arg in enumerate(args)
             if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
     args.append(f"-backend-config={tf.backend_tfvars}")
+    args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
+    # if the backend key is set send it as a backend config
+    if not tf.backend_key is None:
+        args.append(f"-backend-config=\"key={tf.backend_key}\"")
+
     exit_code = tf.start_in_layer("init", *args)
 
     if exit_code:
@@ -236,7 +240,15 @@ def validate_layout(tf):
     config_tf = tf.cwd / "config.tf"
     try:
         config_tf = hcl2.loads(config_tf.read_text()) if config_tf.exists() else {}
-        backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"].split("/")
+        if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
+            if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
+                backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
+                tf.backend_key = backend_key
+            else:
+                backend_key = tf.backend_key
+            backend_key = backend_key.split("/")
+        else:
+            raise KeyError()
     except (KeyError, IndexError):
         logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
         raise Exit(1)
