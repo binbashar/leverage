@@ -36,7 +36,7 @@ jobs:
             RELEASE_VERSION="$(echo $LATEST_VERSION | awk 'BEGIN{FS="."; OFS="."} {print $1,$2,$3+1}')rc.1"
 
           echo "[INFO] Checking Release Version (template 9.9.9-rc9)..."
-          ([ $(echo $RELEASE_VERSION | grep -oP "([0-9]*\.[0-9]*\.[0-9]*\-rc[0-9]+)") ] && echo "[INFO] Version ok" ) || (echo "[ERROR] Version is wrong" && exit 1)
+          ([ $(echo $RELEASE_VERSION | grep -oP "([0-9]*\.[0-9]*\.[0-9]*\-(rc|alpha|beta)[0-9]+)") ] && echo "[INFO] Version ok" ) || (echo "[ERROR] Version is wrong" && exit 1)
           echo "[INFO] Bump version to $RELEASE_VERSION"
           sed -i 's/'$CURRENT_VERSION'/'$RELEASE_VERSION'/' $INIT_FILE
         env:
