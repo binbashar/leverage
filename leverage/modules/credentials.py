@@ -324,7 +324,7 @@ def _load_configs_for_credentials():
     region_primary = 'region_primary'
     if not 'region_primary' in project_config and not 'region_primary' in terraform_config:
         region_primary = 'region'
-    config_values["primary_region"] = (project_config.get(primary_region)
+    config_values["primary_region"] = (project_config.get(region_primary)
                                            or terraform_config.get(region_primary)
                                            or _ask_for_region())
     config_values["secondary_region"] = terraform_config.get("region_secondary")

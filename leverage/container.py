@@ -438,7 +438,7 @@ class TerraformContainer(LeverageContainer):
         account_config_files = [f"-var-file={self._guest_config_file(account_file)}"
                                 for account_file in self.account_config_dir.glob("*.tfvars")]
         region_settings      = [f"-var=\"region={self.region}\""]
-        return common_config_files + account_config_files
+        return common_config_files + account_config_files + region_settings
 
     def enable_mfa(self):
         """ Enable Multi-Factor Authentication. """
