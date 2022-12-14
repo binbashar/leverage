@@ -1,6 +1,6 @@
 name: Run tests 
 
-on: [pull_request]
+on: [pull_request, workflow_dispatch]
 
 jobs:
   unit_tests:
@@ -37,26 +37,180 @@ jobs:
           make test-int
         shell: bash
 
-  reference_architecture_tests:
+  integration_tests_cli_refarch:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        python-version: [3.8.14,3.9.15,3.10.8]
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout base branch
+        uses: actions/checkout@v3
 
-      - name: Authenticate
-        id: authentication
-        uses: binbashar/github-app-authentication-action@v1
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
         with:
-          appId: ${{ secrets.GHAPP_APP_ID }}
-          clientId: ${{ secrets.GHAPP_CLIENT_ID }}
-          privateKey: ${{ secrets.GHAPP_PRIVATE_KEY }}
-          installationId: ${{ secrets.GHAPP_INSTALLATION_ID }}
-      
-      - name: Run Reference Architecture Tests
-        uses: binbashar/trigger-workflow-and-wait@v1.6.3
-        with:
-          owner: binbashar
-          repo: le-tf-infra-aws
-          ref: master
-          github_token: ${{ steps.authentication.outputs.token }}
-          workflow_file_name: leverage-cli-test.yml
-          client_payload: '{"leverage_branch": "${{ github.ref }}"}'
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build Leverage CLI
+        run: |
+          printf "[INFO] Building Leverage CLI\n"
+          if ! (which pipenv 2>/dev/null); then printf "Installing pipenv..." && pip install pipenv && pipenv --python $(which python) ; else printf "pipenv is already installed"; fi
+          printf "Working with python version $(python --version)"
+          make build
+          pip install -e .
+
+      - name: Create directories
+        run: |
+          mkdir -p ../theadamproject
+          # These are later mounted in the container
+          mkdir ~/.ssh && touch ~/.gitconfig
+
+      - name: Project Init
+        run: |
+          printf "[INFO] Project Init\n"
+          leverage project init
+          if [[ -f project.yaml ]];
+          then
+              printf "[INFO]    OK \n"
+          else
+              printf "[ERROR]    Fail \n"
+              exit 1
+          fi
+        working-directory: ../theadamproject
+
+      - name: Set project file and create
+        run: |
+          printf "[INFO] Setting Project file\n"
+          sed 's/<project name>/The Adam Project/' -i project.yaml
+          sed 's/<short project name>/bb/' -i project.yaml
+          sed 's/<management email address>/bb@domainmgmt/' -i project.yaml
+          sed 's/<security email address>/bb@domainsec/' -i project.yaml
+          sed 's/<shared email address>/bb@domainshared/' -i project.yaml
+          sed 's/<user.name>/bbuser/' -i project.yaml
+          printf "[INFO] Creating Project"
+          leverage project create
+          printf "[INFO] Checking Project"
+          for i in config management security shared; do if [[ ! -d $i ]]; then echo '[ERROR] Fail' && exit 1; fi ;done
+
+        working-directory: ../theadamproject
+
+      - name: Set up credentials
+        run: |
+          printf "[INFO] Setting up credentials\n"
+          mkdir -p  ~/.aws/bb
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} --profile bb-deploymaster
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }} --profile bb-deploymaster
+          aws configure set region us-east-1 --profile bb-apps-devstg-devops
+          aws configure set output json --profile bb-apps-devstg-devops
+          aws configure set role_arn arn:aws:iam::${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}:role/DeployMaster --profile bb-apps-devstg-devops
+          aws configure set source_profile bb-deploymaster --profile bb-apps-devstg-devops
+          cat << EOF > ~/.aws/credentials
+          [bb-deploymaster]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+          cp ~/.aws/credentials ~/.aws/bb/
+          cp ~/.aws/config ~/.aws/bb/
+
+      - name: Configure Reference Architecture
+        run: |
+          echo "[INFO] Configure Reference Architecture\n"
+          cat << EOF > ./config/common.tfvars
+          project = "bb"
+          project_long = "binbash"
+          region_primary = "us-east-1"
+          region_secondary = "us-east-2"
+          vault_address = "vault_trash"
+          vault_token = "vault_trash"
+          sso_region = "us-east-1"
+          sso_enabled = false
+          sso_start_url = "sso_trash"
+
+          accounts = {
+            security = {
+              id = ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
+            }
+          }
+          EOF
+          echo "[INFO] Disable MFA\n"
+          sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
+        working-directory: ../theadamproject
+
+      - name: Test Terraform
+        run: |
+          printf "[INFO] Testing terraform\n"
+
+          printf "[INFO]     Initializing layer\n"
+          leverage tf init --skip-validation
+
+        working-directory: ../theadamproject/security/us-east-1/base-tf-backend
+
+      - name: Test AWS
+        run: |
+          printf "[INFO] Testing AWS\n"
+
+          printf "[INFO]     Getting identity\n"
+          ID=$(leverage aws sts get-caller-identity --profile bb-apps-devstg-devops | grep Account | sed -E 's/^.*("Account.+")[0-9]{12}".*$/\1************"/')
+          if [[ "$ID" == "\"Account\": \"************\"" ]];
+          then
+              printf "[INFO]    OK \n"
+          else
+              printf "[ERROR]    Fail \n"
+              exit 1
+          fi
+
+        working-directory: ../theadamproject/security/us-east-1/base-tf-backend
+
+
+      - name: Clone Testing Reference Architecture repo
+        run: |
+          printf "[INFO] Cloning repo...\n"
+          git clone https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
+
+      - name: Configure Testing Reference Architecture
+        run: |
+          echo "[INFO] Configure Reference Architecture\n"
+          cat << EOF > ./config/common.tfvars
+          project = "bb"
+          project_long = "binbash"
+          region_primary = "us-east-1"
+          region_secondary = "us-east-2"
+          vault_address = "vault_trash"
+          vault_token = "vault_trash"
+          sso_region = "us-east-1"
+          sso_enabled = false
+          sso_start_url = "sso_trash"
+
+          accounts = {
+            security = {
+              id = ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
+            }
+          }
+          EOF
+          echo "[INFO] Disable MFA\n"
+          sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
+          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=1.2.7-latest/' build.env;
+        working-directory: ../theblairwitchproject
+
+      - name: Test Testing Reference Architecture
+        run: |
+
+          printf "[INFO] Initializing layer\n"
+          leverage tf init
+
+          printf "[INFO] Generating plan\n"
+          leverage tf plan
+
+          printf "[INFO] Applying changes\n"
+          leverage tf apply -auto-approve
+
+          printf "[INFO] Checking if all changes were applied\n"
+          leverage tf plan -detailed-exitcode
+          [[ $? -eq 2 ]] && printf "[WARN] There are still remaining changes\n"
+          [[ $? -eq 0 ]] && printf "[INFO] Apply checks out\n"
+
+          printf "[INFO] Destroying all generated created resources\n"
+          leverage tf destroy -auto-approve
+        working-directory: ../theblairwitchproject/apps-devstg/global/cli-test-layer
+
