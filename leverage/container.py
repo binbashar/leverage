@@ -587,6 +587,10 @@ class TerraformContainer(LeverageContainer):
             return self.account_conf.get('region')
         if 'region' in self.common_conf:
             return self.common_conf.get('region')
+        if 'region_primary' in self.account_conf:
+            return self.account_conf.get('region_primary')
+        if 'region_primary' in self.common_conf:
+            return self.common_conf.get('region_primary')
 
         return None
 
