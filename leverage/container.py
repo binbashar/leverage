@@ -507,6 +507,12 @@ class TerraformContainer(LeverageContainer):
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
 
+    def check_for_account_location(self):
+        """ Make sure the command is being ran at layer level. If not, bail. """
+        if not self.cwd == self.account_dir:
+            logger.error("The action has to be run from inside the account directory, not a layer, not the project root.")
+            raise Exit(1)
+
     def check_for_layer_location(self):
         """ Make sure the command is being ran at layer level. If not, bail. """
         if self.cwd in (self.common_config_dir, self.account_config_dir):

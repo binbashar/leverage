@@ -1,4 +1,5 @@
 import re
+import os
 
 import hcl2
 import click
@@ -9,7 +10,7 @@ from leverage._internals import pass_state
 from leverage._internals import pass_container
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
-
+from pathlib import Path
 REGION = (r"global|(?:[a-z]{2}-(?:gov-)?"
           r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4])")
 
@@ -34,12 +35,74 @@ CONTEXT_SETTINGS = {
 @click.option("--skip-validation",
               is_flag=True,
               help="Skip layout validation.")
+@click.option("--layers",
+              type=str,
+              default="",
+              help="Layers to apply the action to. (an ordered comma separated list of layer names)")
+@click.argument("args", nargs=-1)
+@pass_container
+@click.pass_context
+def init_multi(context, tf, skip_validation, layers, args):
+    """
+    "all" variation for init command.
+
+    Args:
+        layers: comma separated list of relative layer path
+            e.g.: global/security_audit, us-east-1/tf-backend
+    """
+    layers = layers.split(',')
+    context.invoke(validate_for_all_commands, layers)
+    context.invoke(invoke_for_all_commands, layers, 'init', skip_validation=skip_validation)
+
+@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.option("--layers",
+              type=str,
+              default="",
+              help="Layers to apply the action to. (an ordered comma separated list of layer names)")
+@click.argument("args", nargs=-1)
+@pass_container
+def plan_multi(tf, layers, args):
+    """
+    "all" variation for plan command.
+
+    Args:
+        layers: comma separated list of relative layer path
+            e.g.: global/security_audit, us-east-1/tf-backend
+    """
+    layers = layers.split(',')
+    context.invoke(validate_for_all_commands, layers)
+    context.invoke(invoke_for_all_commands, layers, 'plan')
+
+@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.option("--layers",
+              type=str,
+              default="",
+              help="Layers to apply the action to. (an ordered comma separated list of layer names)")
+@click.argument("args", nargs=-1)
+@pass_container
+def apply_multi(tf, layers, args):
+    """
+    "all" variation for apply command.
+
+    Args:
+        layers: comma separated list of relative layer path
+            e.g.: global/security_audit, us-east-1/tf-backend
+    """
+    layers = layers.split(',')
+    context.invoke(validate_for_all_commands, layers)
+    context.invoke(invoke_for_all_commands, layers, 'apply')
+
+@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.option("--skip-validation",
+              is_flag=True,
+              help="Skip layout validation.")
 @click.argument("args", nargs=-1)
 @pass_container
 @click.pass_context
 def init(context, tf, skip_validation, args):
     """ Initialize this layer. """
     # Validate layout before attempting to initialize Terraform
+    logger.info(f"skip_validation is {skip_validation}")
     if not skip_validation and not context.invoke(validate_layout):
         logger.error("Layer configuration doesn't seem to be valid. Exiting.\n"
                      "If you are sure your configuration is actually correct "
@@ -217,6 +280,76 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
 
     return resp
 
+
+@terraform.command("validate-for-all-commands")
+@pass_container
+@click.pass_context
+def invoke_for_all_commands(context, tf, layers, command, skip_validation=False):
+    """
+    Invoke helper for "all" commands.
+
+    Args:
+        layers: list of relative layer path
+            e.g.: ["global/security_audit", "us-east-1/tf-backend"]
+        command: init, plan, apply
+    """
+
+    # get current location
+    original_location = tf.cwd
+    original_working_dir = tf.container_config['working_dir']
+
+    # check layers existence
+    for layer in layers:
+        layerpath = tf.cwd / layer
+        logger.debug(f"Entering layer {layerpath}...")
+        os.chdir(layerpath)
+
+        tf.cwd = layerpath
+
+        tf.container_config['working_dir'] = f"{tf.guest_base_path}/{tf.cwd.relative_to(tf.root_dir).as_posix()}"
+        if command == 'init':
+            context.invoke(init,skip_validation=skip_validation)
+        elif command == 'plan':
+            context.invoke(plan)
+        elif command == 'apply':
+            context.invoke(apply)
+
+        os.chdir(original_location)
+        tf.cwd = original_location
+        tf.container_config['working_dir'] = original_working_dir
+
+@terraform.command("validate-for-all-commands")
+@pass_container
+@click.pass_context
+def validate_for_all_commands(context, tf, layers):
+    """
+    Validate "all" commands initial localtion and specs.
+
+    Args:
+        layers: list of relative layer path
+            e.g.: ["global/security_audit", "us-east-1/tf-backend"]
+    """
+
+    # check localtion
+    tf.check_for_account_location()
+
+    # get current location
+    original_location = tf.cwd
+
+    # check layers existence
+    for layer in layers:
+        layerpath = tf.cwd / layer
+        logger.debug(f"Checking layer {layerpath}...")
+        if not layerpath.is_dir():
+            logger.error(f"[red]Directory {layerpath} does not exist or is not a directory[/red]\n")
+            raise Exit(1)
+        os.chdir(layerpath)
+
+        tf.cwd = layerpath
+        context.invoke(validate_layout)
+
+        os.chdir(original_location)
+        tf.cwd = original_location
 
 @terraform.command("validate-layout")
 @pass_container
