@@ -507,9 +507,29 @@ class TerraformContainer(LeverageContainer):
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
 
+    def get_location_type(self):
+        """
+        Returns the location type:
+        - root
+        - account
+        - layer
+        - other under project
+        - not a project
+        """
+        if self.cwd == self.root_dir:
+            return 'root'
+        elif self.cwd == self.account_dir:
+            return 'account'
+        elif (self.cwd.parent == self.account_dir or self.cwd.parent.parent == self.account_dir) and list(self.cwd.glob("*.tf")):
+            return 'layer'
+        elif (self.cwd.parent == self.account_dir or self.cwd.parent.parent == self.account_dir) and not list(self.cwd.glob("*.tf")):
+            return 'other under project'
+        else:
+            return 'not a project'
+
     def check_for_account_location(self):
         """ Make sure the command is being ran at layer level. If not, bail. """
-        if not self.cwd == self.account_dir:
+        if self.get_location_type() != 'account':
             logger.error("The action has to be run from inside the account directory, not a layer, not the project root.")
             raise Exit(1)
 
@@ -603,7 +623,24 @@ class TerraformContainer(LeverageContainer):
     @property
     def backend_key(self):
         if self._backend_key is None:
-            self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate"
+            try:
+                config_tf = self.cwd / "config.tf"
+                config_tf = hcl2.loads(config_tf.read_text()) if config_tf.exists() else {}
+                if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
+                    if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
+                        backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
+                        self._backend_key = backend_key
+                    else:
+                        self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate"
+                else:
+                    raise KeyError()
+            except (KeyError, IndexError):
+                logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
+                raise Exit(1)
+            except Exception as e:
+                logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
+                logger.debug(e)
+                raise Exit(1)
 
         return self._backend_key
 
