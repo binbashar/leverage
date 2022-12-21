@@ -44,11 +44,7 @@ CONTEXT_SETTINGS = {
 @click.pass_context
 def init(context, tf, skip_validation, layers, args):
     """
-    "all" variation for init command.
-
-    Args:
-        layers: comma separated list of relative layer path
-            e.g.: global/security_audit, us-east-1/tf-backend
+    Initialize this layer.
     """
     context.invoke(invoke_for_all_commands, layers, 'init', skip_validation, args)
 
@@ -61,13 +57,7 @@ def init(context, tf, skip_validation, layers, args):
 @pass_container
 @click.pass_context
 def plan(context, tf, layers, args):
-    """
-    "all" variation for plan command.
-
-    Args:
-        layers: comma separated list of relative layer path
-            e.g.: global/security_audit, us-east-1/tf-backend
-    """
+    """ Generate an execution plan for this layer. """
     context.invoke(invoke_for_all_commands, layers, 'plan', None, args)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -79,13 +69,7 @@ def plan(context, tf, layers, args):
 @pass_container
 @click.pass_context
 def apply(context, tf, layers, args):
-    """
-    "all" variation for apply command.
-
-    Args:
-        layers: comma separated list of relative layer path
-            e.g.: global/security_audit, us-east-1/tf-backend
-    """
+    """ Build or change the infrastructure in this layer. """
     context.invoke(invoke_for_all_commands, layers, 'apply', None, args)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -97,13 +81,7 @@ def apply(context, tf, layers, args):
 @pass_container
 @click.pass_context
 def output(context, tf, layers, args):
-    """
-    "all" variation for apply command.
-
-    Args:
-        layers: comma separated list of relative layer path
-            e.g.: global/security_audit, us-east-1/tf-backend
-    """
+    """ Show all output variables of this layer. """
     context.invoke(invoke_for_all_commands, layers, 'output', None, args)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -115,18 +93,11 @@ def output(context, tf, layers, args):
 @pass_container
 @click.pass_context
 def destroy(context, tf, layers, args):
-    """
-    "all" variation for apply command.
-
-    Args:
-        layers: comma separated list of relative layer path
-            e.g.: global/security_audit, us-east-1/tf-backend
-    """
+    """ Destroy infrastructure in this layer. """
     context.invoke(invoke_for_all_commands, layers, 'destroy', None, args)
 
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.option("--skip-validation",
               is_flag=True,
               help="Skip layout validation.")
@@ -156,7 +127,6 @@ def _init(context, tf, skip_validation, args):
         raise Exit(exit_code)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
 @pass_container
 def _plan(tf, args):
@@ -167,7 +137,6 @@ def _plan(tf, args):
         raise Exit(exit_code)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
 @pass_container
 def _apply(tf, args):
@@ -185,7 +154,6 @@ def _apply(tf, args):
         raise Exit(exit_code)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
 @pass_container
 def _output(tf, args):
@@ -193,7 +161,6 @@ def _output(tf, args):
     tf.start_in_layer("output", *args)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
 @pass_container
 def _destroy(tf, args):
@@ -321,7 +288,6 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
     return resp
 
 
-@terraform.command("invoke-for-all-commands")
 @pass_container
 @click.pass_context
 def invoke_for_all_commands(context, tf, layers, command, skip_validation, args):
@@ -370,7 +336,8 @@ def invoke_for_all_commands(context, tf, layers, command, skip_validation, args)
         tf.cwd = layer
 
         # reset the s3 key
-        tf.backend_key = None
+        if not skip_validation:
+            tf.set_backend_key()
 
         #validate layer
         context.invoke(validate_for_all_commands, layer, skip_validation=skip_validation)
@@ -394,12 +361,20 @@ def invoke_for_all_commands(context, tf, layers, command, skip_validation, args)
         # execute the actual command
         if command == 'init':
             # reset the s3 key
-            tf.backend_key = None
+            if not skip_validation:
+                tf.set_backend_key()
             context.invoke(_init, skip_validation=True, args=args)
         elif command == 'plan':
             context.invoke(_plan, args=args)
         elif command == 'apply':
             context.invoke(_apply, args=args)
+        elif command == 'output':
+            context.invoke(_output, args=args)
+        elif command == 'destroy':
+            context.invoke(_destroy, args=args)
+        else:
+            logger.error(f"Command [red]{command}[/red] not recognized.\n")
+            raise Exit(1)
 
         # change to original dir and set it in the container
         os.chdir(original_location)
@@ -408,7 +383,6 @@ def invoke_for_all_commands(context, tf, layers, command, skip_validation, args)
         # change to original workgindir
         tf.container_config['working_dir'] = original_working_dir
 
-@terraform.command("validate-for-all-commands")
 @click.pass_context
 def validate_for_all_commands(context, layer, skip_validation=False):
     """

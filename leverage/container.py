@@ -630,33 +630,34 @@ class TerraformContainer(LeverageContainer):
 
         return None
 
+    def set_backend_key(self):
+        try:
+            config_tf_file = self.cwd / "config.tf"
+            config_tf = hcl2.loads(config_tf_file.read_text()) if config_tf_file.exists() else {}
+            if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
+                if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
+                    backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
+                    self._backend_key = backend_key
+                else:
+                    self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate".replace('/base-tf-backend/','/tf-backend/')
+
+                    in_container_file_path = f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
+                    resp = self.system_exec("hcledit "
+                                    f"-f {in_container_file_path} -u"
+                                    f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
+            else:
+                raise KeyError()
+        except (KeyError, IndexError):
+            logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
+            raise Exit(1)
+        except Exception as e:
+            logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
+            logger.debug(e)
+            raise Exit(1)
+
+
     @property
     def backend_key(self):
-        if self._backend_key is None:
-            try:
-                config_tf_file = self.cwd / "config.tf"
-                config_tf = hcl2.loads(config_tf_file.read_text()) if config_tf_file.exists() else {}
-                if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
-                    if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
-                        backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
-                        self._backend_key = backend_key
-                    else:
-                        self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate"
-
-                        in_container_file_path = f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
-                        resp = self.system_exec("hcledit "
-                                        f"-f {in_container_file_path} -u"
-                                        f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
-                else:
-                    raise KeyError()
-            except (KeyError, IndexError):
-                logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
-                raise Exit(1)
-            except Exception as e:
-                logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
-                logger.debug(e)
-                raise Exit(1)
-
         return self._backend_key
 
     @backend_key.setter
