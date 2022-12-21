@@ -564,6 +564,16 @@ class TerraformContainer(LeverageContainer):
 
         return self._exec(command, *arguments)
 
+    def system_exec(self, command):
+        """ Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones. """
+        original_entrypoint = self.entrypoint
+        self.entrypoint = ""
+        exit_code, output = self._exec(command)
+
+        self.entrypoint = original_entrypoint
+        return exit_code, output
+
+
     def start_shell(self):
         """ Launch a shell in the container. """
         if self.mfa_enabled or self.sso_enabled:
@@ -624,14 +634,19 @@ class TerraformContainer(LeverageContainer):
     def backend_key(self):
         if self._backend_key is None:
             try:
-                config_tf = self.cwd / "config.tf"
-                config_tf = hcl2.loads(config_tf.read_text()) if config_tf.exists() else {}
+                config_tf_file = self.cwd / "config.tf"
+                config_tf = hcl2.loads(config_tf_file.read_text()) if config_tf_file.exists() else {}
                 if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
                     if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
                         backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
                         self._backend_key = backend_key
                     else:
                         self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate"
+
+                        in_container_file_path = f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
+                        resp = self.system_exec("hcledit "
+                                        f"-f {in_container_file_path} -u"
+                                        f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
                 else:
                     raise KeyError()
             except (KeyError, IndexError):
