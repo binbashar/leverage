@@ -512,6 +512,7 @@ class TerraformContainer(LeverageContainer):
         Returns the location type:
         - root
         - account
+        - config
         - layer
         - other under project
         - not a project
@@ -520,9 +521,11 @@ class TerraformContainer(LeverageContainer):
             return 'root'
         elif self.cwd == self.account_dir:
             return 'account'
-        elif (self.cwd.parent == self.account_dir or self.cwd.parent.parent == self.account_dir) and list(self.cwd.glob("*.tf")):
+        elif self.cwd in (self.common_config_dir, self.account_config_dir):
+            return 'config'
+        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
             return 'layer'
-        elif (self.cwd.parent == self.account_dir or self.cwd.parent.parent == self.account_dir) and not list(self.cwd.glob("*.tf")):
+        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
             return 'other under project'
         else:
             return 'not a project'
