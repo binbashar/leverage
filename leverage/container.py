@@ -605,7 +605,7 @@ class TerraformContainer(LeverageContainer):
                 region = self._find_region(Path(directory).relative_to(self.account_dir))
 
                 if not region is None:
-                    return { 'directory': directory , 'region': region}
+                    return {'directory': directory , 'region': region}
                 else:
                     logger.error("No region found for backend layer")
                     raise Exit(1)
