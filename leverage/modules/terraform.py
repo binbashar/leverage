@@ -177,7 +177,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         for lp in layer_path:
             if lp.startswith('base-'):
                 lp = lp.replace('base-','')
-            elif lp.startswith('tools'):
+            elif lp.startswith('tools-'):
                 lp = lp.replace('tools-','')
             curated_layer_path.append(lp)
         curated_layer_paths.append(curated_layer_path)
