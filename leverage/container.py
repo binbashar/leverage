@@ -317,7 +317,7 @@ class LeverageContainer:
         - account
         - config
         - layer
-        - other under project
+        - sublayer
         - not a project
         """
         if self.cwd == self.root_dir:
@@ -329,7 +329,7 @@ class LeverageContainer:
         elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
             return 'layer'
         elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
-            return 'other under project'
+            return 'sublayer'
         else:
             return 'not a project'
 

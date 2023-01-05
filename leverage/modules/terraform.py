@@ -200,11 +200,11 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         # running on a layer but --layers was set
         logger.error("Can not set [bold]--layers[/bold] inside a layer.")
         raise Exit(1)
-    elif tf.get_location_type() == 'account' and layers == '':
+    elif tf.get_location_type() in ['account','sublayer'] and len(layers) == 0:
         # running on an account but --layers was not set
         logger.error("[bold]--layers[/bold] has to be set.")
         raise Exit(1)
-    elif not tf.get_location_type() in ['account', 'layer']:
+    elif not tf.get_location_type() in ['account', 'layer', 'sublayer']:
         # running outside a layer and account
         logger.error('This command has to be run inside a layer or account directory.')
         raise Exit(1)
