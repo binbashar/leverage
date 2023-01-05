@@ -646,8 +646,8 @@ class TerraformContainer(LeverageContainer):
 
                     in_container_file_path = f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
                     resp = self.system_exec("hcledit "
-                                    f"-f {in_container_file_path} -u"
-                                    f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
+                                             f"-f {in_container_file_path} -u"
+                                             f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
             else:
                 raise KeyError()
         except (KeyError, IndexError):
