@@ -1,5 +1,6 @@
 import re
 import os
+from pathlib import Path
 
 import hcl2
 import click
@@ -10,7 +11,7 @@ from leverage._internals import pass_state
 from leverage._internals import pass_container
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
-from pathlib import Path
+
 REGION = (r"global|(?:[a-z]{2}-(?:gov-)?"
           r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4])")
 
@@ -37,6 +38,26 @@ CONTEXT_SETTINGS = {
 # ###########################################################################
 # CREATE THE TERRAFORM GROUP'S COMMANDS
 # ###########################################################################
+#
+# --layers is a ordered comma separated list of layer names
+# The layer names are the relative paths of those layers relative to the current directory
+# e.g. if CLI is called from /home/user/project/management and this is the tree:
+# home
+# ├── user
+# │   └── project
+# │       └── management
+# │           ├── global
+# │           |   └── security-base
+# │           |   └── sso
+# │           └── us-east-1
+# │               └── terraform-backend
+#
+# Then all three layers can be initialized as follows:
+# leverage tf init --layers us-east-1/terraform-backend,global/security-base,global/sso
+#
+# It is an ordered list because the layers will be visited in the same order they were
+# supplied.
+#
 layers_option = click.option("--layers",
                              type=str,
                              default="",
@@ -199,27 +220,26 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
     for layer in layers:
         logger.debug(f"Checking for layer {layer}...")
         # change to current dir and set it in the container
-        os.chdir(layer)
+        #os.chdir(layer)
         tf.cwd = layer
 
-        # reset the s3 key
-        if not skip_validation:
-            tf.set_backend_key()
+        # set the s3 key
+        tf.set_backend_key(skip_validation)
 
         #validate layer
         validate_for_all_commands(layer, skip_validation=skip_validation)
 
         # change to original dir and set it in the container
-        os.chdir(original_location)
+        #os.chdir(original_location)
         tf.cwd = original_location
 
     # check layers existence
     for layer in layers:
         if len(layers) > 1:
-            logger.info(f"Invoking command {command} for layer {layer}...")
+            logger.info(f"Invoking command for layer {layer}...")
 
         # change to current dir and set it in the container
-        os.chdir(layer)
+        #os.chdir(layer)
         tf.cwd = layer
 
         # set the working dir
@@ -229,7 +249,7 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         command(args=args)
 
         # change to original dir and set it in the container
-        os.chdir(original_location)
+        #os.chdir(original_location)
         tf.cwd = original_location
 
         # change to original workgindir

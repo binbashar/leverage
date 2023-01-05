@@ -310,6 +310,29 @@ class LeverageContainer:
         """
         return self._exec(command, *arguments)
 
+    def get_location_type(self):
+        """
+        Returns the location type:
+        - root
+        - account
+        - config
+        - layer
+        - other under project
+        - not a project
+        """
+        if self.cwd == self.root_dir:
+            return 'root'
+        elif self.cwd == self.account_dir:
+            return 'account'
+        elif self.cwd in (self.common_config_dir, self.account_config_dir):
+            return 'config'
+        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
+            return 'layer'
+        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
+            return 'other under project'
+        else:
+            return 'not a project'
+
 
 class AWSCLIContainer(LeverageContainer):
     """ Leverage Container specially tailored to run AWS CLI commands. """
@@ -507,35 +530,6 @@ class TerraformContainer(LeverageContainer):
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
 
-    def get_location_type(self):
-        """
-        Returns the location type:
-        - root
-        - account
-        - config
-        - layer
-        - other under project
-        - not a project
-        """
-        if self.cwd == self.root_dir:
-            return 'root'
-        elif self.cwd == self.account_dir:
-            return 'account'
-        elif self.cwd in (self.common_config_dir, self.account_config_dir):
-            return 'config'
-        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
-            return 'layer'
-        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
-            return 'other under project'
-        else:
-            return 'not a project'
-
-    def check_for_account_location(self):
-        """ Make sure the command is being ran at layer level. If not, bail. """
-        if self.get_location_type() != 'account':
-            logger.error("The action has to be run from inside the account directory.")
-            raise Exit(1)
-
     def check_for_layer_location(self):
         """ Make sure the command is being ran at layer level. If not, bail. """
         if self.cwd in (self.common_config_dir, self.account_config_dir):
@@ -633,7 +627,14 @@ class TerraformContainer(LeverageContainer):
 
         return None
 
-    def set_backend_key(self):
+    def set_backend_key(self, skip_validation=False):
+        # Scenarios:
+        #
+        # scenario    |  s3 backend set   |  s3 key set  |  skip_validation  |  result
+        # 0           |  false            |  false       |  false            |  fail
+        # 1           |  false            |  false       |  true             |  ok
+        # 2           |  true             |  false       |  false/true       |  set the key
+        # 3           |  true             |  true        |  false/true       |  read the key
         try:
             config_tf_file = self.cwd / "config.tf"
             config_tf = hcl2.loads(config_tf_file.read_text()) if config_tf_file.exists() else {}
@@ -642,14 +643,15 @@ class TerraformContainer(LeverageContainer):
                     backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
                     self._backend_key = backend_key
                 else:
-                    self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate".replace('/base-tf-backend/','/tf-backend/')
+                    self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate".replace('/base-','/').replace('/tools-','/')
 
                     in_container_file_path = f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
                     resp = self.system_exec("hcledit "
                                              f"-f {in_container_file_path} -u"
                                              f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
             else:
-                raise KeyError()
+                if not skip_validation:
+                    raise KeyError()
         except (KeyError, IndexError):
             logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
             raise Exit(1)
