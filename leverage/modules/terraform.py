@@ -220,7 +220,6 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
     for layer in layers:
         logger.debug(f"Checking for layer {layer}...")
         # change to current dir and set it in the container
-        #os.chdir(layer)
         tf.cwd = layer
 
         # set the s3 key
@@ -230,7 +229,6 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         validate_for_all_commands(layer, skip_validation=skip_validation)
 
         # change to original dir and set it in the container
-        #os.chdir(original_location)
         tf.cwd = original_location
 
     # check layers existence
@@ -239,7 +237,6 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
             logger.info(f"Invoking command for layer {layer}...")
 
         # change to current dir and set it in the container
-        #os.chdir(layer)
         tf.cwd = layer
 
         # set the working dir
@@ -249,7 +246,6 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         command(args=args)
 
         # change to original dir and set it in the container
-        #os.chdir(original_location)
         tf.cwd = original_location
 
         # change to original workgindir
