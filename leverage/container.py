@@ -533,7 +533,7 @@ class TerraformContainer(LeverageContainer):
     def check_for_account_location(self):
         """ Make sure the command is being ran at layer level. If not, bail. """
         if self.get_location_type() != 'account':
-            logger.error("The action has to be run from inside the account directory, not a layer, not the project root.")
+            logger.error("The action has to be run from inside the account directory.")
             raise Exit(1)
 
     def check_for_layer_location(self):
