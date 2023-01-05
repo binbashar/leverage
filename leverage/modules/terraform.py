@@ -38,9 +38,9 @@ CONTEXT_SETTINGS = {
 # CREATE THE TERRAFORM GROUP'S COMMANDS
 # ###########################################################################
 layers_option = click.option("--layers",
-              type=str,
-              default="",
-              help="Layers to apply the action to. (an ordered comma separated list of layer names)")
+                             type=str,
+                             default="",
+                             help="Layers to apply the action to. (an ordered, comma-separated list of layer names)")
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.option("--skip-validation",
