@@ -179,8 +179,8 @@ def login(cli):
     # - when this cond meets:
     #   - no account dir
     #   - no layer dir
-    if not cli.get_location_type() in ['account', 'layer']:
-        logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
+    if not cli.get_location_type() in ['account', 'layer', 'layers-group']:
+        logger.error("SSO configuration can only be performed at [bold]layer[/bold] or [bold]account[/bold] level.")
         raise Exit(1)
 
     exit_code, region = cli.exec(f"configure get sso_region --profile {cli.project}-sso")

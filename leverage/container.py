@@ -329,7 +329,7 @@ class LeverageContainer:
         elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
             return 'layer'
         elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
-            return 'sublayer'
+            return 'layers-group'
         else:
             return 'not a project'
 
