@@ -39,7 +39,7 @@ PROJECT=bb
 MFA_ENABLED=false
 
 # Terraform
-TERRAFORM_IMAGE_TAG=1.2.7-0.0.5
+TERRAFORM_IMAGE_TAG=1.2.7-0.1.0
 ```
 
 So, if you have created a project with version <1.8.0 and want to use it with version >=1.8.0 you should:
