@@ -174,10 +174,13 @@ def sso(context, cli, args):
 @pass_container
 def login(cli):
     """ Login """
-    if (cli.cwd in (cli.root_dir, cli.account_dir) or
-        cli.account_dir.parent != cli.root_dir or
-        not list(cli.cwd.glob("*.tf"))):
-        logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
+    # only from account or layer directories
+    # when to fail:
+    # - when this cond meets:
+    #   - no account dir
+    #   - no layer dir
+    if not cli.get_location_type() in ['account', 'layer', 'layers-group']:
+        logger.error("SSO configuration can only be performed at [bold]layer[/bold] or [bold]account[/bold] level.")
         raise Exit(1)
 
     exit_code, region = cli.exec(f"configure get sso_region --profile {cli.project}-sso")

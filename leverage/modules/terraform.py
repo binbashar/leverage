@@ -1,4 +1,6 @@
 import re
+import os
+from pathlib import Path
 
 import hcl2
 import click
@@ -13,6 +15,9 @@ from leverage.container import TerraformContainer
 REGION = (r"global|(?:[a-z]{2}-(?:gov-)?"
           r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4])")
 
+# ###########################################################################
+# CREATE THE TERRAFORM GROUP
+# ###########################################################################
 @click.group()
 @pass_state
 def terraform(state):
@@ -30,76 +35,83 @@ CONTEXT_SETTINGS = {
     "ignore_unknown_options": True
 }
 
+# ###########################################################################
+# CREATE THE TERRAFORM GROUP'S COMMANDS
+# ###########################################################################
+#
+# --layers is a ordered comma separated list of layer names
+# The layer names are the relative paths of those layers relative to the current directory
+# e.g. if CLI is called from /home/user/project/management and this is the tree:
+# home
+# ├── user
+# │   └── project
+# │       └── management
+# │           ├── global
+# │           |   └── security-base
+# │           |   └── sso
+# │           └── us-east-1
+# │               └── terraform-backend
+#
+# Then all three layers can be initialized as follows:
+# leverage tf init --layers us-east-1/terraform-backend,global/security-base,global/sso
+#
+# It is an ordered list because the layers will be visited in the same order they were
+# supplied.
+#
+layers_option = click.option("--layers",
+                             type=str,
+                             default="",
+                             help="Layers to apply the action to. (an ordered, comma-separated list of layer names)")
+
 @terraform.command(context_settings=CONTEXT_SETTINGS)
 @click.option("--skip-validation",
               is_flag=True,
               help="Skip layout validation.")
+@layers_option
 @click.argument("args", nargs=-1)
 @pass_container
 @click.pass_context
-def init(context, tf, skip_validation, args):
-    """ Initialize this layer. """
-    # Validate layout before attempting to initialize Terraform
-    if not skip_validation and not context.invoke(validate_layout):
-        logger.error("Layer configuration doesn't seem to be valid. Exiting.\n"
-                     "If you are sure your configuration is actually correct "
-                     "you may skip this validation using the --skip-validation flag.")
-        raise Exit(1)
-
-    args = [arg for index, arg in enumerate(args)
-            if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
-    args.append(f"-backend-config={tf.backend_tfvars}")
-    args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
-    # if the backend key is set send it as a backend config
-    if not tf.backend_key is None:
-        args.append(f"-backend-config=\"key={tf.backend_key}\"")
-
-    exit_code = tf.start_in_layer("init", *args)
-
-    if exit_code:
-        raise Exit(exit_code)
-
+def init(context, tf, skip_validation, layers, args):
+    """
+    Initialize this layer.
+    """
+    invoke_for_all_commands(layers, _init, args, skip_validation)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
+@layers_option
 @click.argument("args", nargs=-1)
 @pass_container
-def plan(tf, args):
+@click.pass_context
+def plan(context, tf, layers, args):
     """ Generate an execution plan for this layer. """
-    exit_code = tf.start_in_layer("plan", *tf.tf_default_args, *args)
-
-    if exit_code:
-        raise Exit(exit_code)
-
+    invoke_for_all_commands(layers, _plan, args)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
+@layers_option
 @click.argument("args", nargs=-1)
 @pass_container
-def apply(tf, args):
+@click.pass_context
+def apply(context, tf, layers, args):
     """ Build or change the infrastructure in this layer. """
-    exit_code = tf.start_in_layer("apply", *tf.tf_default_args, *args)
-
-    if exit_code:
-        raise Exit(exit_code)
-
+    invoke_for_all_commands(layers, _apply, args)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
+@layers_option
 @click.argument("args", nargs=-1)
 @pass_container
-def output(tf, args):
+@click.pass_context
+def output(context, tf, layers, args):
     """ Show all output variables of this layer. """
-    tf.start_in_layer("output", *args)
-
+    invoke_for_all_commands(layers, _output, args)
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
+@layers_option
 @click.argument("args", nargs=-1)
 @pass_container
-def destroy(tf, args):
+@click.pass_context
+def destroy(context, tf, layers, args):
     """ Destroy infrastructure in this layer. """
-    exit_code = tf.start_in_layer("destroy", *tf.tf_default_args, *args)
-
-    if exit_code:
-        raise Exit(exit_code)
-
+    invoke_for_all_commands(layers, _destroy, args)
 
 @terraform.command()
 @pass_container
@@ -107,7 +119,6 @@ def version(tf):
     """ Print version. """
     tf.disable_authentication()
     tf.start("version")
-
 
 @terraform.command()
 @click.option("--mfa",
@@ -130,7 +141,6 @@ def shell(tf, mfa, sso):
 
     tf.start_shell()
 
-
 @terraform.command("format", context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
 @pass_container
@@ -140,7 +150,6 @@ def _format(tf, args):
     tf.disable_authentication()
     tf.start("fmt", *args)
 
-
 @terraform.command()
 @pass_container
 def validate(tf):
@@ -148,7 +157,185 @@ def validate(tf):
     tf.disable_authentication()
     tf.start("validate")
 
+@terraform.command("validate-layout")
+@pass_container
+def validate_layout(tf):
+    """ Validate layer conforms to Leverage convention. """
+    tf.set_backend_key()
+    return _validate_layout()
 
+@terraform.command("import")
+@click.argument("address")
+@click.argument("_id", metavar="ID")
+@pass_container
+def _import(tf, address, _id):
+    """ Import a resource. """
+    exit_code = tf.start_in_layer("import", *tf.tf_default_args, address, _id)
+
+    if exit_code:
+        raise Exit(exit_code)
+
+# ###########################################################################
+# HANDLER FOR MANAGING THE BASE COMMANDS (init, plan, apply, destroy, output)
+# ###########################################################################
+@pass_container
+def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
+    """
+    Invoke helper for "all" commands.
+
+    Args:
+        layers: comma separated value of relative layer path
+            e.g.: global/security_audit,us-east-1/tf-backend
+        command: init, plan, apply
+    """
+
+    # convert layers from string to list
+    layers = layers.split(',') if len(layers) > 0 else []
+
+    # based on the location type manage the layers parameter
+    if tf.get_location_type() == 'layer' and len(layers) == 0:
+        # running on a layer
+        layers = [tf.cwd]
+    elif tf.get_location_type() == 'layer':
+        # running on a layer but --layers was set
+        logger.error("Can not set [bold]--layers[/bold] inside a layer.")
+        raise Exit(1)
+    elif tf.get_location_type() in ['account','layers-group'] and len(layers) == 0:
+        # running on an account but --layers was not set
+        logger.error("[bold]--layers[/bold] has to be set.")
+        raise Exit(1)
+    elif not tf.get_location_type() in ['account', 'layer', 'layers-group']:
+        # running outside a layer and account
+        logger.error('This command has to be run inside a layer or account directory.')
+        raise Exit(1)
+    else:
+        # running on an account with --layers set
+        layers = [ tf.cwd / x for x in layers]
+
+    # get current location
+    original_location = tf.cwd
+    original_working_dir = tf.container_config['working_dir']
+
+    # validate each layer before calling the execute command
+    for layer in layers:
+        logger.debug(f"Checking for layer {layer}...")
+        # change to current dir and set it in the container
+        tf.cwd = layer
+
+        # set the s3 key
+        tf.set_backend_key(skip_validation)
+
+        #validate layer
+        validate_for_all_commands(layer, skip_validation=skip_validation)
+
+        # change to original dir and set it in the container
+        tf.cwd = original_location
+
+    # check layers existence
+    for layer in layers:
+        if len(layers) > 1:
+            logger.info(f"Invoking command for layer {layer}...")
+
+        # change to current dir and set it in the container
+        tf.cwd = layer
+
+        # set the working dir
+        tf.container_config['working_dir'] = f"{tf.guest_base_path}/{tf.cwd.relative_to(tf.root_dir).as_posix()}"
+
+        # execute the actual command
+        command(args=args)
+
+        # change to original dir and set it in the container
+        tf.cwd = original_location
+
+        # change to original workgindir
+        tf.container_config['working_dir'] = original_working_dir
+
+def validate_for_all_commands(layer, skip_validation=False):
+    """
+    Validate existense of layer and, if set, all the Leverage related stuff
+    of each of them
+
+    Args:
+        layer: a full layer directory
+    """
+
+    # check layers existence
+    logger.debug(f"Checking layer {layer}...")
+    if not layer.is_dir():
+        logger.error(f"Directory [red]{layer}[/red] does not exist or is not a directory\n")
+        raise Exit(1)
+
+    if not skip_validation and not _validate_layout():
+        logger.error("Layer configuration doesn't seem to be valid. Exiting.\n"
+                    "If you are sure your configuration is actually correct "
+                    "you may skip this validation using the --skip-validation flag.")
+        raise Exit(1)
+
+# ###########################################################################
+# BASE COMMAND EXECUTORS
+# ###########################################################################
+@pass_container
+def _init(tf, args):
+    """ Initialize this layer. """
+
+    args = [arg for index, arg in enumerate(args)
+            if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
+    args.append(f"-backend-config={tf.backend_tfvars}")
+    args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
+    # if the backend key is set send it as a backend config
+    if not tf.backend_key is None:
+        args.append(f"-backend-config=\"key={tf.backend_key}\"")
+
+    exit_code = tf.start_in_layer("init", *args)
+
+    if exit_code:
+        raise Exit(exit_code)
+
+
+@pass_container
+def _plan(tf, args):
+    """ Generate an execution plan for this layer. """
+    exit_code = tf.start_in_layer("plan", *tf.tf_default_args, *args)
+
+    if exit_code:
+        raise Exit(exit_code)
+
+
+@pass_container
+def _apply(tf, args):
+    """ Build or change the infrastructure in this layer. """
+    # if there is a plan, remove all "-var" from the default args
+    tf_default_args  = tf.tf_default_args
+    for arg in args:
+        if not arg.startswith("-"):
+            tf_default_args = [arg for index, arg in enumerate(tf_default_args)
+                    if not arg.startswith("-var")]
+            break
+    exit_code = tf.start_in_layer("apply", *tf_default_args, *args)
+
+    if exit_code:
+        raise Exit(exit_code)
+
+
+@pass_container
+def _output(tf, args):
+    """ Show all output variables of this layer. """
+    tf.start_in_layer("output", *args)
+
+
+@pass_container
+def _destroy(tf, args):
+    """ Destroy infrastructure in this layer. """
+    exit_code = tf.start_in_layer("destroy", *tf.tf_default_args, *args)
+
+    if exit_code:
+        raise Exit(exit_code)
+
+
+# ###########################################################################
+# MISC FUNCTIONS
+# ###########################################################################
 def _make_layer_backend_key(cwd, account_dir, account_name):
     """ Create expected backend key.
 
@@ -218,10 +405,8 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
     return resp
 
 
-@terraform.command("validate-layout")
 @pass_container
-def validate_layout(tf):
-    """ Validate layer conforms to Leverage convention. """
+def _validate_layout(tf):
     tf.check_for_layer_location()
 
     # Check for `environment = <account name>` in account.tfvars
@@ -237,24 +422,7 @@ def validate_layout(tf):
         logger.warning("[yellow]‼[/yellow] Account directory name does not match environment name.\n"
                        f"  Expected [bold]{account_name}[/bold], found [bold]{tf.account_dir.stem}[/bold]\n")
 
-    config_tf = tf.cwd / "config.tf"
-    try:
-        config_tf = hcl2.loads(config_tf.read_text()) if config_tf.exists() else {}
-        if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
-            if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
-                backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
-                tf.backend_key = backend_key
-            else:
-                backend_key = tf.backend_key
-            backend_key = backend_key.split("/")
-        else:
-            raise KeyError()
-    except (KeyError, IndexError):
-        logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
-        raise Exit(1)
-    except:
-        logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
-        raise Exit(1)
+    backend_key = tf.backend_key.split('/')
 
     # Flag to report layout validity
     valid_layout = True
@@ -291,14 +459,3 @@ def validate_layout(tf):
 
     return valid_layout
 
-
-@terraform.command("import")
-@click.argument("address")
-@click.argument("_id", metavar="ID")
-@pass_container
-def _import(tf, address, _id):
-    """ Import a resource. """
-    exit_code = tf.start_in_layer("import", *tf.tf_default_args, address, _id)
-
-    if exit_code:
-        raise Exit(exit_code)
