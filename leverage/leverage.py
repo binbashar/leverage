@@ -13,6 +13,7 @@ from leverage.modules import run
 from leverage.modules import project
 from leverage.modules import terraform
 from leverage.modules import credentials
+from leverage.modules import tfautomv
 
 @click.group(invoke_without_command=True)
 @click.option("--filename", "-f",
@@ -53,3 +54,4 @@ leverage.add_command(terraform)
 leverage.add_command(terraform, name="tf")
 leverage.add_command(credentials)
 leverage.add_command(aws)
+leverage.add_command(tfautomv)

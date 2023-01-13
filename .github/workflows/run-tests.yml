@@ -190,7 +190,7 @@ jobs:
           EOF
           echo "[INFO] Disable MFA\n"
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
-          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=1.2.7-latest/' build.env;
+          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=1.2.7-0.0.5/' build.env;
         working-directory: ../theblairwitchproject
 
       - name: Test Testing Reference Architecture
@@ -213,3 +213,4 @@ jobs:
           printf "[INFO] Destroying all generated created resources\n"
           leverage tf destroy -auto-approve
         working-directory: ../theblairwitchproject/apps-devstg/global/cli-test-layer
+

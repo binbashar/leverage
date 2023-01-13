@@ -87,7 +87,12 @@ def _sso(context, cli):
         logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
         raise Exit(1)
 
-    default_region = cli.common_conf.get("region_primary", cli.common_conf.get("sso_region"))
+    # region_primary was added in refarch v1
+    # for v2 it was replaced by region at project level
+    region_primary = 'region_primary'
+    if not 'region_primary' in cli.common_conf:
+        region_primary = 'region'
+    default_region = cli.common_conf.get(region_primary, cli.common_conf.get("sso_region"))
     if default_region is None:
         logger.error("No primary region configured in global config file.")
         raise Exit(1)
@@ -111,10 +116,27 @@ def _sso(context, cli):
 
     current_account = cli.account_conf.get("environment")
     try:
+        # this is for refarch v1
         account_id = cli.common_conf.get("accounts").get(current_account).get("id")
     except AttributeError:
-        logger.error("Missing environment configuration in global config file.")
-        raise Exit(1)
+        # this is for refarch v2
+        try:
+            # this is for accounts with no org unit on top of it
+            account_id = cli.common_conf.get("organization").get("accounts").get(current_account).get("id")
+        except AttributeError:
+            try:
+                # this is for accounts with no org unit on top of it
+                found = False
+                for ou in cli.common_conf.get("organization").get("organizational_units"):
+                    if current_account in cli.common_conf.get("organization").get("organizational_units").get(ou).get("accounts"):
+                        account_id = cli.common_conf.get("organization").get("organizational_units").get(ou).get("accounts").get(current_account).get("id")
+                        found = True
+                        break
+                if not found:
+                    raise AttributeError
+            except AttributeError:
+                logger.error(f"Missing account configuration for [bold]{current_account}[/bold] in global config file.")
+                raise Exit(1)
     if not account_id:
         logger.error(f"Missing id for account [bold]{current_account}[/bold].")
         raise Exit(1)
@@ -122,7 +144,7 @@ def _sso(context, cli):
     logger.info(f"Configuring [bold]{cli.project}-sso[/bold] profile.")
     sso_profile = {
         "sso_start_url": cli.common_conf.get("sso_start_url"),
-        "sso_region": cli.common_conf.get("sso_region", cli.common_conf.get("region_primary")),
+        "sso_region": cli.common_conf.get("sso_region", cli.common_conf.get(region_primary)),
         "sso_account_id": account_id,
         "sso_role_name": sso_role
     }
@@ -152,10 +174,13 @@ def sso(context, cli, args):
 @pass_container
 def login(cli):
     """ Login """
-    if (cli.cwd in (cli.root_dir, cli.account_dir) or
-        cli.account_dir.parent != cli.root_dir or
-        not list(cli.cwd.glob("*.tf"))):
-        logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
+    # only from account or layer directories
+    # when to fail:
+    # - when this cond meets:
+    #   - no account dir
+    #   - no layer dir
+    if not cli.get_location_type() in ['account', 'layer', 'layers-group']:
+        logger.error("SSO configuration can only be performed at [bold]layer[/bold] or [bold]account[/bold] level.")
         raise Exit(1)
 
     exit_code, region = cli.exec(f"configure get sso_region --profile {cli.project}-sso")
