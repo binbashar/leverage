@@ -13,4 +13,4 @@
 
 ## Before release
 
-Review the checklist [here](https://binbash.atlassian.net/wiki/spaces/BDPS/pages/edit-v2/2158034946)
+Review the checklist [here](https://binbash.atlassian.net/l/cp/BthxSQ0j)
