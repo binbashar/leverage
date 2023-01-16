@@ -11,3 +11,6 @@
 * Link to any supporting github issues or helpful documentation to add some context (e.g. stackoverflow). 
 * Use `closes #123`, if this PR closes a GitHub issue `#123`
 
+## Before release
+
+Review the checklist [here](https://binbash.atlassian.net/l/cp/BthxSQ0j)
