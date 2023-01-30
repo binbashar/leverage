@@ -197,20 +197,19 @@ jobs:
         run: |
 
           printf "[INFO] Initializing layer\n"
-          leverage tf init
+          leverage tf init --layers cli-test-layer,base-identities
 
           printf "[INFO] Generating plan\n"
-          leverage tf plan
+          leverage tf plan --layers cli-test-layer
 
           printf "[INFO] Applying changes\n"
-          leverage tf apply -auto-approve
+          leverage tf apply -auto-approve --layers cli-test-layer
 
           printf "[INFO] Checking if all changes were applied\n"
-          leverage tf plan -detailed-exitcode
+          leverage tf plan -detailed-exitcode --layers cli-test-layer
           [[ $? -eq 2 ]] && printf "[WARN] There are still remaining changes\n"
           [[ $? -eq 0 ]] && printf "[INFO] Apply checks out\n"
 
           printf "[INFO] Destroying all generated created resources\n"
-          leverage tf destroy -auto-approve
-        working-directory: ../theblairwitchproject/apps-devstg/global/cli-test-layer
-
+          leverage tf destroy -auto-approve --layers cli-test-layer
+        working-directory: ../theblairwitchproject/apps-devstg/global

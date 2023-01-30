@@ -222,6 +222,11 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         # change to current dir and set it in the container
         tf.cwd = layer
 
+        # check layers existence
+        if not layer.is_dir():
+            logger.error(f"Directory [red]{layer}[/red] does not exist or is not a directory\n")
+            raise Exit(1)
+
         # set the s3 key
         tf.set_backend_key(skip_validation)
 
@@ -260,12 +265,7 @@ def validate_for_all_commands(layer, skip_validation=False):
         layer: a full layer directory
     """
 
-    # check layers existence
     logger.debug(f"Checking layer {layer}...")
-    if not layer.is_dir():
-        logger.error(f"Directory [red]{layer}[/red] does not exist or is not a directory\n")
-        raise Exit(1)
-
     if not skip_validation and not _validate_layout():
         logger.error("Layer configuration doesn't seem to be valid. Exiting.\n"
                     "If you are sure your configuration is actually correct "
@@ -283,9 +283,6 @@ def _init(tf, args):
             if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
     args.append(f"-backend-config={tf.backend_tfvars}")
     args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
-    # if the backend key is set send it as a backend config
-    if not tf.backend_key is None:
-        args.append(f"-backend-config=\"key={tf.backend_key}\"")
 
     exit_code = tf.start_in_layer("init", *args)
 
