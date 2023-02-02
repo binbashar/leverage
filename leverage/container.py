@@ -91,7 +91,7 @@ class LeverageContainer:
         self.image_tag = self.env_conf.get("TERRAFORM_IMAGE_TAG")
         if not self.image_tag:
             logger.error("No docker image tag defined.\n"
-                         "Please set `TERRAFORM_IMAGE_TAG` variable before running a Leverage command.")
+                         "Please set `TERRAFORM_IMAGE_TAG` variable in the project's [bold]build.env[/bold] file before running a Leverage command.")
             raise Exit(1)
 
         # Get project name
@@ -653,7 +653,7 @@ class TerraformContainer(LeverageContainer):
                 if not skip_validation:
                     raise KeyError()
         except (KeyError, IndexError):
-            logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend bucket key.")
+            logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend block. In some cases you may want to skip this check by using the --skip-validation flag, e.g. the first time you initialize a terraform-backend layer.")
             raise Exit(1)
         except Exception as e:
             logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
