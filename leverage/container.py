@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 from datetime import datetime
-from datetime import timedelta
 
 import hcl2
 from click.exceptions import Exit
@@ -700,3 +699,34 @@ class TFautomvContainer(TerraformContainer):
 
         return self._exec(command, *arguments)
 
+
+class KubeCtlContainer(TerraformContainer):
+    """Container specifically tailored to run kubectl commands."""
+
+    KUBECTL_CLI_BINARY = "/usr/local/bin/kubectl"
+
+    def __init__(self, client):
+        super().__init__(client)
+
+        self.entrypoint = self.KUBECTL_CLI_BINARY
+
+        host_config_path = str(Path.home() / Path(f".kube/{self.project}"))
+        guest_config_path = "/root/.kube"
+        self.container_config["host_config"]["Mounts"].append(
+            # the container is expecting a file named "config" here
+            Mount(source=host_config_path, target=guest_config_path, type="bind")
+        )
+
+    def start(self, command, *arguments):
+        self._prepare_container()
+
+        return self._start(command, *arguments)
+
+    def exec(self, command, *arguments):
+        self._prepare_container()
+
+        return self._exec(command, *arguments)
+
+    def start_shell(self):
+        self.entrypoint = ""
+        self._start()

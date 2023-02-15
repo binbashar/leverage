@@ -14,3 +14,5 @@ leverage.egg-info
 .pytest_cache
 coverage
 .coverage
+
+.idea
