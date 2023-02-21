@@ -728,5 +728,7 @@ class KubeCtlContainer(TerraformContainer):
         return self._exec(command, *arguments)
 
     def start_shell(self):
+        self._prepare_container()
+
         self.entrypoint = ""
         self._start()
