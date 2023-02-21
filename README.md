@@ -49,6 +49,18 @@ So, if you have created a project with version <1.8.0 and want to use it with ve
 
 For the second item you can check the version [here](https://hub.docker.com/r/binbash/leverage-toolbox/tags).
 
+## Setting up development environment
+
+First, you should create a virtual environment and install all the required dependencies by running: `pipenv install --dev`.
+
+If you don't have `pipenv` in your system, you can check the following documentation: https://pipenv.pypa.io/en/latest/install/#installing-pipenv
+
+Once you have everything in place, install the CLI as an editable package inside the virtual environment: `pipenv install -e .` 
+
+This way, the `leverage` command on your venv will be executed from the project folder, using it as the source.
+
+Now all the changes to the project will be immediately reflected on the command.
+
 ## Running Tests
 To run unit tests, pytest is the tool of choice, and the required dependencies are available in the corresponding `dev-requirements.txt`.
 
