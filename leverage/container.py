@@ -717,16 +717,6 @@ class KubeCtlContainer(TerraformContainer):
             Mount(source=host_config_path, target=guest_config_path, type="bind")
         )
 
-    def start(self, command, *arguments):
-        self._prepare_container()
-
-        return self._start(command, *arguments)
-
-    def exec(self, command, *arguments):
-        self._prepare_container()
-
-        return self._exec(command, *arguments)
-
     def start_shell(self):
         self._prepare_container()
 
