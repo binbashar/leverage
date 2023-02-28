@@ -428,7 +428,6 @@ class TerraformContainer(LeverageContainer):
         self.mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
             Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
-            #Mount(source=(self.home / ".ssh").as_posix(), target="/root/.ssh", type="bind"),
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind")
         ]
         if not SSH_AUTH_SOCK is None:
