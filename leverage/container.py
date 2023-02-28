@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from datetime import timedelta
+import os
 
 import hcl2
 from click.exceptions import Exit
@@ -391,7 +392,6 @@ class TerraformContainer(LeverageContainer):
     """ Leverage container specifically tailored to run Terraform commands.
     It handles authentication and some checks regarding where the command is being executed. """
     TF_BINARY = "/bin/terraform"
-    TF_ENTRYPOINT = "/root/scripts/terraform/entrypoint.sh"
 
     TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
     TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
@@ -407,6 +407,9 @@ class TerraformContainer(LeverageContainer):
         self.sso_enabled = self.common_conf.get("sso_enabled", False)
         self.mfa_enabled = self.env_conf.get("MFA_ENABLED", "false") == "true" # TODO: Convert values to bool upon loading
 
+        # SSH AGENT
+        SSH_AUTH_SOCK = os.getenv('SSH_AUTH_SOCK')
+
         self.environment = {
             "COMMON_CONFIG_FILE": self.common_tfvars,
             "ACCOUNT_CONFIG_FILE": self.account_tfvars,
@@ -418,15 +421,18 @@ class TerraformContainer(LeverageContainer):
             "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
-            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level() # Legacy
+            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(), # Legacy
+            "SSH_AUTH_SOCK": '/ssh-agent' if not SSH_AUTH_SOCK is None else ""
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
             Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
-            Mount(source=(self.home / ".ssh").as_posix(), target="/tmp/.ssh", type="bind"),
+            #Mount(source=(self.home / ".ssh").as_posix(), target="/root/.ssh", type="bind"),
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind")
         ]
+        if not SSH_AUTH_SOCK is None:
+            self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
 
         self._backend_key = None
 
@@ -527,8 +533,6 @@ class TerraformContainer(LeverageContainer):
                 "AWS_SHARED_CREDENTIALS_FILE": self.environment.get("AWS_SHARED_CREDENTIALS_FILE").replace("tmp", ".aws"),
                 "AWS_CONFIG_FILE": self.environment.get("AWS_CONFIG_FILE").replace("tmp", ".aws"),
             })
-        else:
-            self.entrypoint = f"{self.TF_ENTRYPOINT} -- {self.entrypoint}"
 
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
