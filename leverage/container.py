@@ -422,7 +422,7 @@ class TerraformContainer(LeverageContainer):
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
             "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(), # Legacy
-            "SSH_AUTH_SOCK": '/ssh-agent' if not SSH_AUTH_SOCK is None else ""
+            "SSH_AUTH_SOCK": '' if SSH_AUTH_SOCK is None else '/ssh-agent'
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
