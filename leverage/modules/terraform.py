@@ -282,7 +282,7 @@ def _init(tf, args):
     args = [arg for index, arg in enumerate(args)
             if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
     args.append(f"-backend-config={tf.backend_tfvars}")
-    args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
+    #args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
 
     exit_code = tf.start_in_layer("init", *args)
 
