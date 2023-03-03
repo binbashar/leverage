@@ -698,27 +698,3 @@ class TFautomvContainer(TerraformContainer):
         self._prepare_container()
 
         return self._exec(command, *arguments)
-
-
-class KubeCtlContainer(TerraformContainer):
-    """Container specifically tailored to run kubectl commands."""
-
-    KUBECTL_CLI_BINARY = "/usr/local/bin/kubectl"
-
-    def __init__(self, client):
-        super().__init__(client)
-
-        self.entrypoint = self.KUBECTL_CLI_BINARY
-
-        host_config_path = str(Path.home() / Path(f".kube/{self.project}"))
-        guest_config_path = "/root/.kube"
-        self.container_config["host_config"]["Mounts"].append(
-            # the container is expecting a file named "config" here
-            Mount(source=host_config_path, target=guest_config_path, type="bind")
-        )
-
-    def start_shell(self):
-        self._prepare_container()
-
-        self.entrypoint = ""
-        self._start()

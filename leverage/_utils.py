@@ -50,3 +50,34 @@ def git(command):
     command = ["git"] + command if command[0] != "git" else command
 
     run(command, stdout=PIPE, stderr=PIPE, check=True)
+
+
+def chain_commands(commands: list, chain: str = " && ") -> str:
+    return f"bash -c \"{chain.join(commands)}\""
+
+
+class CustomEntryPoint:
+    """
+    Set a custom entrypoint on the container while entering the context.
+    Once outside, return it to its original value.
+    """
+
+    def __init__(self, container, entrypoint):
+        self.container = container
+        self.old_entrypoint = container.entrypoint
+        self.new_entrypoint = entrypoint
+
+    def __enter__(self):
+        self.container.entrypoint = self.new_entrypoint
+
+    def __exit__(self, *args, **kwargs):
+        self.container.entrypoint = self.old_entrypoint
+
+
+class EmptyEntryPoint(CustomEntryPoint):
+    """
+    Force an empty entrypoint. This will let you execute any commands freely.
+    """
+
+    def __init__(self, container):
+        super(EmptyEntryPoint, self).__init__(container, entrypoint="")

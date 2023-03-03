@@ -1,7 +1,7 @@
 from leverage._internals import pass_state
 from leverage._internals import pass_container
 from leverage.container import get_docker_client
-from leverage.container import KubeCtlContainer
+from leverage.containers.kubectl import KubeCtlContainer
 
 import click
 
@@ -26,3 +26,9 @@ def kubectl(context, state, args):
 def shell(kctl: KubeCtlContainer):
     """Spawn a shell with the kubectl credentials pre-configured."""
     kctl.start_shell()
+
+
+@kubectl.command(context_settings=CONTEXT_SETTINGS)
+@pass_container
+def configure(kctl: KubeCtlContainer):
+    kctl.configure()
