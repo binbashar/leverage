@@ -63,7 +63,7 @@ class KubeCtlContainer(TerraformContainer):
             logger.error(output)
             raise Exit(exit_code)
 
-        aws_eks_cmd = output.split("\n")[10]
+        aws_eks_cmd = next(op for op in output.split("\n") if op.startswith("aws eks update-kubeconfig"))
         # assuming the cluster container is on the primary region
         return aws_eks_cmd + f" --region {self.common_conf['region_primary']}"
 
@@ -76,6 +76,7 @@ class KubeCtlContainer(TerraformContainer):
 
     def check_for_layer_location(self):
         super(KubeCtlContainer, self).check_for_layer_location()
+        # assuming the "cluster" layer will contain the expected EKS outputs
         if self.cwd.parts[-1] != "cluster":
             logger.error("This command can only run at the [bold]cluster layer[/bold].")
             raise Exit(1)
