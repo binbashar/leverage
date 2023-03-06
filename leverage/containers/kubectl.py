@@ -34,6 +34,7 @@ class KubeCtlContainer(TerraformContainer):
 
     def start_shell(self):
         with EmptyEntryPoint(self):
+            self._prepare_container()
             self._start()
 
     def configure(self):
@@ -56,7 +57,7 @@ class KubeCtlContainer(TerraformContainer):
 
     def _get_eks_kube_config(self) -> str:
         self.check_for_layer_location()
-
+        self._prepare_container()
         exit_code, output = self._exec(f"{self.TF_BINARY} output")
         if exit_code:
             logger.error(output)
