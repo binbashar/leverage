@@ -586,53 +586,6 @@ class TerraformContainer(LeverageContainer):
         self._prepare_container()
         self._start()
 
-    #@property
-    #def region(self):
-    #    """ Determine the region based on PATH, account tfvars or project tfvars. Returns a string with the region name. """
-    #    region = self._find_region(self.cwd.relative_to(self.account_dir))
-
-    #    if not region is None:
-    #        return region
-
-    #    logger.error("No region found")
-    #    raise Exit(1)
-
-    #@property
-    #def terraform_backend(self):
-    #    """ Determine the terraform backend for the account. Returns an object with backend information. """
-    #    # These are the possible backend layer names for Refarch v1 and v2
-    #    possible_layer_names = ['terraform-backend', 'base-tf-backend']
-    #    for layer_name in possible_layer_names:
-    #        for directory in Path(self.account_dir).glob(f"**/{layer_name}"):
-
-    #            region = self._find_region(Path(directory).relative_to(self.account_dir))
-
-    #            if not region is None:
-    #                return {'directory': directory , 'region': region}
-    #            else:
-    #                logger.error("No region found for backend layer")
-    #                raise Exit(1)
-
-    #    logger.error("No backend layer found")
-    #    raise Exit(1)
-
-    #def _find_region(self, local_directory):
-    #    local_directory = local_directory.as_posix().split('/')
-    #    if len(local_directory) > 1:
-    #        if local_directory[0] != 'global':
-    #            return local_directory[0]
-
-    #    if 'region' in self.account_conf:
-    #        return self.account_conf.get('region')
-    #    if 'region' in self.common_conf:
-    #        return self.common_conf.get('region')
-    #    if 'region_primary' in self.account_conf:
-    #        return self.account_conf.get('region_primary')
-    #    if 'region_primary' in self.common_conf:
-    #        return self.common_conf.get('region_primary')
-
-    #    return None
-
     def set_backend_key(self, skip_validation=False):
         # Scenarios:
         #
