@@ -31,4 +31,5 @@ def shell(kctl: KubeCtlContainer):
 @kubectl.command(context_settings=CONTEXT_SETTINGS)
 @pass_container
 def configure(kctl: KubeCtlContainer):
+    """Automatically add the EKS cluster from the layer into your kubectl config file."""
     kctl.configure()
