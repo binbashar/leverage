@@ -69,10 +69,13 @@ class KubeCtlContainer(TerraformContainer):
         # assuming the cluster container is on the primary region
         return aws_eks_cmd + f" --region {self.common_conf['region_primary']}"
 
+    def _get_user_group_id(self, user_id) -> int:
+        user = pwd.getpwuid(user_id)
+        return user.pw_gid
+
     def _change_kube_file_owner_cmd(self) -> str:
         user_id = os.getuid()
-        user = pwd.getpwuid(user_id)
-        group_id = user.pw_gid
+        group_id = self._get_user_group_id(user_id)
 
         return f"chown {user_id}:{group_id} {self.KUBECTL_CONFIG_FILE}"
 

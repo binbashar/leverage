@@ -44,3 +44,9 @@ def with_click_context(click_context):
     the need of a `with` statement. """
     with click_context():
         yield
+
+
+@pytest.fixture
+def muted_click_context(click_context):
+    with click_context(verbose=False):
+        yield

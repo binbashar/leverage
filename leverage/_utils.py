@@ -109,7 +109,8 @@ def refresh_aws_credentials(func):
                 "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
             })
         else:
-            raise Exception("No auth method found")
+            # no auth method found: skip the refresh
+            return func(*args, **kwargs)
 
         logger.info("Fetching  AWS credentials...")
         with CustomEntryPoint(container, f"{auth_method} -- echo"):
@@ -126,7 +127,7 @@ def refresh_aws_credentials(func):
                     "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
                 })
 
-        # now execute the original method
+        # we should have a valid token at this point, now execute the original method
         return func(*args, **kwargs)
 
     return wrapper
