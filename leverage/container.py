@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 from datetime import datetime
-from datetime import timedelta
 
 import hcl2
 from click.exceptions import Exit
@@ -699,4 +698,3 @@ class TFautomvContainer(TerraformContainer):
         self._prepare_container()
 
         return self._exec(command, *arguments)
-

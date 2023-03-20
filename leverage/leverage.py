@@ -14,6 +14,8 @@ from leverage.modules import project
 from leverage.modules import terraform
 from leverage.modules import credentials
 from leverage.modules import tfautomv
+from leverage.modules import kubectl
+
 
 @click.group(invoke_without_command=True)
 @click.option("--filename", "-f",
@@ -55,3 +57,5 @@ leverage.add_command(terraform, name="tf")
 leverage.add_command(credentials)
 leverage.add_command(aws)
 leverage.add_command(tfautomv)
+leverage.add_command(kubectl)
+leverage.add_command(kubectl, name="kc")
