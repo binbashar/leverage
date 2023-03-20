@@ -408,6 +408,9 @@ class TerraformContainer(LeverageContainer):
         self.sso_enabled = self.common_conf.get("sso_enabled", False)
         self.mfa_enabled = self.env_conf.get("MFA_ENABLED", "false") == "true" # TODO: Convert values to bool upon loading
 
+        # SSH AGENT
+        SSH_AUTH_SOCK = os.getenv('SSH_AUTH_SOCK')
+
         self.environment = {
             "COMMON_CONFIG_FILE": self.common_tfvars,
             "ACCOUNT_CONFIG_FILE": self.account_tfvars,
@@ -419,20 +422,22 @@ class TerraformContainer(LeverageContainer):
             "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
-            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
+            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(), # Legacy
+            "SSH_AUTH_SOCK": '' if SSH_AUTH_SOCK is None else '/ssh-agent',
             "TF_PLUGIN_CACHE_DIR": self.TF_PLUGIN_CACHE_DIR,
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
             Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
-            Mount(source=(self.home / ".ssh").as_posix(), target="/root/.ssh", type="bind"),
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
         ]
         # if you have set the tf plugin cache locally
-        if tf_cache_dir := os.environ.get("TF_PLUGIN_CACHE_DIR"):
+        if tf_cache_dir := os.getenv("TF_PLUGIN_CACHE_DIR"):
             # then mount it too into the container
-            self.mounts = [Mount(source=tf_cache_dir, target=self.TF_PLUGIN_CACHE_DIR, type="bind")]
+            self.mounts.append(Mount(source=tf_cache_dir, target=self.TF_PLUGIN_CACHE_DIR, type="bind"))
+        if SSH_AUTH_SOCK is not None:
+            self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
 
         self._backend_key = None
 
@@ -467,8 +472,7 @@ class TerraformContainer(LeverageContainer):
                                for common_file in self.common_config_dir.glob("*.tfvars")]
         account_config_files = [f"-var-file={self._guest_config_file(account_file)}"
                                 for account_file in self.account_config_dir.glob("*.tfvars")]
-        region_settings      = [f"-var=\"region={self.region}\""]
-        return common_config_files + account_config_files + region_settings
+        return common_config_files + account_config_files
 
     def enable_mfa(self):
         """ Enable Multi-Factor Authentication. """
@@ -586,53 +590,6 @@ class TerraformContainer(LeverageContainer):
         self.entrypoint = ""
         self._prepare_container()
         self._start()
-
-    @property
-    def region(self):
-        """ Determine the region based on PATH, account tfvars or project tfvars. Returns a string with the region name. """
-        region = self._find_region(self.cwd.relative_to(self.account_dir))
-
-        if not region is None:
-            return region
-
-        logger.error("No region found")
-        raise Exit(1)
-
-    @property
-    def terraform_backend(self):
-        """ Determine the terraform backend for the account. Returns an object with backend information. """
-        # These are the possible backend layer names for Refarch v1 and v2
-        possible_layer_names = ['terraform-backend', 'base-tf-backend']
-        for layer_name in possible_layer_names:
-            for directory in Path(self.account_dir).glob(f"**/{layer_name}"):
-
-                region = self._find_region(Path(directory).relative_to(self.account_dir))
-
-                if not region is None:
-                    return {'directory': directory , 'region': region}
-                else:
-                    logger.error("No region found for backend layer")
-                    raise Exit(1)
-
-        logger.error("No backend layer found")
-        raise Exit(1)
-
-    def _find_region(self, local_directory):
-        local_directory = local_directory.as_posix().split('/')
-        if len(local_directory) > 1:
-            if local_directory[0] != 'global':
-                return local_directory[0]
-
-        if 'region' in self.account_conf:
-            return self.account_conf.get('region')
-        if 'region' in self.common_conf:
-            return self.common_conf.get('region')
-        if 'region_primary' in self.account_conf:
-            return self.account_conf.get('region_primary')
-        if 'region_primary' in self.common_conf:
-            return self.common_conf.get('region_primary')
-
-        return None
 
     def set_backend_key(self, skip_validation=False):
         # Scenarios:
