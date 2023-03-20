@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -394,6 +395,8 @@ class TerraformContainer(LeverageContainer):
     TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
     TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
 
+    TF_PLUGIN_CACHE_DIR = "/root/.terraform.d/plugin-cache"
+
     def __init__(self, client):
         super().__init__(client)
 
@@ -416,15 +419,20 @@ class TerraformContainer(LeverageContainer):
             "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
-            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level() # Legacy
+            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
+            "TF_PLUGIN_CACHE_DIR": self.TF_PLUGIN_CACHE_DIR,
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
             Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
             Mount(source=(self.home / ".ssh").as_posix(), target="/root/.ssh", type="bind"),
-            Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind")
+            Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
         ]
+        # if you have set the tf plugin cache locally
+        if tf_cache_dir := os.environ.get("TF_PLUGIN_CACHE_DIR"):
+            # then mount it too into the container
+            self.mounts = [Mount(source=tf_cache_dir, target=self.TF_PLUGIN_CACHE_DIR, type="bind")]
 
         self._backend_key = None
 
