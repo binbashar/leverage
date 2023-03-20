@@ -282,7 +282,6 @@ def _init(tf, args):
     args = [arg for index, arg in enumerate(args)
             if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"]
     args.append(f"-backend-config={tf.backend_tfvars}")
-    args.append(f"-backend-config=\"region={tf.terraform_backend.get('region')}\"")
 
     exit_code = tf.start_in_layer("init", *args)
 
@@ -434,7 +433,7 @@ def _validate_layout(tf):
         logger.info("[green]✔ OK[/green]\n")
     else:
         exp_message = [f"{'/'.join(x)}/terraform.tfstate" for x in expected_backend_keys]
-        logger.info(f"Expected on of: {';'.join(exp_message)}")
+        logger.info(f"Expected one of: {';'.join(exp_message)}")
         logger.error("[red]✘ FAILED[/red]\n")
         valid_layout = False
 
