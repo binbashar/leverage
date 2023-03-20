@@ -658,4 +658,3 @@ class TFautomvContainer(TerraformContainer):
         self._prepare_container()
 
         return self._exec(command, *arguments)
-
