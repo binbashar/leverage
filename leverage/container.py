@@ -1,8 +1,7 @@
 import json
+import os
 from pathlib import Path
 from datetime import datetime
-from datetime import timedelta
-import os
 
 import hcl2
 from click.exceptions import Exit
@@ -421,15 +420,24 @@ class TerraformContainer(LeverageContainer):
             "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
-            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(), # Legacy
-            "SSH_AUTH_SOCK": '' if SSH_AUTH_SOCK is None else '/ssh-agent'
+            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
+            "SSH_AUTH_SOCK": '' if SSH_AUTH_SOCK is None else '/ssh-agent',
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
             Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
-            Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind")
+            Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
         ]
+        # if you have set the tf plugin cache locally
+        if tf_cache_dir := os.getenv("TF_PLUGIN_CACHE_DIR"):
+            # then mount it too into the container
+            self.environment["TF_PLUGIN_CACHE_DIR"] = tf_cache_dir
+            # given that terraform use symlinks to point from the .terraform folder into the plugin folder
+            # we need to use the same directory inside the container
+            # otherwise symlinks will be broken once outside the container
+            # which will break terraform usage outside Leverage
+            self.mounts.append(Mount(source=tf_cache_dir, target=tf_cache_dir, type="bind"))
         if SSH_AUTH_SOCK is not None:
             self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
 
@@ -532,7 +540,6 @@ class TerraformContainer(LeverageContainer):
                 "AWS_SHARED_CREDENTIALS_FILE": self.environment.get("AWS_SHARED_CREDENTIALS_FILE").replace("tmp", ".aws"),
                 "AWS_CONFIG_FILE": self.environment.get("AWS_CONFIG_FILE").replace("tmp", ".aws"),
             })
-
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
 
