@@ -395,8 +395,6 @@ class TerraformContainer(LeverageContainer):
     TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
     TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
 
-    TF_PLUGIN_CACHE_DIR = "/root/.terraform.d/plugin-cache"
-
     def __init__(self, client):
         super().__init__(client)
 
@@ -422,9 +420,8 @@ class TerraformContainer(LeverageContainer):
             "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
-            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(), # Legacy
+            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
             "SSH_AUTH_SOCK": '' if SSH_AUTH_SOCK is None else '/ssh-agent',
-            "TF_PLUGIN_CACHE_DIR": self.TF_PLUGIN_CACHE_DIR,
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
@@ -435,7 +432,12 @@ class TerraformContainer(LeverageContainer):
         # if you have set the tf plugin cache locally
         if tf_cache_dir := os.getenv("TF_PLUGIN_CACHE_DIR"):
             # then mount it too into the container
-            self.mounts.append(Mount(source=tf_cache_dir, target=self.TF_PLUGIN_CACHE_DIR, type="bind"))
+            self.environment["TF_PLUGIN_CACHE_DIR"] = tf_cache_dir
+            # given that terraform use symlinks to point from the .terraform folder into the plugin folder
+            # we need to use the same directory inside the container
+            # otherwise symlinks will be broken once outside the container
+            # which will break terraform usage outside Leverage
+            self.mounts.append(Mount(source=tf_cache_dir, target=tf_cache_dir, type="bind"))
         if SSH_AUTH_SOCK is not None:
             self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
 
