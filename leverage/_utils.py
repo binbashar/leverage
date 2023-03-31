@@ -103,11 +103,6 @@ def refresh_aws_credentials(func):
             auth_method = container.TF_SSO_ENTRYPOINT
         elif container.mfa_enabled:
             auth_method = container.TF_MFA_ENTRYPOINT
-            # TODO: ask why this was necessary
-            container.environment.update({
-                "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
-                "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
-            })
         else:
             # no auth method found: skip the refresh
             return func(*args, **kwargs)
@@ -119,13 +114,6 @@ def refresh_aws_credentials(func):
             exit_code = container._start("Fetching done.")
             if exit_code:
                 raise Exit(exit_code)
-            if container.mfa_enabled:
-                # we need to revert to the original values, otherwise other tools that rely on awscli, like kubectl
-                # won't find the credentials
-                container.environment.update({
-                    "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace(".aws", "tmp"),
-                    "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
-                })
 
         # we should have a valid token at this point, now execute the original method
         return func(*args, **kwargs)
