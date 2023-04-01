@@ -89,33 +89,23 @@ class EmptyEntryPoint(CustomEntryPoint):
         super(EmptyEntryPoint, self).__init__(container, entrypoint="")
 
 
-def refresh_aws_credentials(func):
+class AwsCredsEntryPoint(CustomEntryPoint):
     """
-    Use this decorator in the case you want to make sure you will have fresh tokens to interact with AWS
-    during the execution of your wrapped method.
+    Fetching AWS credentials with setting the SSO/MFA entrypoints.
+    This works as a replacement of _prepare_container.
     """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        container = args[0]  # this is the "self" of the method you are decorating; a LeverageContainer instance
 
+    def __init__(self, container):
         if container.sso_enabled:
             container._check_sso_token()
-            auth_method = container.TF_SSO_ENTRYPOINT
+            auth_method = f"{container.TF_SSO_ENTRYPOINT} -- "
         elif container.mfa_enabled:
-            auth_method = container.TF_MFA_ENTRYPOINT
+            auth_method = f"{container.TF_MFA_ENTRYPOINT} -- "
+            container.environment.update({
+                "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
+                "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
+            })
         else:
-            # no auth method found: skip the refresh
-            return func(*args, **kwargs)
+            auth_method = ""
 
-        logger.info("Fetching  AWS credentials...")
-        with CustomEntryPoint(container, f"{auth_method} -- echo"):
-            # this simple echo "Fetching..." will run the SSO/MFA entrypoints underneath
-            # that takes care of the token refresh
-            exit_code = container._start("Fetching done.")
-            if exit_code:
-                raise Exit(exit_code)
-
-        # we should have a valid token at this point, now execute the original method
-        return func(*args, **kwargs)
-
-    return wrapper
+        super(AwsCredsEntryPoint, self).__init__(container, entrypoint=auth_method)

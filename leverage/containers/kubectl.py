@@ -6,7 +6,7 @@ from click.exceptions import Exit
 from docker.types import Mount
 
 from leverage import logger
-from leverage._utils import chain_commands, EmptyEntryPoint, refresh_aws_credentials
+from leverage._utils import chain_commands, AwsCredsEntryPoint
 from leverage.container import TerraformContainer
 
 
@@ -26,24 +26,22 @@ class KubeCtlContainer(TerraformContainer):
         self.container_config["host_config"]["Mounts"].append(
             # the container is expecting a file named "config" here
             Mount(
-                source=host_config_path,
+                source=str(self.host_kubectl_config_dir),
                 target=str(self.KUBECTL_CONFIG_PATH),
                 type="bind",
             )
         )
 
-    @refresh_aws_credentials
     def start_shell(self):
-        with EmptyEntryPoint(self):
+        with AwsCredsEntryPoint(self):
             self._start()
 
-    @refresh_aws_credentials
     def configure(self):
         # make sure we are on the cluster layer
         self.check_for_layer_location()
 
         logger.info("Retrieving k8s cluster information...")
-        with EmptyEntryPoint(self):
+        with AwsCredsEntryPoint(self):
             # generate the command that will configure the new cluster
             add_eks_cluster_cmd = self._get_eks_kube_config()
         # and the command that will set the proper ownership on the config file (otherwise the owner will be "root")
@@ -51,7 +49,7 @@ class KubeCtlContainer(TerraformContainer):
         full_cmd = chain_commands([add_eks_cluster_cmd, change_owner_cmd])
 
         logger.info("Configuring context...")
-        with EmptyEntryPoint(self):
+        with AwsCredsEntryPoint(self):
             # we use _start here because in the case of MFA it will ask for the token
             exit_code = self._start(full_cmd)
         if exit_code:
@@ -60,12 +58,12 @@ class KubeCtlContainer(TerraformContainer):
         logger.info("Done.")
 
     def _get_eks_kube_config(self) -> str:
-        exit_code, output = self._exec(f"{self.TF_BINARY} output")
+        exit_code, output = self._start_with_output(f"{self.TF_BINARY} output -no-color")
         if exit_code:
             logger.error(output)
             raise Exit(exit_code)
 
-        aws_eks_cmd = next(op for op in output.split("\n") if op.startswith("aws eks update-kubeconfig"))
+        aws_eks_cmd = next(op for op in output.split("\r\n") if op.startswith("aws eks update-kubeconfig"))
         # assuming the cluster container is on the primary region
         return aws_eks_cmd + f" --region {self.common_conf['region_primary']}"
 

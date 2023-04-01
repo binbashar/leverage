@@ -269,6 +269,20 @@ class LeverageContainer:
 
         return self._run(container, run_func)
 
+    def _start_with_output(self, command="/bin/bash", *args):
+        """
+        Same than _start but also returns the outputs (by dumping the logs) of the container.
+        """
+        container = self._create_container(True, command, *args)
+
+        def run_func(client, container):
+            dockerpty.start(client=client.api, container=container)
+            exit_code = client.api.inspect_container(container)["State"]["ExitCode"]
+            logs = client.api.logs(container).decode("utf-8")
+            return exit_code, logs
+
+        return self._run(container, run_func)
+
     def start(self, command="/bin/sh", *arguments):
         """ Run command with the given arguments in an interactive container.
 
