@@ -89,28 +89,6 @@ class EmptyEntryPoint(CustomEntryPoint):
         super(EmptyEntryPoint, self).__init__(container, entrypoint="")
 
 
-class AwsCredsEntryPoint(CustomEntryPoint):
-    """
-    Fetching AWS credentials with setting the SSO/MFA entrypoints.
-    This works as a replacement of _prepare_container.
-    """
-
-    def __init__(self, container):
-        if container.sso_enabled:
-            container._check_sso_token()
-            auth_method = f"{container.TF_SSO_ENTRYPOINT} -- "
-        elif container.mfa_enabled:
-            auth_method = f"{container.TF_MFA_ENTRYPOINT} -- "
-            container.environment.update({
-                "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
-                "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
-            })
-        else:
-            auth_method = ""
-
-        super(AwsCredsEntryPoint, self).__init__(container, entrypoint=auth_method)
-
-
 def refresh_aws_credentials(func):
     """
     Use this decorator in the case you want to make sure you will have fresh tokens to interact with AWS

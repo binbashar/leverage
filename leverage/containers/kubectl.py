@@ -6,7 +6,7 @@ from click.exceptions import Exit
 from docker.types import Mount
 
 from leverage import logger
-from leverage._utils import chain_commands, AwsCredsEntryPoint, refresh_aws_credentials
+from leverage._utils import chain_commands, refresh_aws_credentials
 from leverage.container import TerraformContainer
 
 
