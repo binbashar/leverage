@@ -125,8 +125,11 @@ def test_start_shell_mfa(kubectl_container):
     # container._run = Mock()
 
     kubectl_container.enable_mfa()
-    kubectl_container.start_shell()
-    container_args = kubectl_container.client.api.create_container.call_args[1]
+    # mock the __exit__ of the context manager to avoid the restoration of the values
+    # otherwise the asserts around /.aws/ wouldn't be possible
+    with patch("leverage._utils.AwsCredsEntryPoint.__exit__"):
+        kubectl_container.start_shell()
+        container_args = kubectl_container.client.api.create_container.call_args[1]
 
     # we want a shell, so -> /bin/bash with no entrypoint
     assert container_args["command"] == "/bin/bash"
