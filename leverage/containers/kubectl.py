@@ -6,7 +6,7 @@ from click.exceptions import Exit
 from docker.types import Mount
 
 from leverage import logger
-from leverage._utils import chain_commands, AwsCredsEntryPoint
+from leverage._utils import chain_commands, AwsCredsEntryPoint, refresh_aws_credentials
 from leverage.container import TerraformContainer
 
 
@@ -36,26 +36,24 @@ class KubeCtlContainer(TerraformContainer):
             )
         )
 
+    @refresh_aws_credentials
     def start_shell(self):
-        with AwsCredsEntryPoint(self):
-            self._start()
+        self._start(command="/bin/bash")
 
+    @refresh_aws_credentials
     def configure(self):
         # make sure we are on the cluster layer
         self.check_for_layer_location()
 
         logger.info("Retrieving k8s cluster information...")
-        with AwsCredsEntryPoint(self):
-            # generate the command that will configure the new cluster
-            add_eks_cluster_cmd = self._get_eks_kube_config()
+        # generate the command that will configure the new cluster
+        add_eks_cluster_cmd = self._get_eks_kube_config()
         # and the command that will set the proper ownership on the config file (otherwise the owner will be "root")
         change_owner_cmd = self._change_kube_file_owner_cmd()
         full_cmd = chain_commands([add_eks_cluster_cmd, change_owner_cmd])
 
         logger.info("Configuring context...")
-        with AwsCredsEntryPoint(self):
-            # we use _start here because in the case of MFA it will ask for the token
-            exit_code = self._start(full_cmd)
+        exit_code = self._start(full_cmd)
         if exit_code:
             raise Exit(exit_code)
 

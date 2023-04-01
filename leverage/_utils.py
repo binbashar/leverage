@@ -109,3 +109,36 @@ class AwsCredsEntryPoint(CustomEntryPoint):
             auth_method = ""
 
         super(AwsCredsEntryPoint, self).__init__(container, entrypoint=auth_method)
+
+
+def refresh_aws_credentials(func):
+    """
+    Use this decorator in the case you want to make sure you will have fresh tokens to interact with AWS
+    during the execution of all the command inside the wrapped method.
+    The difference with _prepare_container is that it doesn't use the default entrypoint of the class
+    letting you use different binaries during a single command.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        container = args[0]  # this is the "self" of the method you are decorating; a LeverageContainer instance
+
+        if container.sso_enabled:
+            container._check_sso_token()
+            auth_method = container.TF_SSO_ENTRYPOINT
+        elif container.mfa_enabled:
+            auth_method = container.TF_MFA_ENTRYPOINT
+            container.environment.update({
+                "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
+                "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
+            })
+        else:
+            # no auth method found: skip the original entrypoint
+            auth_method = container.entrypoint
+
+        # override the entrypoint with the auth script
+        container.entrypoint = auth_method
+        # from now one, every call to a command will be preceded by the MFA/SSO scripts
+        # making sure you have fresh credentials before executing them
+        return func(*args, **kwargs)
+
+    return wrapper
