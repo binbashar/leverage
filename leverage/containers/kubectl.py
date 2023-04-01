@@ -36,11 +36,11 @@ class KubeCtlContainer(TerraformContainer):
             )
         )
 
-    @refresh_aws_credentials
+    @refresh_aws_credentials(entrypoint="")
     def start_shell(self):
-        self._start(command="/bin/bash")
+        self._start("/bin/bash")
 
-    @refresh_aws_credentials
+    @refresh_aws_credentials(entrypoint="")
     def configure(self):
         # make sure we are on the cluster layer
         self.check_for_layer_location()

@@ -62,61 +62,38 @@ def chain_commands(commands: list, chain: str = " && ") -> str:
     return f"bash -c \"{chain.join(commands)}\""
 
 
-class CustomEntryPoint:
-    """
-    Set a custom entrypoint on the container while entering the context.
-    Once outside, return it to its original value.
-    """
-
-    def __init__(self, container, entrypoint):
-        self.container = container
-        self.old_entrypoint = container.entrypoint
-        self.new_entrypoint = entrypoint
-
-    def __enter__(self):
-        self.container.entrypoint = self.new_entrypoint
-
-    def __exit__(self, *args, **kwargs):
-        self.container.entrypoint = self.old_entrypoint
-
-
-class EmptyEntryPoint(CustomEntryPoint):
-    """
-    Force an empty entrypoint. This will let you execute any commands freely.
-    """
-
-    def __init__(self, container):
-        super(EmptyEntryPoint, self).__init__(container, entrypoint="")
-
-
-def refresh_aws_credentials(func):
+def refresh_aws_credentials(entrypoint=None):
     """
     Use this decorator in the case you want to make sure you will have fresh tokens to interact with AWS
     during the execution of all the command inside the wrapped method.
-    The difference with _prepare_container is that it doesn't use the default entrypoint of the class
-    letting you use different binaries during a single command.
+    The difference with _prepare_container is that it let you don't use the default entrypoint of the class
+    in case you need to execute different binaries during a single command.
     """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        container = args[0]  # this is the "self" of the method you are decorating; a LeverageContainer instance
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            container = args[0]  # this is the "self" of the method you are decorating; a LeverageContainer instance
 
-        if container.sso_enabled:
-            container._check_sso_token()
-            auth_method = container.TF_SSO_ENTRYPOINT
-        elif container.mfa_enabled:
-            auth_method = container.TF_MFA_ENTRYPOINT
-            container.environment.update({
-                "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
-                "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
-            })
-        else:
-            # no auth method found: skip the original entrypoint
-            auth_method = container.entrypoint
+            if container.sso_enabled:
+                container._check_sso_token()
+                auth_method = container.TF_SSO_ENTRYPOINT
+            elif container.mfa_enabled:
+                auth_method = container.TF_MFA_ENTRYPOINT
+                container.environment.update({
+                    "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
+                    "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
+                })
+            else:
+                # no auth method required: don't prepend any script then
+                auth_method = None
 
-        # override the entrypoint with the auth script
-        container.entrypoint = auth_method
-        # from now one, every call to a command will be preceded by the MFA/SSO scripts
-        # making sure you have fresh credentials before executing them
-        return func(*args, **kwargs)
+            new_entrypoint = entrypoint if entrypoint is not None else container.entrypoint
+            container.entrypoint = f"{auth_method} -- {new_entrypoint}" if auth_method else new_entrypoint
+            # from now one, every call to a command will be preceded by the MFA/SSO scripts
+            # making sure you have fresh credentials before executing them
+            return func(*args, **kwargs)
 
-    return wrapper
+        return wrapper
+
+    return decorator
+
