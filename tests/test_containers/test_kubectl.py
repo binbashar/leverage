@@ -33,8 +33,8 @@ def kubectl_container(muted_click_context):
 
 
 def test_get_eks_kube_config(kubectl_container):
-    tf_output = "\naws eks update-kubeconfig --name test-cluster --profile test-profile\n"
-    with patch.object(kubectl_container, "_exec", return_value=(0, tf_output)):
+    tf_output = "\r\naws eks update-kubeconfig --name test-cluster --profile test-profile\r\n"
+    with patch.object(kubectl_container, "_start_with_output", return_value=(0, tf_output)):
         kubectl_container.common_conf["region_primary"] = "us-east-1"
         cmd = kubectl_container._get_eks_kube_config()
 
@@ -45,7 +45,7 @@ def test_get_eks_kube_config_tf_output_error(kubectl_container):
     """
     Test that if the TF OUTPUT fails, we get an error back.
     """
-    with patch.object(kubectl_container, "_exec", return_value=(1, "ERROR!")):
+    with patch.object(kubectl_container, "_start_with_output", return_value=(1, "ERROR!")):
         with pytest.raises(Exit):
             kubectl_container._get_eks_kube_config()
 
