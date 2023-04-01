@@ -22,7 +22,11 @@ class KubeCtlContainer(TerraformContainer):
 
         self.entrypoint = self.KUBECTL_CLI_BINARY
 
-        host_config_path = str(Path.home() / Path(f".kube/{self.project}"))
+        self.host_kubectl_config_dir = Path.home() / Path(f".kube/{self.project}")
+        if not self.host_kubectl_config_dir.exists():
+            # make sure the folder exists before mounting it
+            self.host_kubectl_config_dir.mkdir(parents=True)
+
         self.container_config["host_config"]["Mounts"].append(
             # the container is expecting a file named "config" here
             Mount(
