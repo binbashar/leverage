@@ -77,6 +77,7 @@ class LeverageContainer:
         self.client = client
 
         self.home = Path.home()
+        self.cwd = Path.cwd()
         try:
             self.root_dir = Path(get_root_path())
             self.account_dir = Path(get_account_path())
@@ -175,10 +176,6 @@ class LeverageContainer:
     @property
     def guest_aws_credentials_dir(self):
         return f"/root/tmp/{self.project}"
-
-    @property
-    def cwd(self):
-        return Path.cwd()
 
     @property
     def region(self):
