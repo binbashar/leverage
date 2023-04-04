@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch, PropertyMock
 
 import pytest
 from click.exceptions import Exit
@@ -32,10 +32,10 @@ def kubectl_container(muted_click_context):
 ##############
 
 
+@patch.object(KubeCtlContainer, "cwd", PropertyMock(return_value=Path("/project/account/us-east-1/cluster")))
 def test_get_eks_kube_config(kubectl_container):
     tf_output = "\r\naws eks update-kubeconfig --name test-cluster --profile test-profile\r\n"
     with patch.object(kubectl_container, "_start_with_output", return_value=(0, tf_output)):
-        kubectl_container.common_conf["region_primary"] = "us-east-1"
         cmd = kubectl_container._get_eks_kube_config()
 
     assert cmd == AWS_EKS_UPDATE_KUBECONFIG
@@ -56,6 +56,7 @@ def test_change_kube_file_owner_cmd(kubectl_container):
         assert kubectl_container._change_kube_file_owner_cmd() == "chown 1234:5678 /root/.kube/config"
 
 
+@patch.object(KubeCtlContainer, "cwd", PropertyMock(return_value=Path("/random")))
 def test_check_for_layer_location(kubectl_container, caplog):
     """
     Test that if we are not on a cluster layer, we raise an error.
@@ -65,7 +66,6 @@ def test_check_for_layer_location(kubectl_container, caplog):
 
     with patch.object(TerraformContainer, "check_for_layer_location"):  # assume parent method is already tested
         with pytest.raises(Exit):
-            kubectl_container.cwd = Path("/random")
             kubectl_container.check_for_layer_location()
 
     assert caplog.messages[0] == "This command can only run at the [bold]cluster layer[/bold]."

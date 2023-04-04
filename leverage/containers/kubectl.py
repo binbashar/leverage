@@ -67,8 +67,7 @@ class KubeCtlContainer(TerraformContainer):
             raise Exit(exit_code)
 
         aws_eks_cmd = next(op for op in output.split("\r\n") if op.startswith("aws eks update-kubeconfig"))
-        # assuming the cluster container is on the primary region
-        return aws_eks_cmd + f" --region {self.common_conf['region_primary']}"
+        return aws_eks_cmd + f" --region {self.region}"
 
     def _get_user_group_id(self, user_id) -> int:
         user = pwd.getpwuid(user_id)

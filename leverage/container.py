@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -20,6 +21,15 @@ from leverage.path import get_global_config_path
 from leverage.path import get_account_config_path
 from leverage.path import NotARepositoryError
 from leverage.conf import load as load_env
+
+REGION = (
+    r"(.*)"  # project folder
+    # start region 
+    r"(global|(?:[a-z]{2}-(?:gov-)?"
+    r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4]))"
+    # end region
+    r"(.*)"  # layer
+)
 
 
 def get_docker_client():
@@ -67,7 +77,6 @@ class LeverageContainer:
         self.client = client
 
         self.home = Path.home()
-        self.cwd = Path.cwd()
         try:
             self.root_dir = Path(get_root_path())
             self.account_dir = Path(get_account_path())
@@ -166,6 +175,22 @@ class LeverageContainer:
     @property
     def guest_aws_credentials_dir(self):
         return f"/root/tmp/{self.project}"
+
+    @property
+    def cwd(self):
+        return Path.cwd()
+
+    @property
+    def region(self):
+        """
+        Return the region of the layer.
+        """
+        if matches := re.match(REGION, self.cwd.as_posix()):
+            # the region (group 1) is between the projects folders (group 0) and the layers (group 2)
+            return matches.groups()[1]
+
+        logger.exception(f"No valid region could be found at: {self.cwd.as_posix()}")
+        raise Exit(1)
 
     def ensure_image(self):
         """ Make sure the required Docker image is available in the system. If not, pull it from registry. """
