@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch, PropertyMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from click.exceptions import Exit
