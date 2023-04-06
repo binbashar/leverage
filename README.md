@@ -53,7 +53,7 @@ For the second item you can check the version [here](https://hub.docker.com/r/bi
 
 First, you should create a virtual environment and install all the required dependencies by running: `pipenv install --dev`.
 
-If you don't have `pipenv` in your system, you can check the following documentation: https://pipenv.pypa.io/en/latest/install/#installing-pipenv
+If you don't have `pipenv` in your system, you can check the following documentation: https://pipenv.pypa.io/en/latest/#install-pipenv-today
 
 Once you have everything in place, install the CLI as an editable package inside the virtual environment: `pipenv install -e .` 
 

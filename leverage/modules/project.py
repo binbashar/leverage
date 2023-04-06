@@ -45,7 +45,8 @@ PROJECT_STRUCTURE = {
     "management": {
         "global": [
             "base-identities",
-            "organizations"
+            "organizations",
+            "sso"
         ],
         "primary_region": [
             "base-tf-backend",
