@@ -33,9 +33,9 @@ def kubectl_container(muted_click_context):
 
 
 def test_get_eks_kube_config(kubectl_container):
-    tf_output = "\naws eks update-kubeconfig --name test-cluster --profile test-profile\n"
-    with patch.object(kubectl_container, "_exec", return_value=(0, tf_output)):
-        kubectl_container.common_conf["region_primary"] = "us-east-1"
+    tf_output = "\r\naws eks update-kubeconfig --name test-cluster --profile test-profile\r\n"
+    with patch.object(kubectl_container, "_start_with_output", return_value=(0, tf_output)):
+        kubectl_container.cwd = Path("/project/account/us-east-1/cluster")
         cmd = kubectl_container._get_eks_kube_config()
 
     assert cmd == AWS_EKS_UPDATE_KUBECONFIG
@@ -45,7 +45,7 @@ def test_get_eks_kube_config_tf_output_error(kubectl_container):
     """
     Test that if the TF OUTPUT fails, we get an error back.
     """
-    with patch.object(kubectl_container, "_exec", return_value=(1, "ERROR!")):
+    with patch.object(kubectl_container, "_start_with_output", return_value=(1, "ERROR!")):
         with pytest.raises(Exit):
             kubectl_container._get_eks_kube_config()
 
@@ -85,7 +85,7 @@ def test_start_shell(kubectl_container):
     container_args = kubectl_container.client.api.create_container.call_args[1]
 
     # we want a shell, so -> /bin/bash with no entrypoint
-    assert container_args["command"] == "/bin/sh"
+    assert container_args["command"] == "/bin/bash"
     assert container_args["entrypoint"] == ""
 
     # make sure we are pointing to the AWS credentials
@@ -106,8 +106,53 @@ def test_start_shell(kubectl_container):
 @patch.object(KubeCtlContainer, "check_for_layer_location", Mock())
 # nor terraform
 @patch.object(KubeCtlContainer, "_get_eks_kube_config", Mock(return_value=AWS_EKS_UPDATE_KUBECONFIG))
-def test_configure(kubectl_container, caplog):
+def test_configure(kubectl_container):
     with patch.object(kubectl_container, "_start", return_value=0) as mock_start:
         kubectl_container.configure()
 
     assert mock_start.call_args[0][0] == f'bash -c "{AWS_EKS_UPDATE_KUBECONFIG} && chown 1234:5678 /root/.kube/config"'
+
+
+#####################
+# test auth methods #
+#####################
+
+def test_start_shell_mfa(kubectl_container):
+    """
+    Make sure the command is executed through the proper MFA script.
+    """
+    # container = KubeCtlContainer(docker_client, env_conf=dict(MFA_ENABLED="true", **FAKE_ENV))
+    # container._run = Mock()
+
+    kubectl_container.enable_mfa()
+    # mock the __exit__ of the context manager to avoid the restoration of the values
+    # otherwise the asserts around /.aws/ wouldn't be possible
+    with patch("leverage._utils.AwsCredsEntryPoint.__exit__"):
+        kubectl_container.start_shell()
+        container_args = kubectl_container.client.api.create_container.call_args[1]
+
+    # we want a shell, so -> /bin/bash with no entrypoint
+    assert container_args["command"] == "/bin/bash"
+    assert container_args["entrypoint"] == "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
+
+    # make sure we are pointing to the right AWS credentials: /.aws/ folder for MFA
+    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/.aws/test/config"
+    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/.aws/test/credentials"
+
+
+def test_start_shell_sso(kubectl_container):
+    """
+    Make sure the command is executed through the proper SSO script.
+    """
+    kubectl_container.enable_sso()
+    kubectl_container._check_sso_token = Mock(return_value=True)
+    kubectl_container.start_shell()
+    container_args = kubectl_container.client.api.create_container.call_args[1]
+
+    # we want a shell, so -> /bin/bash with no entrypoint
+    assert container_args["command"] == "/bin/bash"
+    assert container_args["entrypoint"] == "/root/scripts/aws-sso/aws-sso-entrypoint.sh -- "
+
+    # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
+    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"
+    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/tmp/test/credentials"

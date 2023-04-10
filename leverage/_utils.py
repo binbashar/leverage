@@ -1,13 +1,8 @@
 """
     General use utilities.
 """
-import functools
 from subprocess import run
 from subprocess import PIPE
-
-from click.exceptions import Exit
-
-from leverage import logger
 
 
 def clean_exception_traceback(exception):
@@ -67,7 +62,6 @@ class CustomEntryPoint:
     Set a custom entrypoint on the container while entering the context.
     Once outside, return it to its original value.
     """
-
     def __init__(self, container, entrypoint):
         self.container = container
         self.old_entrypoint = container.entrypoint
@@ -80,54 +74,31 @@ class CustomEntryPoint:
         self.container.entrypoint = self.old_entrypoint
 
 
-class EmptyEntryPoint(CustomEntryPoint):
+class AwsCredsEntryPoint(CustomEntryPoint):
     """
-    Force an empty entrypoint. This will let you execute any commands freely.
+    Fetching AWS credentials by setting the SSO/MFA entrypoints.
+    This works as a replacement of _prepare_container.
     """
 
     def __init__(self, container):
-        super(EmptyEntryPoint, self).__init__(container, entrypoint="")
-
-
-def refresh_aws_credentials(func):
-    """
-    Use this decorator in the case you want to make sure you will have fresh tokens to interact with AWS
-    during the execution of your wrapped method.
-    """
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        container = args[0]  # this is the "self" of the method you are decorating; a LeverageContainer instance
-
         if container.sso_enabled:
             container._check_sso_token()
-            auth_method = container.TF_SSO_ENTRYPOINT
+            auth_method = f"{container.TF_SSO_ENTRYPOINT} -- "
         elif container.mfa_enabled:
-            auth_method = container.TF_MFA_ENTRYPOINT
-            # TODO: ask why this was necessary
+            auth_method = f"{container.TF_MFA_ENTRYPOINT} -- "
             container.environment.update({
                 "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace("tmp", ".aws"),
                 "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
             })
         else:
-            # no auth method found: skip the refresh
-            return func(*args, **kwargs)
+            auth_method = ""
 
-        logger.info("Fetching  AWS credentials...")
-        with CustomEntryPoint(container, f"{auth_method} -- echo"):
-            # this simple echo "Fetching..." will run the SSO/MFA entrypoints underneath
-            # that takes care of the token refresh
-            exit_code = container._start("Fetching done.")
-            if exit_code:
-                raise Exit(exit_code)
-            if container.mfa_enabled:
-                # we need to revert to the original values, otherwise other tools that rely on awscli, like kubectl
-                # won't find the credentials
-                container.environment.update({
-                    "AWS_SHARED_CREDENTIALS_FILE": container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace(".aws", "tmp"),
-                    "AWS_CONFIG_FILE": container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
-                })
+        super(AwsCredsEntryPoint, self).__init__(container, entrypoint=auth_method)
 
-        # we should have a valid token at this point, now execute the original method
-        return func(*args, **kwargs)
-
-    return wrapper
+    def __exit__(self, *args, **kwargs):
+        super(AwsCredsEntryPoint, self).__exit__(*args, **kwargs)
+        if self.container.mfa_enabled:
+            self.container.environment.update({
+                "AWS_SHARED_CREDENTIALS_FILE": self.container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace(".aws", "tmp"),
+                "AWS_CONFIG_FILE": self.container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
+            })
