@@ -25,7 +25,7 @@ jobs:
         run: |
           echo "[INFO] Get latest tag"
           git fetch --all --tags
-          RELEASE_VERSION=$(git tag | tail -1)
+          RELEASE_VERSION=$(git tag --sort=-taggerdate | tail -1)
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/v//)
           echo $RELEASE_VERSION
 
