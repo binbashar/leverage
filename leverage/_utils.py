@@ -4,6 +4,10 @@
 from subprocess import run
 from subprocess import PIPE
 
+from click.exceptions import Exit
+
+from leverage import logger
+
 
 def clean_exception_traceback(exception):
     """ Delete special local variables from all frames of an exception's traceback
@@ -102,3 +106,28 @@ class AwsCredsEntryPoint(CustomEntryPoint):
                 "AWS_SHARED_CREDENTIALS_FILE": self.container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace(".aws", "tmp"),
                 "AWS_CONFIG_FILE": self.container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
             })
+
+
+class ExitError(Exit):
+    """
+    Raise an Exit exception but also print an error description.
+    """
+    def __init__(self, exit_code: int, error_description: str):
+        logger.error(error_description)
+        super(Exit).__init__(exit_code)
+
+
+class ContainerSession:
+    """
+    TODO: add description
+    """
+    def __init__(self, docker_client, container):
+        self.docker_client = docker_client
+        self.container = container
+
+    def __enter__(self):
+        self.docker_client.api.start(self.container)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.docker_client.api.stop(self.container)
+        self.docker_client.api.remove_container(self.container)

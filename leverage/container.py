@@ -1,8 +1,10 @@
 import json
 import os
 import re
+import webbrowser
 from pathlib import Path
 from datetime import datetime
+from time import sleep
 
 import hcl2
 from click.exceptions import Exit
@@ -13,7 +15,8 @@ from docker.types import Mount
 
 from leverage import __toolbox_version__
 from leverage import logger
-from leverage.logger import console
+from leverage._utils import CustomEntryPoint, ExitError, ContainerSession
+from leverage.logger import console, raw_logger
 from leverage.logger import get_script_log_level
 from leverage.path import get_root_path
 from leverage.path import get_account_path
@@ -30,6 +33,8 @@ REGION = (
     # end region
     r"(.*)"  # layer
 )
+
+raw_logger = raw_logger()
 
 
 def get_docker_client():
@@ -61,8 +66,6 @@ class LeverageContainer:
     NOTE: An aggregation approach to this design should be considered instead of the current inheritance approach.
     """
     LEVERAGE_IMAGE = "binbash/leverage-toolbox"
-
-    SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com"
 
     COMMON_TFVARS = "common.tfvars"
     ACCOUNT_TFVARS = "account.tfvars"
@@ -374,9 +377,15 @@ class AWSCLIContainer(LeverageContainer):
     """ Leverage Container specially tailored to run AWS CLI commands. """
     AWS_CLI_BINARY = "/usr/local/bin/aws"
 
+    # SSO scripts
     AWS_SSO_LOGIN_SCRIPT = "/root/scripts/aws-sso/aws-sso-login.sh"
     AWS_SSO_LOGOUT_SCRIPT = "/root/scripts/aws-sso/aws-sso-logout.sh"
     AWS_SSO_CONFIGURE_SCRIPT = "/root/scripts/aws-sso/aws-sso-configure.sh"
+
+    # SSO constants
+    AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
+    AWS_SSO_CODE_WAIT_SECONDS = 2
+    AWS_SSO_CODE_ATTEMPTS = 5
 
     def __init__(self, client):
         super().__init__(client)
@@ -421,6 +430,42 @@ class AWSCLIContainer(LeverageContainer):
 
         self.entrypoint = self.AWS_CLI_BINARY
         return exit_code, output
+
+    def get_sso_code(self, container) -> str:
+        """
+        Find and return the SSO user code by periodically checking the logs.
+        Up until N attempts.
+        """
+        for _ in range(self.AWS_SSO_CODE_ATTEMPTS):
+            # pull logs periodically until we find our SSO code
+            logs = self.client.api.logs(container).decode("utf-8")
+            if "Then enter the code:" in logs:
+                raw_logger.info(logs)  # container logs already come formatted, so we need to print them raw
+                return logs.split("Then enter the code:")[1].split("\n")[2]
+
+            sleep(self.AWS_SSO_CODE_WAIT_SECONDS)
+
+        raise ExitError(1, "Get SSO code timed-out")
+
+    def sso_login(self) -> int:
+        # TODO: what about using the .region property we have now? that takes the value from the path of the layer
+        exit_code, region = self.exec(f"configure get sso_region --profile {self.project}-sso")
+
+        with CustomEntryPoint(self, ""):
+            container = self._create_container(False, command=self.AWS_SSO_LOGIN_SCRIPT)
+
+        with ContainerSession(self.client, container):
+            # grab the user code from the logs
+            user_code = self.get_sso_code(container)
+            # with the user code, we can now autocomplete the url
+            webbrowser.open_new_tab(self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code))
+            # now let's wait until the command locking the container resolve itself:
+            # aws sso login will wait for the user code
+            # once submitted to the browser, the authentication finish and the lock is released
+            exit_code = self.client.api.wait(container)["StatusCode"]
+            raw_logger.info(self.client.api.logs(container).decode("utf-8"))
+
+        return exit_code
 
 
 class TerraformContainer(LeverageContainer):
