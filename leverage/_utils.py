@@ -114,7 +114,7 @@ class ExitError(Exit):
     """
     def __init__(self, exit_code: int, error_description: str):
         logger.error(error_description)
-        super(Exit).__init__(exit_code)
+        super(Exit, self).__init__(exit_code)
 
 
 class ContainerSession:

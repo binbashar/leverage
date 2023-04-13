@@ -349,6 +349,9 @@ class LeverageContainer:
         """
         return self._exec(command, *arguments)
 
+    def docker_logs(self, container):
+        return self.client.api.logs(container).decode("utf-8")
+
     def get_location_type(self):
         """
         Returns the location type:
@@ -438,7 +441,7 @@ class AWSCLIContainer(LeverageContainer):
         """
         for _ in range(self.AWS_SSO_CODE_ATTEMPTS):
             # pull logs periodically until we find our SSO code
-            logs = self.client.api.logs(container).decode("utf-8")
+            logs = self.docker_logs(container)
             if "Then enter the code:" in logs:
                 raw_logger.info(logs)  # container logs already come formatted, so we need to print them raw
                 return logs.split("Then enter the code:")[1].split("\n")[2]
@@ -447,15 +450,20 @@ class AWSCLIContainer(LeverageContainer):
 
         raise ExitError(1, "Get SSO code timed-out")
 
-    def sso_login(self) -> int:
+    def get_sso_region(self):
         # TODO: what about using the .region property we have now? that takes the value from the path of the layer
-        exit_code, region = self.exec(f"configure get sso_region --profile {self.project}-sso")
+        _, region = self.exec(f"configure get sso_region --profile {self.project}-sso")
+        return region
+
+    def sso_login(self) -> int:
+        region = self.get_sso_region()
 
         with CustomEntryPoint(self, ""):
             container = self._create_container(False, command=self.AWS_SSO_LOGIN_SCRIPT)
 
         with ContainerSession(self.client, container):
-            # grab the user code from the logs
+            # once inside this block, the SSO_LOGIN_SCRIPT is being executed in the "background"
+            # now let's grab the user code from the logs
             user_code = self.get_sso_code(container)
             # with the user code, we can now autocomplete the url
             webbrowser.open_new_tab(self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code))
@@ -463,7 +471,7 @@ class AWSCLIContainer(LeverageContainer):
             # aws sso login will wait for the user code
             # once submitted to the browser, the authentication finish and the lock is released
             exit_code = self.client.api.wait(container)["StatusCode"]
-            raw_logger.info(self.client.api.logs(container).decode("utf-8"))
+            raw_logger.info(self.docker_logs(container))
 
         return exit_code
 
