@@ -6,7 +6,7 @@ import click
 from leverage import path as lepath
 from leverage._internals import State
 from leverage._internals import Module
-
+from leverage.logger import _configure_logger, _leverage_logger
 
 BUILD_SCRIPTS = Path("./tests/build_scripts/").resolve()
 BUILD_SCRIPT = BUILD_SCRIPTS / "simple_build.py"
@@ -50,3 +50,9 @@ def with_click_context(click_context):
 def muted_click_context(click_context):
     with click_context(verbose=False):
         yield
+
+
+@pytest.fixture
+def propagate_logs():
+    _configure_logger(logger=_leverage_logger)
+    _leverage_logger.propagate = True

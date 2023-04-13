@@ -1,30 +1,19 @@
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from click.exceptions import Exit
 
 from leverage.container import TerraformContainer
 from leverage.containers.kubectl import KubeCtlContainer
-from leverage.logger import _configure_logger, _leverage_logger
+from tests.test_containers import container_fixture_factory
 
-FAKE_ENV = {"TERRAFORM_IMAGE_TAG": "test", "PROJECT": "test"}
-FAKE_HOST_CONFIG = {
-    "NetworkMode": "default",
-    "SecurityOpt": ["label:disable"],
-    "Mounts": [],
-}
 AWS_EKS_UPDATE_KUBECONFIG = "aws eks update-kubeconfig --name test-cluster --profile test-profile --region us-east-1"
 
 
 @pytest.fixture
 def kubectl_container(muted_click_context):
-    mocked_client = MagicMock()
-    mocked_client.api.create_host_config.return_value = FAKE_HOST_CONFIG
-    with patch("leverage.container.load_env", return_value=FAKE_ENV):
-        container = KubeCtlContainer(mocked_client)
-        container._run = Mock()
-        return container
+    return container_fixture_factory(KubeCtlContainer)
 
 
 ##############
@@ -56,13 +45,10 @@ def test_change_kube_file_owner_cmd(kubectl_container):
         assert kubectl_container._change_kube_file_owner_cmd() == "chown 1234:5678 /root/.kube/config"
 
 
-def test_check_for_layer_location(kubectl_container, caplog):
+def test_check_for_layer_location(kubectl_container, propagate_logs, caplog):
     """
     Test that if we are not on a cluster layer, we raise an error.
     """
-    _configure_logger(logger=_leverage_logger)
-    _leverage_logger.propagate = True
-
     with patch.object(TerraformContainer, "check_for_layer_location"):  # assume parent method is already tested
         with pytest.raises(Exit):
             kubectl_container.cwd = Path("/random")
@@ -117,13 +103,11 @@ def test_configure(kubectl_container):
 # test auth methods #
 #####################
 
+
 def test_start_shell_mfa(kubectl_container):
     """
     Make sure the command is executed through the proper MFA script.
     """
-    # container = KubeCtlContainer(docker_client, env_conf=dict(MFA_ENABLED="true", **FAKE_ENV))
-    # container._run = Mock()
-
     kubectl_container.enable_mfa()
     # mock the __exit__ of the context manager to avoid the restoration of the values
     # otherwise the asserts around /.aws/ wouldn't be possible
