@@ -387,8 +387,8 @@ class AWSCLIContainer(LeverageContainer):
 
     # SSO constants
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
-    AWS_SSO_CODE_WAIT_SECONDS = 2
-    AWS_SSO_CODE_ATTEMPTS = 5
+    AWS_SSO_CODE_WAIT_SECONDS = 1
+    AWS_SSO_CODE_ATTEMPTS = 10
 
     def __init__(self, client):
         super().__init__(client)
@@ -441,9 +441,9 @@ class AWSCLIContainer(LeverageContainer):
         """
         for _ in range(self.AWS_SSO_CODE_ATTEMPTS):
             # pull logs periodically until we find our SSO code
+            logger.info("Fetching SSO code...")
             logs = self.docker_logs(container)
             if "Then enter the code:" in logs:
-                raw_logger.info(logs)  # container logs already come formatted, so we need to print them raw
                 return logs.split("Then enter the code:")[1].split("\n")[2]
 
             sleep(self.AWS_SSO_CODE_WAIT_SECONDS)
