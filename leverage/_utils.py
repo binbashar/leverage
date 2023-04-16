@@ -119,7 +119,8 @@ class ExitError(Exit):
 
 class ContainerSession:
     """
-    TODO: add description
+    Handle the start/stop cycle of a container.
+    Useful when you need to keep your container alive to share context between multiple commands.
     """
     def __init__(self, docker_client, container):
         self.docker_client = docker_client
