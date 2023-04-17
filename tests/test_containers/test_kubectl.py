@@ -117,6 +117,7 @@ def test_configure(kubectl_container):
 # test auth methods #
 #####################
 
+
 def test_start_shell_mfa(kubectl_container):
     """
     Make sure the command is executed through the proper MFA script.

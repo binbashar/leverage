@@ -26,22 +26,20 @@ def dir_structure(monkeypatch, tmp_path):
 
 @pytest.fixture
 def click_context():
-    def context(verbose=True,
-                build_script_name="build.py"):
+    def context(verbose=True, build_script_name="build.py"):
         state = State()
         state.verbosity = verbose
         state.module = Module(name=build_script_name)
 
-        return click.Context(command=click.Command("leverage"),
-                             obj=state)
+        return click.Context(command=click.Command("leverage"), obj=state)
 
     return context
 
 
 @pytest.fixture
 def with_click_context(click_context):
-    """ Utility fixture to use a default leverage click context without
-    the need of a `with` statement. """
+    """Utility fixture to use a default leverage click context without
+    the need of a `with` statement."""
     with click_context():
         yield
 
