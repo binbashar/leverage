@@ -46,43 +46,43 @@ PROJECT_STRUCTURE = {
         "global": [
             "base-identities",
             "organizations",
-            "sso"
+            "sso",
         ],
         "primary_region": [
             "base-tf-backend",
-            "security-base"
-        ]
+            "security-base",
+        ],
     },
     "security": {
         "global": [
-            "base-identities"
+            "base-identities",
         ],
         "primary_region": [
             "base-tf-backend",
-            "security-base"
-        ]
+            "security-base",
+        ],
     },
     "shared": {
         "global": [
-            "base-identities"
+            "base-identities",
         ],
         "primary_region": [
             "base-network",
             "base-tf-backend",
-            "security-base"
-        ]
-    }
+            "security-base",
+        ],
+    },
 }
 
 
 @click.group()
 def project():
-    """ Manage a Leverage project. """
+    """Manage a Leverage project."""
 
 
 @project.command()
 def init():
-    """ Initializes and gets all the required resources to be able to create a new Leverage project. """
+    """Initializes and gets all the required resources to be able to create a new Leverage project."""
 
     # Application's directory
     if not LEVERAGE_DIR.exists():
@@ -110,9 +110,10 @@ def init():
 
     # Project configuration file
     if not PROJECT_CONFIG.exists():
-        logger.info(f"No project configuration file found. Dropping configuration template [bold]{PROJECT_CONFIG_FILE}[/bold].")
-        copy2(src=CONFIG_FILE_TEMPLATE,
-              dst=PROJECT_CONFIG_FILE)
+        logger.info(
+            f"No project configuration file found. Dropping configuration template [bold]{PROJECT_CONFIG_FILE}[/bold]."
+        )
+        copy2(src=CONFIG_FILE_TEMPLATE, dst=PROJECT_CONFIG_FILE)
 
     else:
         logger.warning(f"Project configuration file [bold]{PROJECT_CONFIG_FILE}[/bold] already exists in directory.")
@@ -121,7 +122,7 @@ def init():
 
 
 def _copy_account(account, primary_region):
-    """ Copy account directory and all its files.
+    """Copy account directory and all its files.
 
     Args:
         account (str): Account name.
@@ -130,23 +131,29 @@ def _copy_account(account, primary_region):
     (PROJECT_ROOT / account).mkdir()
 
     # Copy config directory
-    copytree(src=TEMPLATE_DIR / account / CONFIG_DIRECTORY,
-             dst=PROJECT_ROOT / account / CONFIG_DIRECTORY,
-             ignore=IGNORE_PATTERNS)
+    copytree(
+        src=TEMPLATE_DIR / account / CONFIG_DIRECTORY,
+        dst=PROJECT_ROOT / account / CONFIG_DIRECTORY,
+        ignore=IGNORE_PATTERNS,
+    )
     # Copy all global layers in account
     for layer in PROJECT_STRUCTURE[account]["global"]:
-        copytree(src=TEMPLATE_DIR / account / "global" / layer,
-                 dst=PROJECT_ROOT / account / "global" / layer,
-                 ignore=IGNORE_PATTERNS)
+        copytree(
+            src=TEMPLATE_DIR / account / "global" / layer,
+            dst=PROJECT_ROOT / account / "global" / layer,
+            ignore=IGNORE_PATTERNS,
+        )
     # Copy all layers with a region in account
     for layer in PROJECT_STRUCTURE[account]["primary_region"]:
-        copytree(src=TEMPLATE_DIR / account / "primary_region" / layer,
-                 dst=PROJECT_ROOT / account / primary_region / layer,
-                 ignore=IGNORE_PATTERNS)
+        copytree(
+            src=TEMPLATE_DIR / account / "primary_region" / layer,
+            dst=PROJECT_ROOT / account / primary_region / layer,
+            ignore=IGNORE_PATTERNS,
+        )
 
 
 def _copy_project_template(config):
-    """ Copy all files and directories from the Leverage project template to the project directory.
+    """Copy all files and directories from the Leverage project template to the project directory.
     It excludes al jinja templates as those will be rendered directly to their final location.
 
     Args:
@@ -155,13 +162,10 @@ def _copy_project_template(config):
     logger.info("Creating project directory structure.")
 
     # Copy .gitignore file
-    copy2(src=TEMPLATE_DIR / ".gitignore",
-          dst=PROJECT_ROOT / ".gitignore")
+    copy2(src=TEMPLATE_DIR / ".gitignore", dst=PROJECT_ROOT / ".gitignore")
 
     # Root config directory
-    copytree(src=TEMPLATE_DIR / CONFIG_DIRECTORY,
-             dst=PROJECT_ROOT / CONFIG_DIRECTORY,
-             ignore=IGNORE_PATTERNS)
+    copytree(src=TEMPLATE_DIR / CONFIG_DIRECTORY, dst=PROJECT_ROOT / CONFIG_DIRECTORY, ignore=IGNORE_PATTERNS)
 
     # Accounts
     for account in PROJECT_STRUCTURE:
@@ -171,7 +175,7 @@ def _copy_project_template(config):
 
 
 def value(dictionary, key):
-    """ Utility function to be used as jinja filter, to ease extraction of values from dictionaries,
+    """Utility function to be used as jinja filter, to ease extraction of values from dictionaries,
     which is sometimes necessary.
 
     Args:
@@ -185,14 +189,12 @@ def value(dictionary, key):
 
 
 # Jinja environment used for rendering the templates
-JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()),
-                        trim_blocks=False,
-                        lstrip_blocks=False)
+JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()), trim_blocks=False, lstrip_blocks=False)
 JINJA_ENV.filters["value"] = value
 
 
 def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=PROJECT_ROOT):
-    """ Render the given templates using the given configuration values.
+    """Render the given templates using the given configuration values.
 
     Args:
         template_files (iterable(Path)): Iterable containing the Path objects corresponding to the
@@ -205,14 +207,16 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
         template_location = template_file.relative_to(TEMPLATES_REPO_DIR)
 
         template = JINJA_ENV.get_template(template_location.as_posix())
-        if not 'terraform_image_tag' in config:
-            config['terraform_image_tag'] = __toolbox_version__
+        if not "terraform_image_tag" in config:
+            config["terraform_image_tag"] = __toolbox_version__
         rendered_template = template.render(config)
 
         rendered_location = template_file.relative_to(source)
-        if (rendered_location.parent.name == ""
-                or rendered_location.parent.name == CONFIG_DIRECTORY
-                or rendered_location.parent.parent.name == "global"):
+        if (
+            rendered_location.parent.name == ""
+            or rendered_location.parent.name == CONFIG_DIRECTORY
+            or rendered_location.parent.parent.name == "global"
+        ):
             rendered_location = destination / rendered_location
 
         else:
@@ -239,9 +243,7 @@ def _render_account_templates(account, config, source=TEMPLATE_DIR):
         layer_dir = account_dir / layer
 
         layer_templates = layer_dir.glob(TEMPLATE_PATTERN)
-        _render_templates(template_files=layer_templates,
-                          config=config,
-                          source=source)
+        _render_templates(template_files=layer_templates, config=config, source=source)
 
 
 def _render_project_template(config, source=TEMPLATE_DIR):
@@ -251,21 +253,17 @@ def _render_project_template(config, source=TEMPLATE_DIR):
     template_files.extend(config_templates)
 
     logger.info("Setting up common base files.")
-    _render_templates(template_files=template_files,
-                      config=config,
-                      source=source)
+    _render_templates(template_files=template_files, config=config, source=source)
 
     # Render each account's templates
     for account in config["organization"]["accounts"]:
-        _render_account_templates(account=account,
-                                  config=config,
-                                  source=source)
+        _render_account_templates(account=account, config=config, source=source)
 
     logger.info("Project configuration finished.")
 
 
 def load_project_config():
-    """ Load project configuration file.
+    """Load project configuration file.
 
     Raises:
         Exit: For any error produced during configuration loading.
@@ -288,12 +286,14 @@ def load_project_config():
 
 @project.command()
 def create():
-    """ Create the directory structure required by the project configuration and set up each account accordingly. """
+    """Create the directory structure required by the project configuration and set up each account accordingly."""
 
     config = load_project_config()
     if not config:
-        logger.error("No configuration file found for the project."
-                     " Make sure the project has already been initialized ([bold]leverage project init[/bold]).")
+        logger.error(
+            "No configuration file found for the project."
+            " Make sure the project has already been initialized ([bold]leverage project init[/bold])."
+        )
         return
 
     if (PROJECT_ROOT / "config").exists():
@@ -319,7 +319,7 @@ def create():
 
 
 def render_file(file, config=None):
-    """ Utility to re-render specific files.
+    """Utility to re-render specific files.
 
     Args:
         file (str): Relative path to file to render.

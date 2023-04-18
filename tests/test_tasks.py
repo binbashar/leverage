@@ -17,23 +17,19 @@ from .conftest import BUILD_SCRIPT
 
 
 def some_task(*args, **kwargs):
-    """ A task. """
+    """A task."""
     pass
 
 
 def _some_dependency(*args, **kwargs):
-    """ A dependency. """
+    """A dependency."""
     pass
+
+
 some_dependency = Task(task=_some_dependency)
 
 
-@pytest.mark.parametrize(
-    "potential_task, dependencies",
-    [
-        (some_task, [some_dependency]),
-        (some_task, [])
-    ]
-)
+@pytest.mark.parametrize("potential_task, dependencies", [(some_task, [some_dependency]), (some_task, [])])
 def test_task_decorator(potential_task, dependencies):
     task_factory = task(*dependencies)
     task_obj = task_factory(potential_task)
@@ -49,17 +45,24 @@ def test_task_decorator_checks_dependencies_are_tasks():
     class SomeClass:
         pass
 
-    with pytest.raises(NotATaskError,
-                       match=(r"Dependencies _some_dependency, SomeClass are not tasks. "
-                              r"They all must be functions decorated with the `@task\(\)` decorator.")):
+    with pytest.raises(
+        NotATaskError,
+        match=(
+            r"Dependencies _some_dependency, SomeClass are not tasks. "
+            r"They all must be functions decorated with the `@task\(\)` decorator."
+        ),
+    ):
+
         @task(_some_dependency, SomeClass)
         def other_task():
             pass
 
 
 def test_task_decorator_checks_for_missing_parens():
-    with pytest.raises(MissingParensInDecoratorError,
-                       match="Possible parentheses missing in function `other_task` decorator."):
+    with pytest.raises(
+        MissingParensInDecoratorError, match="Possible parentheses missing in function `other_task` decorator."
+    ):
+
         @task
         def other_task():
             pass
@@ -74,12 +77,10 @@ def test_load_tasks_no_build_script(monkeypatch):
 
 def test_load_tasks(monkeypatch):
     monkeypatch.setattr("leverage.tasks.get_build_script_path", lambda filename: BUILD_SCRIPT.as_posix())
-    spec = util.spec_from_file_location(name=BUILD_SCRIPT.stem,
-                                        location=BUILD_SCRIPT)
+    spec = util.spec_from_file_location(name=BUILD_SCRIPT.stem, location=BUILD_SCRIPT)
     expected_module = util.module_from_spec(spec)
     spec.loader.exec_module(expected_module)
-    expected_module = Module(name=BUILD_SCRIPT.name,
-                             tasks=_get_tasks(module=expected_module))
+    expected_module = Module(name=BUILD_SCRIPT.name, tasks=_get_tasks(module=expected_module))
 
     module = load_tasks(build_script_filename=BUILD_SCRIPT.name)
     assert module == expected_module
@@ -103,8 +104,7 @@ def test__load_build_script_captures_module_exceptions(with_click_context):
 
 
 def test__get_tasks():
-    spec = util.spec_from_file_location(name=BUILD_SCRIPT.stem,
-                                        location=BUILD_SCRIPT)
+    spec = util.spec_from_file_location(name=BUILD_SCRIPT.stem, location=BUILD_SCRIPT)
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)
 

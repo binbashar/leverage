@@ -27,7 +27,7 @@ from leverage.conf import load as load_env
 
 REGION = (
     r"(.*)"  # project folder
-    # start region 
+    # start region
     r"(global|(?:[a-z]{2}-(?:gov-)?"
     r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4]))"
     # end region
@@ -38,7 +38,7 @@ raw_logger = raw_logger()
 
 
 def get_docker_client():
-    """ Attempt to get a Docker client from the environment configuration. Halt application otherwise.
+    """Attempt to get a Docker client from the environment configuration. Halt application otherwise.
 
     Raises:
         Exit: If communication to Docker server could not be established.
@@ -51,20 +51,23 @@ def get_docker_client():
         docker_client.ping()
 
     except:
-        logger.error("Docker daemon doesn't seem to be responding. "
-                     "Please check it is up and running correctly before re-running the command.")
+        logger.error(
+            "Docker daemon doesn't seem to be responding. "
+            "Please check it is up and running correctly before re-running the command."
+        )
         raise Exit(1)
 
     return docker_client
 
 
 class LeverageContainer:
-    """ Basic Leverage Container. Holds the minimum information required to run the Docker image that Leverage uses
+    """Basic Leverage Container. Holds the minimum information required to run the Docker image that Leverage uses
     to perform its operations. Commands can be issued as interactive via `start` for when live output or user input is desired
     or the can be simply executed via `exec` to run silently and retrieve the command output.
 
     NOTE: An aggregation approach to this design should be considered instead of the current inheritance approach.
     """
+
     LEVERAGE_IMAGE = "binbash/leverage-toolbox"
 
     COMMON_TFVARS = "common.tfvars"
@@ -72,7 +75,7 @@ class LeverageContainer:
     BACKEND_TFVARS = "backend.tfvars"
 
     def __init__(self, client):
-        """ Project related paths are determined and stored. Project configuration is loaded.
+        """Project related paths are determined and stored. Project configuration is loaded.
 
         Args:
             client (docker.DockerClient): Client to interact with Docker daemon.
@@ -103,8 +106,10 @@ class LeverageContainer:
         self.image = self.env_conf.get("TERRAFORM_IMAGE", self.LEVERAGE_IMAGE)
         self.image_tag = self.env_conf.get("TERRAFORM_IMAGE_TAG")
         if not self.image_tag:
-            logger.error("No docker image tag defined.\n"
-                         "Please set `TERRAFORM_IMAGE_TAG` variable in the project's [bold]build.env[/bold] file before running a Leverage command.")
+            logger.error(
+                "No docker image tag defined.\n"
+                "Please set `TERRAFORM_IMAGE_TAG` variable in the project's [bold]build.env[/bold] file before running a Leverage command."
+            )
             raise Exit(1)
 
         # Get project name
@@ -122,10 +127,7 @@ class LeverageContainer:
             self.host_aws_credentials_dir.mkdir(parents=True)
         self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
 
-        self.host_config = self.client.api.create_host_config(
-            security_opt=["label:disable"],
-            mounts=[]
-        )
+        self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=[])
         self.container_config = {
             "image": f"{self.image}:{self.image_tag}",
             "command": "",
@@ -133,7 +135,7 @@ class LeverageContainer:
             "environment": {},
             "entrypoint": "",
             "working_dir": f"{self.guest_base_path}/{self.cwd.relative_to(self.root_dir).as_posix()}",
-            "host_config": self.host_config
+            "host_config": self.host_config,
         }
 
     @property
@@ -193,7 +195,7 @@ class LeverageContainer:
         raise Exit(1)
 
     def ensure_image(self):
-        """ Make sure the required Docker image is available in the system. If not, pull it from registry. """
+        """Make sure the required Docker image is available in the system. If not, pull it from registry."""
         found_image = self.client.api.images(f"{self.image}:{self.image_tag}")
         if found_image:
             return
@@ -203,9 +205,11 @@ class LeverageContainer:
         try:
             stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
         except NotFound as e:
-            logger.error(f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. "
-                         "If you come from a project created with an older version of Leverage CLI or have modified the 'build.env' file manually, "
-                         f"please consider either deleting the file, or configuring a valid toolbox version to use. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')")
+            logger.error(
+                f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. "
+                "If you come from a project created with an older version of Leverage CLI or have modified the 'build.env' file manually, "
+                f"please consider either deleting the file, or configuring a valid toolbox version to use. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')"
+            )
             raise Exit(1)
         except APIError as pull:
             pull.__traceback__ = None
@@ -229,7 +233,7 @@ class LeverageContainer:
             logger.info(info)
 
     def _create_container(self, tty, command="", *args):
-        """ Create the container that will run the command.
+        """Create the container that will run the command.
 
         Args:
             tty (bool): Whether the container will run interactively or not.
@@ -256,7 +260,7 @@ class LeverageContainer:
             raise Exit(1)
 
     def _run(self, container, run_func):
-        """ Apply the given run function to the given container, return its outputs and handle container cleanup.
+        """Apply the given run function to the given container, return its outputs and handle container cleanup.
 
         Args:
             container (dict): Reference to a Docker container.
@@ -278,7 +282,7 @@ class LeverageContainer:
             self.client.api.remove_container(container)
 
     def _start(self, command="/bin/sh", *args):
-        """ Create an interactive container, and run command with the given arguments.
+        """Create an interactive container, and run command with the given arguments.
 
         Args:
             command (str, optional): Command to run. Defaults to "/bin/sh".
@@ -309,7 +313,7 @@ class LeverageContainer:
         return self._run(container, run_func)
 
     def start(self, command="/bin/sh", *arguments):
-        """ Run command with the given arguments in an interactive container.
+        """Run command with the given arguments in an interactive container.
 
         Args:
             command (str, optional): Command. Defaults to "/bin/sh".
@@ -320,7 +324,7 @@ class LeverageContainer:
         return self._start(command, *arguments)
 
     def _exec(self, command="", *args):
-        """ Create a non interactive container and execute command with the given arguments.
+        """Create a non interactive container and execute command with the given arguments.
 
         Args:
             command (str, optional): Command. Defaults to "".
@@ -339,7 +343,7 @@ class LeverageContainer:
         return self._run(container, run_func)
 
     def exec(self, command="", *arguments):
-        """ Execute command with the given arguments in a container.
+        """Execute command with the given arguments in a container.
 
         Args:
             command (str, optional): Command. Defaults to "".
@@ -363,21 +367,22 @@ class LeverageContainer:
         - not a project
         """
         if self.cwd == self.root_dir:
-            return 'root'
+            return "root"
         elif self.cwd == self.account_dir:
-            return 'account'
+            return "account"
         elif self.cwd in (self.common_config_dir, self.account_config_dir):
-            return 'config'
+            return "config"
         elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
-            return 'layer'
+            return "layer"
         elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
-            return 'layers-group'
+            return "layers-group"
         else:
-            return 'not a project'
+            return "not a project"
 
 
 class AWSCLIContainer(LeverageContainer):
-    """ Leverage Container specially tailored to run AWS CLI commands. """
+    """Leverage Container specially tailored to run AWS CLI commands."""
+
     AWS_CLI_BINARY = "/usr/local/bin/aws"
 
     # SSO scripts
@@ -400,23 +405,22 @@ class AWSCLIContainer(LeverageContainer):
             "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
             "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
-            "SCRIPT_LOG_LEVEL": get_script_log_level()
+            "SCRIPT_LOG_LEVEL": get_script_log_level(),
         }
         self.entrypoint = self.AWS_CLI_BINARY
         self.mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
-            Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind")
+            Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
         ]
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
-
 
     def start(self, command, profile=""):
         args = [] if not profile else ["--profile", profile]
         return self._start(command, *args)
 
     def system_start(self, command):
-        """ Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones. """
+        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
         self.entrypoint = ""
         exit_code = self._start(command)
         self.entrypoint = self.AWS_CLI_BINARY
@@ -427,7 +431,7 @@ class AWSCLIContainer(LeverageContainer):
         return self._exec(command, *args)
 
     def system_exec(self, command):
-        """ Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones. """
+        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
         self.entrypoint = ""
         exit_code, output = self._exec(command)
 
@@ -477,8 +481,9 @@ class AWSCLIContainer(LeverageContainer):
 
 
 class TerraformContainer(LeverageContainer):
-    """ Leverage container specifically tailored to run Terraform commands.
-    It handles authentication and some checks regarding where the command is being executed. """
+    """Leverage container specifically tailored to run Terraform commands.
+    It handles authentication and some checks regarding where the command is being executed."""
+
     TF_BINARY = "/bin/terraform"
 
     TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
@@ -493,10 +498,12 @@ class TerraformContainer(LeverageContainer):
 
         # Set authentication methods
         self.sso_enabled = self.common_conf.get("sso_enabled", False)
-        self.mfa_enabled = self.env_conf.get("MFA_ENABLED", "false") == "true" # TODO: Convert values to bool upon loading
+        self.mfa_enabled = (
+            self.env_conf.get("MFA_ENABLED", "false") == "true"
+        )  # TODO: Convert values to bool upon loading
 
         # SSH AGENT
-        SSH_AUTH_SOCK = os.getenv('SSH_AUTH_SOCK')
+        SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
 
         self.environment = {
             "COMMON_CONFIG_FILE": self.common_tfvars,
@@ -504,13 +511,13 @@ class TerraformContainer(LeverageContainer):
             "BACKEND_CONFIG_FILE": self.backend_tfvars,
             "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
             "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
-            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials", # Legacy?
-            "SRC_AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config", # Legacy?
+            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",  # Legacy?
+            "SRC_AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",  # Legacy?
             "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
             "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
             "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
-            "SSH_AUTH_SOCK": '' if SSH_AUTH_SOCK is None else '/ssh-agent',
+            "SSH_AUTH_SOCK": "" if SSH_AUTH_SOCK is None else "/ssh-agent",
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
@@ -535,7 +542,7 @@ class TerraformContainer(LeverageContainer):
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
     def _guest_config_file(self, file):
-        """ Map config file in host to location in guest.
+        """Map config file in host to location in guest.
 
         Args:
             file (pathlib.Path): File in host to map
@@ -558,28 +565,32 @@ class TerraformContainer(LeverageContainer):
 
     @property
     def tf_default_args(self):
-        """ Array of strings containing all valid config files for layer as parameters for Terraform """
-        common_config_files = [f"-var-file={self._guest_config_file(common_file)}"
-                               for common_file in self.common_config_dir.glob("*.tfvars")]
-        account_config_files = [f"-var-file={self._guest_config_file(account_file)}"
-                                for account_file in self.account_config_dir.glob("*.tfvars")]
+        """Array of strings containing all valid config files for layer as parameters for Terraform"""
+        common_config_files = [
+            f"-var-file={self._guest_config_file(common_file)}"
+            for common_file in self.common_config_dir.glob("*.tfvars")
+        ]
+        account_config_files = [
+            f"-var-file={self._guest_config_file(account_file)}"
+            for account_file in self.account_config_dir.glob("*.tfvars")
+        ]
         return common_config_files + account_config_files
 
     def enable_mfa(self):
-        """ Enable Multi-Factor Authentication. """
+        """Enable Multi-Factor Authentication."""
         self.mfa_enabled = True
 
     def enable_sso(self):
-        """ Enable Single Sign-On Authentication. """
+        """Enable Single Sign-On Authentication."""
         self.sso_enabled = True
 
     def disable_authentication(self):
-        """ Disable all authentication. """
+        """Disable all authentication."""
         self.mfa_enabled = False
         self.sso_enabled = False
 
     def _check_sso_token(self):
-        """ Check for the existence and validity of the SSO token to be used to get credentials. """
+        """Check for the existence and validity of the SSO token to be used to get credentials."""
 
         # Adding `token` file name to this function in order to
         # meet the requirement regarding to have just one
@@ -593,11 +604,13 @@ class TerraformContainer(LeverageContainer):
             raise Exit(1)
 
         if token_file not in token_files:
-            sso_role = 'token'
+            sso_role = "token"
             token_file = self.sso_cache / sso_role
             if token_file not in token_files:
-                logger.error("No valid AWS SSO token found for current account.\n"
-                            "Please log out and reconfigure SSO before proceeding.")
+                logger.error(
+                    "No valid AWS SSO token found for current account.\n"
+                    "Please log out and reconfigure SSO before proceeding."
+                )
                 raise Exit(1)
 
         entrypoint = self.entrypoint
@@ -615,8 +628,8 @@ class TerraformContainer(LeverageContainer):
         self.entrypoint = entrypoint
 
     def _prepare_container(self):
-        """ Adjust entrypoint and environment variables for when SSO or MFA are used.
-        Note that SSO takes precedence over MFA when both are active. """
+        """Adjust entrypoint and environment variables for when SSO or MFA are used.
+        Note that SSO takes precedence over MFA when both are active."""
         if self.sso_enabled:
             self._check_sso_token()
 
@@ -625,22 +638,28 @@ class TerraformContainer(LeverageContainer):
         elif self.mfa_enabled:
             self.entrypoint = f"{self.TF_MFA_ENTRYPOINT} -- {self.entrypoint}"
 
-            self.environment.update({
-                "AWS_SHARED_CREDENTIALS_FILE": self.environment.get("AWS_SHARED_CREDENTIALS_FILE").replace("tmp", ".aws"),
-                "AWS_CONFIG_FILE": self.environment.get("AWS_CONFIG_FILE").replace("tmp", ".aws"),
-            })
+            self.environment.update(
+                {
+                    "AWS_SHARED_CREDENTIALS_FILE": self.environment.get("AWS_SHARED_CREDENTIALS_FILE").replace(
+                        "tmp", ".aws"
+                    ),
+                    "AWS_CONFIG_FILE": self.environment.get("AWS_CONFIG_FILE").replace("tmp", ".aws"),
+                }
+            )
 
         logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
 
     def check_for_layer_location(self):
-        """ Make sure the command is being ran at layer level. If not, bail. """
+        """Make sure the command is being ran at layer level. If not, bail."""
         if self.cwd in (self.common_config_dir, self.account_config_dir):
             logger.error("Currently in a configuration directory, no Terraform command can be run here.")
             raise Exit(1)
 
         if self.cwd in (self.root_dir, self.account_dir):
-            logger.error("Terraform commands cannot run neither in the root of the project or in"
-                         " the root directory of an account.")
+            logger.error(
+                "Terraform commands cannot run neither in the root of the project or in"
+                " the root directory of an account."
+            )
             raise Exit(1)
 
         if not list(self.cwd.glob("*.tf")):
@@ -653,7 +672,7 @@ class TerraformContainer(LeverageContainer):
         return self._start(command, *arguments)
 
     def start_in_layer(self, command, *arguments):
-        """ Run a command that can only be performed in layer level. """
+        """Run a command that can only be performed in layer level."""
         self.check_for_layer_location()
 
         return self.start(command, *arguments)
@@ -664,7 +683,7 @@ class TerraformContainer(LeverageContainer):
         return self._exec(command, *arguments)
 
     def system_exec(self, command):
-        """ Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones. """
+        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
         original_entrypoint = self.entrypoint
         self.entrypoint = ""
         exit_code, output = self._exec(command)
@@ -672,9 +691,8 @@ class TerraformContainer(LeverageContainer):
         self.entrypoint = original_entrypoint
         return exit_code, output
 
-
     def start_shell(self):
-        """ Launch a shell in the container. """
+        """Launch a shell in the container."""
         if self.mfa_enabled or self.sso_enabled:
             self.check_for_layer_location()
 
@@ -693,28 +711,39 @@ class TerraformContainer(LeverageContainer):
         try:
             config_tf_file = self.cwd / "config.tf"
             config_tf = hcl2.loads(config_tf_file.read_text()) if config_tf_file.exists() else {}
-            if 'terraform' in config_tf and 'backend' in config_tf["terraform"][0] and 's3' in config_tf["terraform"][0]["backend"][0]:
-                if 'key' in config_tf["terraform"][0]["backend"][0]["s3"]:
+            if (
+                "terraform" in config_tf
+                and "backend" in config_tf["terraform"][0]
+                and "s3" in config_tf["terraform"][0]["backend"][0]
+            ):
+                if "key" in config_tf["terraform"][0]["backend"][0]["s3"]:
                     backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
                     self._backend_key = backend_key
                 else:
-                    self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate".replace('/base-','/').replace('/tools-','/')
+                    self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate".replace(
+                        "/base-", "/"
+                    ).replace("/tools-", "/")
 
-                    in_container_file_path = f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
-                    resp = self.system_exec("hcledit "
-                                             f"-f {in_container_file_path} -u"
-                                             f" attribute append terraform.backend.key \"\\\"{self._backend_key}\\\"\"")
+                    in_container_file_path = (
+                        f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
+                    )
+                    resp = self.system_exec(
+                        "hcledit "
+                        f"-f {in_container_file_path} -u"
+                        f' attribute append terraform.backend.key "\\"{self._backend_key}\\""'
+                    )
             else:
                 if not skip_validation:
                     raise KeyError()
         except (KeyError, IndexError):
-            logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend block. In some cases you may want to skip this check by using the --skip-validation flag, e.g. the first time you initialize a terraform-backend layer.")
+            logger.error(
+                "[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend block. In some cases you may want to skip this check by using the --skip-validation flag, e.g. the first time you initialize a terraform-backend layer."
+            )
             raise Exit(1)
         except Exception as e:
             logger.error("[red]✘[/red] Malformed [bold]config.tf[/bold] file. Unable to parse.")
             logger.debug(e)
             raise Exit(1)
-
 
     @property
     def backend_key(self):
@@ -726,14 +755,15 @@ class TerraformContainer(LeverageContainer):
 
 
 class TFautomvContainer(TerraformContainer):
-    """ Leverage Container tailored to run general commands. """
-    TFAUTOMV_CLI_BINARY = '/usr/local/bin/tfautomv'
+    """Leverage Container tailored to run general commands."""
+
+    TFAUTOMV_CLI_BINARY = "/usr/local/bin/tfautomv"
 
     def __init__(self, client):
         super().__init__(client)
 
-        self.environment['TF_CLI_ARGS_init'] = ' '.join(self.tf_default_args)
-        self.environment['TF_CLI_ARGS_plan'] = ' '.join(self.tf_default_args)
+        self.environment["TF_CLI_ARGS_init"] = " ".join(self.tf_default_args)
+        self.environment["TF_CLI_ARGS_plan"] = " ".join(self.tf_default_args)
 
         self.entrypoint = self.TFAUTOMV_CLI_BINARY
 
@@ -742,10 +772,10 @@ class TFautomvContainer(TerraformContainer):
     def start(self, *arguments):
         self._prepare_container()
 
-        return self._start('', *arguments)
+        return self._start("", *arguments)
 
     def start_in_layer(self, *arguments):
-        """ Run a command that can only be performed in layer level. """
+        """Run a command that can only be performed in layer level."""
         self.check_for_layer_location()
 
         return self.start(*arguments)

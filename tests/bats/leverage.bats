@@ -38,7 +38,7 @@ teardown(){
     run leverage -l
 
     assert_line --index 0 "Tasks in build file \`build.py\`:"
-    assert_line --index 1 --regexp "^  hello\s+Say hello.\s+$"
+    assert_line --index 1 --regexp "^  hello\s+Say hello.$"
     assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
 }
 
@@ -52,7 +52,7 @@ teardown(){
     run leverage -l
 
     assert_line --index 0 "Tasks in build file \`build.py\`:"
-    assert_line --index 1 --regexp "^  hello\s+Say hello.\s+$"
+    assert_line --index 1 --regexp "^  hello\s+Say hello.$"
     assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
 }
 

@@ -18,21 +18,20 @@ from leverage.modules import kubectl
 
 
 @click.group(invoke_without_command=True)
-@click.option("--filename", "-f",
-              default="build.py",
-              show_default=True,
-              help="Name of the build file containing the tasks definitions.")
-@click.option("--list-tasks", "-l",
-              is_flag=True,
-              help="List available tasks to run.")
-@click.option("-v", "--verbose",
-              is_flag=True,
-              help="Increase output verbosity.")
+@click.option(
+    "--filename",
+    "-f",
+    default="build.py",
+    show_default=True,
+    help="Name of the build file containing the tasks definitions.",
+)
+@click.option("--list-tasks", "-l", is_flag=True, help="List available tasks to run.")
+@click.option("-v", "--verbose", is_flag=True, help="Increase output verbosity.")
 @click.version_option(version=__version__)
 @pass_state
 @click.pass_context
 def leverage(context, state, filename, list_tasks, verbose):
-    """ Leverage Reference Architecture projects command-line tool. """
+    """Leverage Reference Architecture projects command-line tool."""
     # --verbose | -v
     state.verbosity = verbose
 
