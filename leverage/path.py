@@ -12,7 +12,7 @@ class NotARepositoryError(RuntimeError):
 
 
 def get_working_path():
-    """ Get the interpreters current directory.
+    """Get the interpreters current directory.
 
     Returns:
         str: Current working directory.
@@ -21,7 +21,7 @@ def get_working_path():
 
 
 def get_home_path():
-    """ Get the current user's home directory.
+    """Get the current user's home directory.
 
     Returns:
         str: User's home directory.
@@ -30,7 +30,7 @@ def get_home_path():
 
 
 def get_root_path():
-    """ Get the path to the root of the Git repository.
+    """Get the path to the root of the Git repository.
 
     Raises:
         NotARepositoryError: If the current directory is not within a git repository.
@@ -39,11 +39,9 @@ def get_root_path():
         str: Root of the repository.
     """
     try:
-        root = run(["git", "rev-parse", "--show-toplevel"],
-                   stdout=PIPE,
-                   stderr=PIPE,
-                   check=True,
-                   encoding="utf-8").stdout
+        root = run(
+            ["git", "rev-parse", "--show-toplevel"], stdout=PIPE, stderr=PIPE, check=True, encoding="utf-8"
+        ).stdout
 
     except CalledProcessError as exc:
         if "fatal: not a git repository" in exc.stderr:
@@ -53,7 +51,7 @@ def get_root_path():
 
 
 def get_account_path():
-    """ Get the path to the current account directory.
+    """Get the path to the current account directory.
 
     Returns:
         str: Path to the current account directory.
@@ -75,7 +73,7 @@ def get_account_path():
 
 
 def get_global_config_path():
-    """ Get the path to the config that is common to all accounts.
+    """Get the path to the config that is common to all accounts.
 
     Returns:
         str: Global config file path.
@@ -84,7 +82,7 @@ def get_global_config_path():
 
 
 def get_account_config_path():
-    """ Get the path to the config of the current account.
+    """Get the path to the config of the current account.
 
     Returns:
         str: Current config file path.
@@ -93,7 +91,7 @@ def get_account_config_path():
 
 
 def get_build_script_path(filename="build.py"):
-    """ Get path to the build script containing all tasks to be run.
+    """Get path to the build script containing all tasks to be run.
     Search through the current directory up to the repository's root directory.
 
     Args:

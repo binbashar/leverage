@@ -78,7 +78,7 @@ def test_get_account_path(monkeypatch, tmp_path):
 def test_get_global_config_path(monkeypatch):
     monkeypatch.setattr(lepath, "get_root_path", lambda: ".")
 
-    assert get_global_config_path() == './config'
+    assert get_global_config_path() == "./config"
 
 
 def test_get_account_config_path(monkeypatch):
@@ -87,14 +87,7 @@ def test_get_account_config_path(monkeypatch):
     assert get_account_config_path() == "./account/config"
 
 
-@pytest.mark.parametrize(
-    "build_script_location",
-    [
-        "",
-        "account",
-        "account/config"
-    ]
-)
+@pytest.mark.parametrize("build_script_location", ["", "account", "account/config"])
 def test_get_build_script_path(dir_structure, build_script_location):
     root_dir, _ = dir_structure
 

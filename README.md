@@ -61,6 +61,18 @@ This way, the `leverage` command on your venv will be executed from the project 
 
 Now all the changes to the project will be immediately reflected on the command.
 
+## Pre-commit hooks
+
+In order to run black automatically on every commit, you should install `pre-commit` first:
+
+https://pre-commit.com/#installation
+
+And then the hooks:
+
+```
+pre-commit install
+```
+
 ## Running Tests
 To run unit tests, pytest is the tool of choice, and the required dependencies are available in the corresponding `dev-requirements.txt`.
 

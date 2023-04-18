@@ -1,6 +1,8 @@
 """
     Command line arguments and tasks arguments parsing utilities.
 """
+
+
 class InvalidArgumentOrderError(RuntimeError):
     pass
 
@@ -10,7 +12,7 @@ class DuplicateKeywordArgumentError(RuntimeError):
 
 
 def parse_task_args(arguments):
-    """ Parse the arguments for a task and return args and kwargs appropriately
+    """Parse the arguments for a task and return args and kwargs appropriately
 
     Args:
         arguments (str): Arguments to parse.
@@ -34,7 +36,9 @@ def parse_task_args(arguments):
     for argument in arguments:
         if "=" not in argument:
             if kwargs:
-                raise InvalidArgumentOrderError(f"Positional argument `{argument}` from task `{{task}}` cannot follow a keyword argument.")
+                raise InvalidArgumentOrderError(
+                    f"Positional argument `{argument}` from task `{{task}}` cannot follow a keyword argument."
+                )
 
             args.append(argument.strip())
 

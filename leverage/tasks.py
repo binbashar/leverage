@@ -27,7 +27,7 @@ class MissingParensInDecoratorError(ImportError):
 
 
 def task(*dependencies, **options):
-    """ Task decorator to mark functions in a build script as tasks to be performed.
+    """Task decorator to mark functions in a build script as tasks to be performed.
 
     Raises:
         MissingParensInDecorator: When the decorator is most likely being used without parentheses
@@ -52,16 +52,17 @@ def task(*dependencies, **options):
     # where the dependency provided is a function and not a task. So the need of parentheses is
     # enforced through this check below
     if len(dependencies) == 1 and isfunction(dependencies[0]):
-        raise MissingParensInDecoratorError("Possible parentheses missing in function "
-                                            f"`{dependencies[0].__name__}` decorator.")
+        raise MissingParensInDecoratorError(
+            "Possible parentheses missing in function " f"`{dependencies[0].__name__}` decorator."
+        )
 
-    not_tasks = [dependency.__name__
-                 for dependency in dependencies
-                 if not Task.is_task(dependency)]
+    not_tasks = [dependency.__name__ for dependency in dependencies if not Task.is_task(dependency)]
 
     if not_tasks:
-        raise NotATaskError(f"Dependencies {', '.join(not_tasks)} are not tasks. "
-                            "They all must be functions decorated with the `@task()` decorator.")
+        raise NotATaskError(
+            f"Dependencies {', '.join(not_tasks)} are not tasks. "
+            "They all must be functions decorated with the `@task()` decorator."
+        )
 
     def _task(func):
         return Task(func, list(dependencies), options)
@@ -70,13 +71,14 @@ def task(*dependencies, **options):
 
 
 class Task:
-    """ Task to be run by Leverage, created from a function with the @task() decorator.
+    """Task to be run by Leverage, created from a function with the @task() decorator.
     A task which name starts with an underscore is considered private and, as such, not shown
     when tasks are listed, this can also be explicitly indicated in the decorator.
     An ignored task won't be ran by Leverage.
     """
+
     def __init__(self, task, dependencies=None, options=None):
-        """ Task object initialization
+        """Task object initialization
 
         Args:
             task (function): Function to be called upon task execution.
@@ -98,34 +100,32 @@ class Task:
 
     @classmethod
     def is_task(cls, obj):
-        """ Whether the given object is a task or not """
+        """Whether the given object is a task or not"""
         return isinstance(obj, cls)
 
     @property
     def is_private(self):
-        """ Whether the task is private or not """
+        """Whether the task is private or not"""
         return self._private
 
     @property
     def is_ignored(self):
-        """ Whether the task is ignored or not """
+        """Whether the task is ignored or not"""
         return self._ignored
 
     def __call__(self, *args, **kwargs):
-        """ Execute the task """
+        """Execute the task"""
         self.task(*args, **kwargs)
 
     def __eq__(self, other):
-        return (isinstance(other, Task)
-                and self.name == other.name
-                and self.doc == other.doc)
+        return isinstance(other, Task) and self.name == other.name and self.doc == other.doc
 
     def __hash__(self):
         return id(self)
 
 
 def load_tasks(build_script_filename="build.py"):
-    """ Load the tasks in the build script if there is one.
+    """Load the tasks in the build script if there is one.
 
     Args:
         build_script_filename (str, optional): Name of the file containing the defined tasks. Defaults to "build.py".
@@ -142,7 +142,7 @@ def load_tasks(build_script_filename="build.py"):
 
 
 def _load_build_script(build_script):
-    """ Load build script as module and return the useful bits.
+    """Load build script as module and return the useful bits.
     If build script is malformed the exception trace is printed and the application exits.
 
     Args:
@@ -163,16 +163,14 @@ def _load_build_script(build_script):
 
     # Load build script as module
     try:
-        module = importlib.import_module(f".{build_script.stem}",
-                                         package=package.name)
+        module = importlib.import_module(f".{build_script.stem}", package=package.name)
 
     except (ImportError, ModuleNotFoundError, SyntaxError) as exc:
         # Remove frames in the traceback until we reach the one pertaining to the build
         # script, as to avoid polluting the output with internal leverage calls,
         # only frames of the build script and its dependencies are shown.
         build_script = build_script.as_posix()
-        while (exc.__traceback__ is not None
-                and exc.__traceback__.tb_frame.f_code.co_filename != build_script):
+        while exc.__traceback__ is not None and exc.__traceback__.tb_frame.f_code.co_filename != build_script:
             exc.__traceback__ = exc.__traceback__.tb_next
 
         exc = clean_exception_traceback(exception=exc)
@@ -180,13 +178,15 @@ def _load_build_script(build_script):
         logger.exception("Error in build script.", exc_info=exc)
         raise Exit(1)
 
-    return Module(name=Path(module.__file__).name,
-                  tasks=_get_tasks(module=module),
-                  default_task=getattr(module, "__DEFAULT__", None))
+    return Module(
+        name=Path(module.__file__).name,
+        tasks=_get_tasks(module=module),
+        default_task=getattr(module, "__DEFAULT__", None),
+    )
 
 
 def _get_tasks(module):
-    """ Extract all Task objects from a loaded module.
+    """Extract all Task objects from a loaded module.
 
     Args:
         module (module): Loaded module containing the definition of tasks.
@@ -206,7 +206,7 @@ _DEFAULT = "Default"
 
 
 def list_tasks(module):
-    """ Print all non-private tasks in a neat table-like format.
+    """Print all non-private tasks in a neat table-like format.
     Indicates whether the task is ignored and/or if it is the default one.
 
     Args:
@@ -238,7 +238,6 @@ def list_tasks(module):
 
         # Body
         for name, attr, doc in tasks_grid:
-
             doc_line = "" if not doc else doc[0]
             click.echo(f"  {name:<{name_column_width}}  {attr: ^{attr_column_width}}\t{doc_line}")
             # Print the remaining lines of the dosctring with the correct indentation

@@ -33,7 +33,7 @@ class TaskNotFoundError(RuntimeError):
 @click.argument("tasks", nargs=-1)
 @pass_state
 def run(state, tasks):
-    """ Perform specified task(s) and all of its dependencies.
+    """Perform specified task(s) and all of its dependencies.
 
     When no task is given, the default (__DEFAULT__) task is run, if no default task has been defined, all available tasks are listed.
     """
@@ -45,8 +45,7 @@ def run(state, tasks):
         try:
             tasks_to_run = _prepare_tasks_to_run(state.module, tasks)
 
-        except (TaskNotFoundError,
-                MalformedTaskArgumentError) as exc:
+        except (TaskNotFoundError, MalformedTaskArgumentError) as exc:
             logger.error(str(exc))
             raise Exit(1)
 
@@ -64,7 +63,7 @@ def run(state, tasks):
 
 
 def _prepare_tasks_to_run(module, input_tasks):
-    """ Validate input tasks and arguments and pair them with the corresponding module's task.
+    """Validate input tasks and arguments and pair them with the corresponding module's task.
 
     Args:
         module (dict): Dict containing the tasks from the build script.
@@ -91,8 +90,7 @@ def _prepare_tasks_to_run(module, input_tasks):
         try:
             args, kwargs = parse_task_args(arguments=arguments)
 
-        except (InvalidArgumentOrderError,
-                DuplicateKeywordArgumentError) as exc:
+        except (InvalidArgumentOrderError, DuplicateKeywordArgumentError) as exc:
             logger.error(str(exc).format(task=name))
             raise Exit(1)
 
@@ -107,7 +105,7 @@ def _prepare_tasks_to_run(module, input_tasks):
 
 
 def _run_tasks(tasks):
-    """ Run the tasks provided.
+    """Run the tasks provided.
 
     Args:
         tasks (list(tuple)): List of 3-tuples containing a task and it's positional and keyword arguments to run.
@@ -120,7 +118,7 @@ def _run_tasks(tasks):
 
 
 def _run(task, completed_tasks, *args, **kwargs):
-    """ Run the given task and all it's required dependencies, keeping track of all the already
+    """Run the given task and all it's required dependencies, keeping track of all the already
     completed tasks as not to repeat them.
 
     Args:
@@ -136,7 +134,6 @@ def _run(task, completed_tasks, *args, **kwargs):
         completed_tasks.update(_completed_tasks)
 
     if task not in completed_tasks:
-
         if task.is_ignored:
             _logger.info(f"[bold yellow]⤳[/bold yellow] Ignoring task [bold italic]{task.name}[/bold italic]")
 
@@ -151,7 +148,9 @@ def _run(task, completed_tasks, *args, **kwargs):
                 exc.__traceback__ = exc.__traceback__.tb_next.tb_next
                 exc = clean_exception_traceback(exception=exc)
 
-                _logger.exception(f"[bold red]![/bold red] Error in task [bold italic]{task.name}[/bold italic]", exc_info=exc)
+                _logger.exception(
+                    f"[bold red]![/bold red] Error in task [bold italic]{task.name}[/bold italic]", exc_info=exc
+                )
                 _logger.critical("[red]✘[/red] [bold on red]Aborting build[/bold on red]")
                 raise Exit(1)
 

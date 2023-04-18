@@ -18,10 +18,7 @@ INFO = logging.getLevelName("INFO")
 WARNING = logging.getLevelName("WARNING")
 
 
-@pytest.mark.parametrize(
-    "verbose, expected_value",
-    [(True, 3), (False, 2)]
-)
+@pytest.mark.parametrize("verbose, expected_value", [(True, 3), (False, 2)])
 def test_get_script_log_level(click_context, verbose, expected_value):
     with click_context(verbose=verbose):
         log_level = get_script_log_level()

@@ -23,21 +23,18 @@ CONFIG_PATH=/home/user/.config/
 @pytest.mark.parametrize(
     "write_files, expected_values",
     [
-        ( # Env files present
+        (  # Env files present
             True,
             {
                 "PROJECT": "foobar",
                 "MFA_ENABLED": "true",
                 "ENTRYPOINT": "/bin/run",
                 "DEBUG": "true",
-                "CONFIG_PATH": "/home/user/.config/"
-            }
+                "CONFIG_PATH": "/home/user/.config/",
+            },
         ),
-        ( # No env files
-            False,
-            {}
-        )
-    ]
+        (False, {}),  # No env files
+    ],
 )
 def test_load_config(monkeypatch, click_context, tmp_path, write_files, expected_values):
     with click_context():
