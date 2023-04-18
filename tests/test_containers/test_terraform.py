@@ -6,7 +6,7 @@ from tests.test_containers import container_fixture_factory
 
 @pytest.fixture
 def terraform_container(muted_click_context, monkeypatch):
-    monkeypatch.setenv('TF_PLUGIN_CACHE_DIR', '/home/testing/.terraform/cache')
+    monkeypatch.setenv("TF_PLUGIN_CACHE_DIR", "/home/testing/.terraform/cache")
     return container_fixture_factory(TerraformContainer)
 
 
