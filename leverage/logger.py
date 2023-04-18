@@ -34,7 +34,11 @@ def get_script_log_level():
     Returns:
         int: Logging level as defined in the Leverage scripts.
     """
-    log_level = {logging.ERROR: 1, logging.INFO: 2, logging.DEBUG: 3}
+    log_level = {
+        logging.ERROR: 1,
+        logging.INFO: 2,
+        logging.DEBUG: 3,
+    }
 
     verbosity = get_current_context().obj.verbosity
     return log_level[verbosity]

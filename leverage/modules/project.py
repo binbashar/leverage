@@ -43,11 +43,35 @@ CONFIG_DIRECTORY = "config"
 # TODO: Keep this structure in the project's directory
 PROJECT_STRUCTURE = {
     "management": {
-        "global": ["base-identities", "organizations", "sso"],
-        "primary_region": ["base-tf-backend", "security-base"],
+        "global": [
+            "base-identities",
+            "organizations",
+            "sso",
+        ],
+        "primary_region": [
+            "base-tf-backend",
+            "security-base",
+        ],
     },
-    "security": {"global": ["base-identities"], "primary_region": ["base-tf-backend", "security-base"]},
-    "shared": {"global": ["base-identities"], "primary_region": ["base-network", "base-tf-backend", "security-base"]},
+    "security": {
+        "global": [
+            "base-identities",
+        ],
+        "primary_region": [
+            "base-tf-backend",
+            "security-base",
+        ],
+    },
+    "shared": {
+        "global": [
+            "base-identities",
+        ],
+        "primary_region": [
+            "base-network",
+            "base-tf-backend",
+            "security-base",
+        ],
+    },
 }
 
 
