@@ -392,7 +392,7 @@ class AWSCLIContainer(LeverageContainer):
 
     # SSO constants
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
-    AWS_SSO_CODE_WAIT_SECONDS = 1
+    AWS_SSO_CODE_WAIT_SECONDS = 2
     AWS_SSO_CODE_ATTEMPTS = 10
 
     def __init__(self, client):
