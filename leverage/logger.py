@@ -9,6 +9,7 @@ from rich.logging import RichHandler
 from click import get_current_context
 
 
+_RAW_LOGGING_FORMAT = "%(message)s"
 _TASK_LOGGING_FORMAT = (
     "[bold light_yellow3][ %(build_script)s -[/bold light_yellow3]"
     " %(message)s [bold light_yellow3]][/bold light_yellow3]"
@@ -160,5 +161,19 @@ def get_tasks_logger():
 
     formatter = logging.Formatter(_TASK_LOGGING_FORMAT)
     logger.handlers[0].setFormatter(formatter)
+
+    return logger
+
+
+def raw_logger():
+    """
+    Provide a raw logger, in case we need to print stuff that already comes formatted (like some container logs).
+    """
+    logger = logging.getLogger("raw")
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(_RAW_LOGGING_FORMAT)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
     return logger

@@ -153,9 +153,7 @@ def login(cli):
         logger.error(f"Region configuration for [bold]{cli.project}-sso[/bold] profile not found.")
         raise Exit(1)
 
-    webbrowser.open_new_tab(cli.SSO_LOGIN_URL.format(region=region.strip()))
-    exit_code = cli.system_start(cli.AWS_SSO_LOGIN_SCRIPT)
-    if exit_code:
+    if exit_code := cli.sso_login():
         raise Exit(exit_code)
 
 
