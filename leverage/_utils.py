@@ -117,8 +117,7 @@ class AwsCredsEntryPoint(CustomEntryPoint):
                 }
             )
         # now return file ownership on the aws credentials files
-        with CustomEntryPoint(self.container, ""):
-            self.container._exec(self.container.change_ownership_cmd(self.container.guest_aws_credentials_dir))
+        self.container.change_file_ownership(self.container.guest_aws_credentials_dir)
 
 
 class ExitError(Exit):

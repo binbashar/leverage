@@ -13,7 +13,7 @@ import dockerpty
 from docker import DockerClient
 from docker.errors import APIError, NotFound
 from docker.types import Mount
-from typing import Tuple
+from typing import Tuple, Union, List
 
 from leverage import __toolbox_version__
 from leverage import logger
@@ -373,12 +373,21 @@ class LeverageContainer:
         user = pwd.getpwuid(user_id)
         return user.pw_gid
 
-    def change_ownership_cmd(self, path: Path, recursive=True) -> str:
+    def change_ownership_cmd(self, path: Union[Path, str], recursive=True) -> str:
         recursive = "-R " if recursive else ""
         user_id = os.getuid()
         group_id = self.get_current_user_group_id(user_id)
 
         return f"chown {user_id}:{group_id} {recursive}{path}"
+
+    def change_file_ownership(self, path: Union[Path, str], recursive=True):
+        """
+        Change the file/folder ownership from the internal docker user (usually root)
+        to the user executing the CLI.
+        """
+        cmd = self.change_ownership_cmd(path, recursive=recursive)
+        with CustomEntryPoint(self, entrypoint=""):
+            self._exec(cmd)
 
 
 class AWSCLIContainer(LeverageContainer):
@@ -479,6 +488,8 @@ class AWSCLIContainer(LeverageContainer):
             # once submitted to the browser, the authentication finish and the lock is released
             exit_code = self.client.api.wait(container)["StatusCode"]
             raw_logger.info(self.docker_logs(container))
+            # now return ownership of the token file back to the user
+            self.change_file_ownership(self.guest_aws_credentials_dir)
 
         return exit_code
 
