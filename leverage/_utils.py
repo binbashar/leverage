@@ -85,7 +85,7 @@ class AwsCredsEntryPoint(CustomEntryPoint):
     This works as a replacement of _prepare_container.
     """
 
-    def __init__(self, container):
+    def __init__(self, container, override_entrypoint=None):
         if container.sso_enabled:
             container._check_sso_token()
             auth_method = f"{container.TF_SSO_ENTRYPOINT} -- "
@@ -102,7 +102,8 @@ class AwsCredsEntryPoint(CustomEntryPoint):
         else:
             auth_method = ""
 
-        super(AwsCredsEntryPoint, self).__init__(container, entrypoint=auth_method)
+        new_entrypoint = f"{auth_method}{container.entrypoint if override_entrypoint is None else override_entrypoint}"
+        super(AwsCredsEntryPoint, self).__init__(container, entrypoint=new_entrypoint)
 
     def __exit__(self, *args, **kwargs):
         super(AwsCredsEntryPoint, self).__exit__(*args, **kwargs)
@@ -115,6 +116,9 @@ class AwsCredsEntryPoint(CustomEntryPoint):
                     "AWS_CONFIG_FILE": self.container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
                 }
             )
+        # now return file ownership on the aws credentials files
+        with CustomEntryPoint(self.container, ""):
+            self.container._exec(self.container.change_ownership_cmd(self.container.guest_aws_credentials_dir))
 
 
 class ExitError(Exit):

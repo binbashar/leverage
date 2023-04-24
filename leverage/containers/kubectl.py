@@ -1,5 +1,3 @@
-import os
-import pwd
 from pathlib import Path
 
 from click.exceptions import Exit
@@ -37,8 +35,8 @@ class KubeCtlContainer(TerraformContainer):
         )
 
     def start_shell(self):
-        with AwsCredsEntryPoint(self):
-            self._start("/bin/bash")
+        with AwsCredsEntryPoint(self, override_entrypoint=""):
+            self._start(self.SHELL)
 
     def configure(self):
         # make sure we are on the cluster layer
@@ -49,7 +47,7 @@ class KubeCtlContainer(TerraformContainer):
         with AwsCredsEntryPoint(self):
             add_eks_cluster_cmd = self._get_eks_kube_config()
         # and the command that will set the proper ownership on the config file (otherwise the owner will be "root")
-        change_owner_cmd = self._change_kube_file_owner_cmd()
+        change_owner_cmd = self.change_ownership_cmd(self.KUBECTL_CONFIG_FILE, recursive=False)
         full_cmd = chain_commands([add_eks_cluster_cmd, change_owner_cmd])
 
         logger.info("Configuring context...")
@@ -61,23 +59,13 @@ class KubeCtlContainer(TerraformContainer):
         logger.info("Done.")
 
     def _get_eks_kube_config(self) -> str:
-        exit_code, output = self._start_with_output(f"{self.TF_BINARY} output -no-color")
+        exit_code, output = self._start_with_output(f"{self.TF_BINARY} output -no-color")  # TODO: override on CM?
         if exit_code:
             logger.error(output)
             raise Exit(exit_code)
 
         aws_eks_cmd = next(op for op in output.split("\r\n") if op.startswith("aws eks update-kubeconfig"))
         return aws_eks_cmd + f" --region {self.region}"
-
-    def _get_user_group_id(self, user_id) -> int:
-        user = pwd.getpwuid(user_id)
-        return user.pw_gid
-
-    def _change_kube_file_owner_cmd(self) -> str:
-        user_id = os.getuid()
-        group_id = self._get_user_group_id(user_id)
-
-        return f"chown {user_id}:{group_id} {self.KUBECTL_CONFIG_FILE}"
 
     def check_for_layer_location(self):
         super(KubeCtlContainer, self).check_for_layer_location()

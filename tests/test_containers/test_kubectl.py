@@ -39,12 +39,6 @@ def test_get_eks_kube_config_tf_output_error(kubectl_container):
             kubectl_container._get_eks_kube_config()
 
 
-@patch("os.getuid", Mock(return_value=1234))
-def test_change_kube_file_owner_cmd(kubectl_container):
-    with patch.object(kubectl_container, "_get_user_group_id", return_value=5678):
-        assert kubectl_container._change_kube_file_owner_cmd() == "chown 1234:5678 /root/.kube/config"
-
-
 def test_check_for_layer_location(kubectl_container, propagate_logs, caplog):
     """
     Test that if we are not on a cluster layer, we raise an error.
@@ -68,7 +62,7 @@ def test_start_shell(kubectl_container):
     It must have aws credentials and the .kube config folder sets properly.
     """
     kubectl_container.start_shell()
-    container_args = kubectl_container.client.api.create_container.call_args[1]
+    container_args = kubectl_container.client.api.create_container.call_args_list[0][1]
 
     # we want a shell, so -> /bin/bash with no entrypoint
     assert container_args["command"] == "/bin/bash"
@@ -87,7 +81,7 @@ def test_start_shell(kubectl_container):
 
 # don't rely on the OS user
 @patch("os.getuid", Mock(return_value=1234))
-@patch.object(KubeCtlContainer, "_get_user_group_id", Mock(return_value=5678))
+@patch.object(KubeCtlContainer, "get_current_user_group_id", Mock(return_value=5678))
 # nor the filesystem
 @patch.object(KubeCtlContainer, "check_for_layer_location", Mock())
 # nor terraform
@@ -113,7 +107,7 @@ def test_start_shell_mfa(kubectl_container):
     # otherwise the asserts around /.aws/ wouldn't be possible
     with patch("leverage._utils.AwsCredsEntryPoint.__exit__"):
         kubectl_container.start_shell()
-        container_args = kubectl_container.client.api.create_container.call_args[1]
+        container_args = kubectl_container.client.api.create_container.call_args_list[0][1]
 
     # we want a shell, so -> /bin/bash with no entrypoint
     assert container_args["command"] == "/bin/bash"
@@ -131,7 +125,7 @@ def test_start_shell_sso(kubectl_container):
     kubectl_container.enable_sso()
     kubectl_container._check_sso_token = Mock(return_value=True)
     kubectl_container.start_shell()
-    container_args = kubectl_container.client.api.create_container.call_args[1]
+    container_args = kubectl_container.client.api.create_container.call_args_list[0][1]
 
     # we want a shell, so -> /bin/bash with no entrypoint
     assert container_args["command"] == "/bin/bash"

@@ -1,5 +1,6 @@
 import json
 import os
+import pwd
 import re
 import webbrowser
 from pathlib import Path
@@ -12,10 +13,11 @@ import dockerpty
 from docker import DockerClient
 from docker.errors import APIError, NotFound
 from docker.types import Mount
+from typing import Tuple
 
 from leverage import __toolbox_version__
 from leverage import logger
-from leverage._utils import CustomEntryPoint, ExitError, ContainerSession
+from leverage._utils import AwsCredsEntryPoint, CustomEntryPoint, ExitError, ContainerSession
 from leverage.logger import console, raw_logger
 from leverage.logger import get_script_log_level
 from leverage.path import get_root_path
@@ -73,6 +75,8 @@ class LeverageContainer:
     COMMON_TFVARS = "common.tfvars"
     ACCOUNT_TFVARS = "account.tfvars"
     BACKEND_TFVARS = "backend.tfvars"
+
+    SHELL = "/bin/bash"
 
     def __init__(self, client):
         """Project related paths are determined and stored. Project configuration is loaded.
@@ -281,11 +285,11 @@ class LeverageContainer:
             self.client.api.stop(container)
             self.client.api.remove_container(container)
 
-    def _start(self, command="/bin/sh", *args):
+    def _start(self, command: str, *args):
         """Create an interactive container, and run command with the given arguments.
 
         Args:
-            command (str, optional): Command to run. Defaults to "/bin/sh".
+            command: Command to run.
 
         Returns:
             int: Execution exit code.
@@ -298,7 +302,7 @@ class LeverageContainer:
 
         return self._run(container, run_func)
 
-    def _start_with_output(self, command="/bin/bash", *args):
+    def _start_with_output(self, command, *args):
         """
         Same than _start but also returns the outputs (by dumping the logs) of the container.
         """
@@ -312,25 +316,15 @@ class LeverageContainer:
 
         return self._run(container, run_func)
 
-    def start(self, command="/bin/sh", *arguments):
+    def start(self, command: str, *arguments) -> int:
         """Run command with the given arguments in an interactive container.
-
-        Args:
-            command (str, optional): Command. Defaults to "/bin/sh".
-
-        Returns:
-            int: Execution exit code.
+        Returns execution exit code.
         """
         return self._start(command, *arguments)
 
-    def _exec(self, command="", *args):
+    def _exec(self, command: str, *args) -> Tuple[int, str]:
         """Create a non interactive container and execute command with the given arguments.
-
-        Args:
-            command (str, optional): Command. Defaults to "".
-
-        Returns:
-            int, str: Execution exit code and output.
+        Returns execution exit code and output.
         """
         container = self._create_container(False, command, *args)
 
@@ -342,14 +336,9 @@ class LeverageContainer:
 
         return self._run(container, run_func)
 
-    def exec(self, command="", *arguments):
+    def exec(self, command: str, *arguments) -> Tuple[int, str]:
         """Execute command with the given arguments in a container.
-
-        Args:
-            command (str, optional): Command. Defaults to "".
-
-        Returns:
-            int, str: Execution exit code and output/
+        Returns execution exit code and output.
         """
         return self._exec(command, *arguments)
 
@@ -378,6 +367,18 @@ class LeverageContainer:
             return "layers-group"
         else:
             return "not a project"
+
+    @staticmethod
+    def get_current_user_group_id(user_id) -> int:
+        user = pwd.getpwuid(user_id)
+        return user.pw_gid
+
+    def change_ownership_cmd(self, path: Path, recursive=True) -> str:
+        recursive = "-R " if recursive else ""
+        user_id = os.getuid()
+        group_id = self.get_current_user_group_id(user_id)
+
+        return f"chown {user_id}:{group_id} {recursive}{path}"
 
 
 class AWSCLIContainer(LeverageContainer):
@@ -419,6 +420,7 @@ class AWSCLIContainer(LeverageContainer):
         args = [] if not profile else ["--profile", profile]
         return self._start(command, *args)
 
+    # FIXME: we have a context manager for this now, remove this method later!
     def system_start(self, command):
         """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
         self.entrypoint = ""
@@ -430,6 +432,7 @@ class AWSCLIContainer(LeverageContainer):
         args = [] if not profile else ["--profile", profile]
         return self._exec(command, *args)
 
+    # FIXME: we have a context manager for this now, remove this method later!
     def system_exec(self, command):
         """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
         self.entrypoint = ""
@@ -526,20 +529,24 @@ class TerraformContainer(LeverageContainer):
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
         ]
         # if you have set the tf plugin cache locally
-        if tf_cache_dir := os.getenv("TF_PLUGIN_CACHE_DIR"):
+        if self.tf_cache_dir:
             # then mount it too into the container
-            self.environment["TF_PLUGIN_CACHE_DIR"] = tf_cache_dir
+            self.environment["TF_PLUGIN_CACHE_DIR"] = self.tf_cache_dir
             # given that terraform use symlinks to point from the .terraform folder into the plugin folder
             # we need to use the same directory inside the container
             # otherwise symlinks will be broken once outside the container
             # which will break terraform usage outside Leverage
-            self.mounts.append(Mount(source=tf_cache_dir, target=tf_cache_dir, type="bind"))
+            self.mounts.append(Mount(source=self.tf_cache_dir, target=self.tf_cache_dir, type="bind"))
         if SSH_AUTH_SOCK is not None:
             self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
 
         self._backend_key = None
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
+
+    @property
+    def tf_cache_dir(self):
+        return os.getenv("TF_PLUGIN_CACHE_DIR")
 
     def _guest_config_file(self, file):
         """Map config file in host to location in guest.
@@ -627,28 +634,6 @@ class TerraformContainer(LeverageContainer):
 
         self.entrypoint = entrypoint
 
-    def _prepare_container(self):
-        """Adjust entrypoint and environment variables for when SSO or MFA are used.
-        Note that SSO takes precedence over MFA when both are active."""
-        if self.sso_enabled:
-            self._check_sso_token()
-
-            self.entrypoint = f"{self.TF_SSO_ENTRYPOINT} -- {self.entrypoint}"
-
-        elif self.mfa_enabled:
-            self.entrypoint = f"{self.TF_MFA_ENTRYPOINT} -- {self.entrypoint}"
-
-            self.environment.update(
-                {
-                    "AWS_SHARED_CREDENTIALS_FILE": self.environment.get("AWS_SHARED_CREDENTIALS_FILE").replace(
-                        "tmp", ".aws"
-                    ),
-                    "AWS_CONFIG_FILE": self.environment.get("AWS_CONFIG_FILE").replace("tmp", ".aws"),
-                }
-            )
-
-        logger.debug(f"[bold cyan]Running with entrypoint:[/bold cyan] {self.entrypoint}")
-
     def check_for_layer_location(self):
         """Make sure the command is being ran at layer level. If not, bail."""
         if self.cwd in (self.common_config_dir, self.account_config_dir):
@@ -667,9 +652,8 @@ class TerraformContainer(LeverageContainer):
             raise Exit(1)
 
     def start(self, command, *arguments):
-        self._prepare_container()
-
-        return self._start(command, *arguments)
+        with AwsCredsEntryPoint(self, self.entrypoint):
+            return self._start(command, *arguments)
 
     def start_in_layer(self, command, *arguments):
         """Run a command that can only be performed in layer level."""
@@ -678,10 +662,10 @@ class TerraformContainer(LeverageContainer):
         return self.start(command, *arguments)
 
     def exec(self, command, *arguments):
-        self._prepare_container()
+        with AwsCredsEntryPoint(self):
+            return self._exec(command, *arguments)
 
-        return self._exec(command, *arguments)
-
+    # FIXME: we have a context manager for this now, remove this method later!
     def system_exec(self, command):
         """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
         original_entrypoint = self.entrypoint
@@ -696,9 +680,8 @@ class TerraformContainer(LeverageContainer):
         if self.mfa_enabled or self.sso_enabled:
             self.check_for_layer_location()
 
-        self.entrypoint = ""
-        self._prepare_container()
-        self._start()
+        with AwsCredsEntryPoint(self, override_entrypoint=""):
+            self._start(self.SHELL)
 
     def set_backend_key(self, skip_validation=False):
         # Scenarios:
@@ -770,9 +753,8 @@ class TFautomvContainer(TerraformContainer):
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
     def start(self, *arguments):
-        self._prepare_container()
-
-        return self._start("", *arguments)
+        with AwsCredsEntryPoint(self):
+            return self._start("", *arguments)
 
     def start_in_layer(self, *arguments):
         """Run a command that can only be performed in layer level."""
@@ -781,6 +763,5 @@ class TFautomvContainer(TerraformContainer):
         return self.start(*arguments)
 
     def exec(self, command, *arguments):
-        self._prepare_container()
-
-        return self._exec(command, *arguments)
+        with AwsCredsEntryPoint(self):
+            return self._exec(command, *arguments)

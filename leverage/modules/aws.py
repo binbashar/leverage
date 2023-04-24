@@ -1,5 +1,3 @@
-import webbrowser
-
 import click
 from click.exceptions import Exit
 
