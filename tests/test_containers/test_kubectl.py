@@ -79,14 +79,11 @@ def test_start_shell(kubectl_container):
     assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/root/tmp/test")
 
 
-# don't rely on the OS user
-@patch("os.getuid", Mock(return_value=1234))
-@patch.object(KubeCtlContainer, "get_current_user_group_id", Mock(return_value=5678))
-# nor the filesystem
+# don't rely on the filesystem
 @patch.object(KubeCtlContainer, "check_for_layer_location", Mock())
 # nor terraform
 @patch.object(KubeCtlContainer, "_get_eks_kube_config", Mock(return_value=AWS_EKS_UPDATE_KUBECONFIG))
-def test_configure(kubectl_container):
+def test_configure(kubectl_container, fake_os_user):
     with patch.object(kubectl_container, "_start", return_value=0) as mock_start:
         kubectl_container.configure()
 
