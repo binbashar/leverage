@@ -1,4 +1,4 @@
-name: Build Package and Push
+name: Release | PyPi Build Package and Push
 
 on:
   release:
