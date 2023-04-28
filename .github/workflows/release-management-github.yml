@@ -1,4 +1,4 @@
-name: Release | Github Release
+name: Release | Github Release Drafter
 
 on:
   push:
