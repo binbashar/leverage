@@ -7,7 +7,6 @@ from click.exceptions import Exit
 from leverage import logger
 from leverage._internals import pass_state
 from leverage._internals import pass_container
-from leverage._utils import chain_commands, CustomEntryPoint
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
 

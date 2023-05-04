@@ -18,8 +18,17 @@ def test_get_current_user_group_id(mocked_get_pw, leverage_container):
 
 
 def test_change_ownership_cmd(leverage_container, fake_os_user):
-    assert leverage_container.change_ownership_cmd("/tmp/") == "chown 1234:5678 -R /tmp/"
+    assert leverage_container.change_ownership_cmd("/tmp/", recursive=True) == "chown 1234:5678 -R /tmp/"
 
 
 def test_change_ownership_non_recursive_cmd(leverage_container, fake_os_user):
     assert leverage_container.change_ownership_cmd("/tmp/file.txt", recursive=False) == "chown 1234:5678 /tmp/file.txt"
+
+
+def test_change_file_ownership(leverage_container, fake_os_user):
+    leverage_container.change_file_ownership("/tmp/file.txt", recursive=False)
+    container_args = leverage_container.client.api.create_container.call_args_list[0][1]
+
+    assert container_args["command"] == "chown 1234:5678 /tmp/file.txt"
+    # we use chown directly so no entrypoint must be set
+    assert container_args["entrypoint"] == ""
