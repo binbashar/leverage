@@ -111,3 +111,4 @@ To run all tests, run `make tests`. Alternatively `make test-unit` or `make test
 
 ## License
 Leverage CLI is licensed under [MIT license](http://opensource.org/licenses/MIT)[BinBash Inc](https://github.com/binbashar)
+
