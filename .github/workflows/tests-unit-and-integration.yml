@@ -89,6 +89,7 @@ jobs:
           sed 's/<user.name>/bbuser/' -i project.yaml
           printf "[INFO] Creating Project"
           systemctl status docker
+          echo $SSH_AUTH_SOCK
           leverage project create
           systemctl status docker
           printf "[INFO] Checking Project"

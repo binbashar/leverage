@@ -503,7 +503,7 @@ class TerraformContainer(LeverageContainer):
         )  # TODO: Convert values to bool upon loading
 
         # SSH AGENT
-        SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
+        SSH_AUTH_SOCK = None  # os.getenv("SSH_AUTH_SOCK")
 
         self.environment = {
             "COMMON_CONFIG_FILE": self.common_tfvars,
