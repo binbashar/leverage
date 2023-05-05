@@ -19,8 +19,8 @@ teardown(){
 
     # Create required build.env in root directory and go there
     cd "$ROOT_DIR"
-
-    run leverage terraform version
+    run systemctl status docker
+    run leverage --verbose terraform version
 
     assert_output --regexp "[\S\s]*Terraform v[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}[\s\S]*"
 }
