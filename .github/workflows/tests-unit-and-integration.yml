@@ -69,7 +69,7 @@ jobs:
       - name: Project Init
         run: |
           printf "[INFO] Project Init\n"
-          leverage project init
+          leverage -v project init
           if [[ -f project.yaml ]];
           then
               printf "[INFO]    OK \n"
@@ -89,7 +89,7 @@ jobs:
           sed 's/<shared email address>/bb@domainshared/' -i project.yaml
           sed 's/<user.name>/bbuser/' -i project.yaml
           printf "[INFO] Creating Project"
-          leverage project create
+          leverage -v project create
           printf "[INFO] Checking Project"
           for i in config management security shared; do if [[ ! -d $i ]]; then echo '[ERROR] Fail' && exit 1; fi ;done
 
