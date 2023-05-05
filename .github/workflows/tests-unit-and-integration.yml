@@ -79,14 +79,9 @@ jobs:
           fi
         working-directory: ../theadamproject
 
-      - name: Check docker
-        run: |
-          docker --version
-          ls /var/run/docker.sock
-          ls /var/run/docker/docker.sock
-
       - name: Set project file and create
         run: |
+          export DOCKER_HOST="/var/run/docker.sock"
           printf "[INFO] Setting Project file\n"
           sed 's/<project name>/The Adam Project/' -i project.yaml
           sed 's/<short project name>/bb/' -i project.yaml
