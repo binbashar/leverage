@@ -85,8 +85,13 @@ jobs:
           ls -l /var/run/docker.sock
           ls /var/run -l
           cat /lib/systemd/system/docker.socket
+          echo " "
+          echo "USER "
           whoami
           groups
+          echo "DOCKER "
+          docker pull binbash/leverage-toolbox:1.2.7-0.1.9
+          docker image ls | grep toolbox
 
       - name: Set project file and create
         run: |
