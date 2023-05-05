@@ -85,6 +85,8 @@ jobs:
           ls -l /var/run/docker.sock
           ls /var/run -l
           cat /lib/systemd/system/docker.socket
+          whoami
+          groups
 
       - name: Set project file and create
         run: |
