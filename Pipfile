@@ -15,7 +15,6 @@ wheel = "==0.36.2"
 twine = "==3.4.1"
 leverage = {editable = true, path = "."}
 black = "==23.3.0"
-urllib3=="1.26.15"
 
 [packages]
 yaenv = "==1.4.1"
