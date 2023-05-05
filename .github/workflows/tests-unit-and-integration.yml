@@ -89,8 +89,8 @@ jobs:
           sed 's/<user.name>/bbuser/' -i project.yaml
           printf "[INFO] Creating Project"
           systemctl status docker
-          docker ps
           leverage project create
+          systemctl status docker
           printf "[INFO] Checking Project"
           for i in config management security shared; do if [[ ! -d $i ]]; then echo '[ERROR] Fail' && exit 1; fi ;done
 
