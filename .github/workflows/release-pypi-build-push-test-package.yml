@@ -1,4 +1,4 @@
-name: Test Build Package and Push
+name: Release | PyPi Build Test Package and Push
 
 on:
   workflow_dispatch:
