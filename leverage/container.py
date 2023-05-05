@@ -48,7 +48,8 @@ def get_docker_client():
     """
     try:
         docker_client = DockerClient.from_env()
-        docker_client.ping()
+        value = docker_client.ping()
+        logger.info(f"Pong: {value}")
 
     except:
         logger.error(
@@ -503,7 +504,7 @@ class TerraformContainer(LeverageContainer):
         )  # TODO: Convert values to bool upon loading
 
         # SSH AGENT
-        SSH_AUTH_SOCK = None  # os.getenv("SSH_AUTH_SOCK")
+        SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
 
         self.environment = {
             "COMMON_CONFIG_FILE": self.common_tfvars,
