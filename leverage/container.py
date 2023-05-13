@@ -394,6 +394,7 @@ class AWSCLIContainer(LeverageContainer):
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
     AWS_SSO_CODE_WAIT_SECONDS = 2
     AWS_SSO_CODE_ATTEMPTS = 10
+    FALLBACK_LINK_MSG = "Opening the browser... if it fails, click on this link instead:\n{link}"
 
     def __init__(self, client):
         super().__init__(client)
@@ -443,9 +444,9 @@ class AWSCLIContainer(LeverageContainer):
         Find and return the SSO user code by periodically checking the logs.
         Up until N attempts.
         """
+        logger.info("Fetching SSO code...")
         for _ in range(self.AWS_SSO_CODE_ATTEMPTS):
             # pull logs periodically until we find our SSO code
-            logger.info("Fetching SSO code...")
             logs = self.docker_logs(container)
             if "Then enter the code:" in logs:
                 return logs.split("Then enter the code:")[1].split("\n")[2]
@@ -470,7 +471,10 @@ class AWSCLIContainer(LeverageContainer):
             # now let's grab the user code from the logs
             user_code = self.get_sso_code(container)
             # with the user code, we can now autocomplete the url
-            webbrowser.open_new_tab(self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code))
+            link = self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code)
+            webbrowser.open_new_tab(link)
+            # The SSO code is only valid once: if the browser was able to open it, the fallback link will be invalid
+            logger.info(self.FALLBACK_LINK_MSG.format(link=link))
             # now let's wait until the command locking the container resolve itself:
             # aws sso login will wait for the user code
             # once submitted to the browser, the authentication finish and the lock is released

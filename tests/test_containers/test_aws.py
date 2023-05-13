@@ -46,14 +46,17 @@ def test_get_sso_code_exit_error(aws_container, propagate_logs, caplog):
 @patch.object(AWSCLIContainer, "get_sso_code", Mock(return_value="TEST-CODE"))
 @patch.object(AWSCLIContainer, "docker_logs", Mock(side_effect=(SSO_CODE_MSG, "Logged in successfully!")))
 @patch("webbrowser.open_new_tab")
-def test_sso_login(mocked_new_tab, aws_container):
+def test_sso_login(mocked_new_tab, aws_container, propagate_logs, caplog):
     """
     Test that we call the correct script and open the correct url.
     """
+    test_link = "https://device.sso.us-east-1.amazonaws.com/?user_code=TEST-CODE"
     aws_container.sso_login()
 
     container_args = aws_container.client.api.create_container.call_args[1]
     # make sure we point to the correct script
     assert container_args["command"] == "/root/scripts/aws-sso/aws-sso-login.sh"
     # and the browser tab points to the correct code and the correct region
-    assert mocked_new_tab.call_args[0][0] == "https://device.sso.us-east-1.amazonaws.com/?user_code=TEST-CODE"
+    assert mocked_new_tab.call_args[0][0] == test_link
+    # and the fallback method is printed
+    assert caplog.messages[0] == aws_container.FALLBACK_LINK_MSG.format(link=test_link)
