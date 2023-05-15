@@ -394,7 +394,7 @@ class AWSCLIContainer(LeverageContainer):
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
     AWS_SSO_CODE_WAIT_SECONDS = 2
     AWS_SSO_CODE_ATTEMPTS = 10
-    FALLBACK_LINK_MSG = "Opening the browser... if it fails, click on this link instead:\n{link}"
+    FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
 
     def __init__(self, client):
         super().__init__(client)
