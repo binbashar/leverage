@@ -368,11 +368,6 @@ class LeverageContainer:
         else:
             return "not a project"
 
-    @staticmethod
-    def get_current_user_group_id(user_id) -> int:
-        user = pwd.getpwuid(user_id)
-        return user.pw_gid
-
     def change_ownership_cmd(self, path: Union[Path, str], recursive=True) -> str:
         recursive = "-R " if recursive else ""
         user_id = os.getuid()
