@@ -1,6 +1,4 @@
 import re
-import os
-from pathlib import Path
 
 import hcl2
 import click
@@ -45,13 +43,13 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 # e.g. if CLI is called from /home/user/project/management and this is the tree:
 # home
 # ├── user
-# │   └── project
-# │       └── management
-# │           ├── global
-# │           |   └── security-base
-# │           |   └── sso
-# │           └── us-east-1
-# │               └── terraform-backend
+# │   └── project
+# │       └── management
+# │           ├── global
+# │           |   └── security-base
+# │           |   └── sso
+# │           └── us-east-1
+# │               └── terraform-backend
 #
 # Then all three layers can be initialized as follows:
 # leverage tf init --layers us-east-1/terraform-backend,global/security-base,global/sso
@@ -73,11 +71,18 @@ layers_option = click.option(
 @click.argument("args", nargs=-1)
 @pass_container
 @click.pass_context
-def init(context, tf, skip_validation, layers, args):
+def init(context, tf: TerraformContainer, skip_validation, layers, args):
     """
     Initialize this layer.
     """
-    invoke_for_all_commands(layers, _init, args, skip_validation)
+    layers = invoke_for_all_commands(layers, _init, args, skip_validation)
+
+    # now change ownership on all the downloaded modules and providers
+    for layer in layers:
+        tf.change_file_ownership(tf.guest_base_path / layer.relative_to(tf.root_dir) / ".terraform")
+    # and then providers in the cache folder
+    if tf.tf_cache_dir:
+        tf.change_file_ownership(tf.tf_cache_dir)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -263,10 +268,12 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         # change to original workgindir
         tf.container_config["working_dir"] = original_working_dir
 
+    return layers
+
 
 def validate_for_all_commands(layer, skip_validation=False):
     """
-    Validate existense of layer and, if set, all the Leverage related stuff
+    Validate existence of layer and, if set, all the Leverage related stuff
     of each of them
 
     Args:
