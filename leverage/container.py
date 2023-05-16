@@ -376,7 +376,7 @@ class LeverageContainer:
     def change_ownership_cmd(self, path: Union[Path, str], recursive=True) -> str:
         recursive = "-R " if recursive else ""
         user_id = os.getuid()
-        group_id = self.get_current_user_group_id(user_id)
+        group_id = os.getgid()
 
         return f"chown {user_id}:{group_id} {recursive}{path}"
 
