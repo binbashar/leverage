@@ -53,11 +53,11 @@ For the second item you can check the version [here](https://hub.docker.com/r/bi
 
 First, you should create a virtual environment and install all the required dependencies by running: `pipenv install --dev`.
 
-If you don't have `pipenv` in your system, you can check the following documentation: https://pipenv.pypa.io/en/latest/#install-pipenv-today
+NOTE: If you don't have `pipenv` in your system, you can check the following documentation: https://pipenv.pypa.io/en/latest/#install-pipenv-today
 
-Once you have everything in place, install the CLI as an editable package inside the virtual environment: `pipenv install -e .` 
+Now, go to the directory that you will be using for running the local version of the CLI (it needs to be directory outside the CLI's source code) and install the CLI as an editable package inside this new virtual environment: `pipenv install -e /path/to/cli-source-code`.
 
-This way, the `leverage` command on your venv will be executed from the project folder, using it as the source.
+After that shell into the virtual environment via `pipenv shell` to start using the CLI in dev mode. This way, the `leverage` command on your virtual environment will be executed from the project folder, using it as the source.
 
 Now all the changes to the project will be immediately reflected on the command.
 
