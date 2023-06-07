@@ -44,7 +44,6 @@ CONFIG_DIRECTORY = "config"
 PROJECT_STRUCTURE = {
     "management": {
         "global": [
-            "base-identities",
             "organizations",
             "sso",
         ],
@@ -55,7 +54,6 @@ PROJECT_STRUCTURE = {
     },
     "security": {
         "global": [
-            "base-identities",
         ],
         "primary_region": [
             "base-tf-backend",
@@ -64,7 +62,6 @@ PROJECT_STRUCTURE = {
     },
     "shared": {
         "global": [
-            "base-identities",
         ],
         "primary_region": [
             "base-network",
