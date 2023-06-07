@@ -53,16 +53,14 @@ PROJECT_STRUCTURE = {
         ],
     },
     "security": {
-        "global": [
-        ],
+        "global": [],
         "primary_region": [
             "base-tf-backend",
             "security-base",
         ],
     },
     "shared": {
-        "global": [
-        ],
+        "global": [],
         "primary_region": [
             "base-network",
             "base-tf-backend",
