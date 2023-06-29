@@ -26,7 +26,7 @@ def dir_structure(monkeypatch, tmp_path):
 
 @pytest.fixture
 def click_context():
-    def context(verbose=True, build_script_name="build.py"):
+    def context(verbose=2, build_script_name="build.py"):
         state = State()
         state.verbosity = verbose
         state.module = Module(name=build_script_name)
@@ -46,7 +46,7 @@ def with_click_context(click_context):
 
 @pytest.fixture
 def muted_click_context(click_context):
-    with click_context(verbose=False):
+    with click_context(verbose=0):
         yield
 
 

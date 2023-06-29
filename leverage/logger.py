@@ -20,7 +20,7 @@ _leverage_logger = logging.getLogger("leverage")
 
 
 LOGGING_LEVELS = {
-    0: logging.ERROR,
+    0: logging.WARNING,
     1: logging.INFO,
     2: logging.DEBUG,
 }
@@ -42,7 +42,7 @@ def get_script_log_level():
         int: Logging level as defined in the Leverage scripts.
     """
     log_level = {
-        logging.ERROR: 1,
+        logging.WARNING: 1,
         logging.INFO: 2,
         logging.DEBUG: 3,
     }

@@ -18,7 +18,14 @@ INFO = logging.getLevelName("INFO")
 WARNING = logging.getLevelName("WARNING")
 
 
-@pytest.mark.parametrize("verbose, expected_value", [(True, 3), (False, 2)])
+@pytest.mark.parametrize(
+    "verbose, expected_value",
+    [
+        (2, 3),  # debug
+        (1, 2),  # info
+        (0, 1),  # warning
+    ],
+)
 def test_get_script_log_level(click_context, verbose, expected_value):
     with click_context(verbose=verbose):
         log_level = get_script_log_level()
@@ -27,22 +34,23 @@ def test_get_script_log_level(click_context, verbose, expected_value):
 
 
 def test_get_verbosity():
-    assert get_verbosity(verbose=True) == DEBUG
-    assert get_verbosity(verbose=False) == INFO
+    assert get_verbosity(verbose=2) == DEBUG
+    assert get_verbosity(verbose=1) == INFO
+    assert get_verbosity(verbose=0) == WARNING
 
 
 def test__configure_logger(click_context):
-    with click_context(verbose=False):
+    with click_context(verbose=0):
         logger = logging.getLogger("build")
 
         _configure_logger(logger)
 
-        assert logger.level == INFO
+        assert logger.level == WARNING
         assert len(logger.handlers) == 1
 
         handler = logger.handlers[0]
         assert isinstance(handler, RichHandler)
-        assert handler.level == INFO
+        assert handler.level == WARNING
 
 
 def test_initialize_logger(with_click_context):

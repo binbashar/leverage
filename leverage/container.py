@@ -481,7 +481,7 @@ class AWSCLIContainer(LeverageContainer):
             link = self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code)
             webbrowser.open_new_tab(link)
             # The SSO code is only valid once: if the browser was able to open it, the fallback link will be invalid
-            logger.info(self.FALLBACK_LINK_MSG.format(link=link))
+            logger.warning(self.FALLBACK_LINK_MSG.format(link=link))
             # now let's wait until the command locking the container resolve itself:
             # aws sso login will wait for the user code
             # once submitted to the browser, the authentication finish and the lock is released
