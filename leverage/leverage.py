@@ -26,7 +26,7 @@ from leverage.modules import kubectl
     help="Name of the build file containing the tasks definitions.",
 )
 @click.option("--list-tasks", "-l", is_flag=True, help="List available tasks to run.")
-@click.option("-v", "--verbose", is_flag=True, help="Increase output verbosity.")
+@click.option("-v", "--verbose", count=True, help="Select output verbosity.")
 @click.version_option(version=__version__)
 @pass_state
 @click.pass_context

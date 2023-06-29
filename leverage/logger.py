@@ -19,6 +19,12 @@ _TIME_FORMAT = lambda time: f"[{time:%H:%M:%S}.{time.microsecond//1000:03}]"
 _leverage_logger = logging.getLogger("leverage")
 
 
+LOGGING_LEVELS = {
+    0: logging.ERROR,
+    1: logging.INFO,
+    2: logging.DEBUG,
+}
+
 # Use the same console for the logging handler and any other special cases like
 # spinners, tables or progress bars.
 # TODO: Deprecate in favor of using rich's global console.
@@ -45,16 +51,14 @@ def get_script_log_level():
     return log_level[verbosity]
 
 
-def get_verbosity(verbose):
+def get_verbosity(verbose: int):
     """Transform the given verbosity level into the corresponding logging level.
-
-    Args:
-        verbose (bool): Whether the logging should be verbose or not
 
     Returns:
         int: Logging level
     """
-    return logging.DEBUG if verbose else logging.INFO
+    verbose = 2 if verbose > 2 else verbose
+    return LOGGING_LEVELS[verbose]
 
 
 def _configure_logger(logger, show_level=True):
