@@ -11,7 +11,7 @@ Provides the means to interact with your Leverage project and allows you to defi
 
 
 ## Documentation
-For installation instructions and all documentation regarding Leverage CLI, please refer to [this page](https://leverage.binbash.com.ar/how-it-works/leverage-cli/).
+For installation instructions and all documentation regarding Leverage CLI, please refer to [this page](https://leverage.binbash.co/user-guide/leverage-cli/installation/).
 
 ### Note for migration from previous versions
 
