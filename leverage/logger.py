@@ -165,7 +165,7 @@ def get_tasks_logger():
     return logger
 
 
-def raw_logger():
+def _raw_logger():
     """
     Provide a raw logger, in case we need to print stuff that already comes formatted (like some container logs).
     """
@@ -177,3 +177,6 @@ def raw_logger():
     logger.addHandler(handler)
 
     return logger
+
+
+raw_logger = _raw_logger()
