@@ -1,4 +1,4 @@
-FROM docker:dind
+FROM docker:24.0.5-dind-alpine3.18
 
 LABEL vendor="Binbash Leverage (leverage@binbash.com.ar)"
 
