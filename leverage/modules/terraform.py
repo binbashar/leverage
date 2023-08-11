@@ -8,7 +8,7 @@ from click.exceptions import Exit
 from leverage import logger
 from leverage._internals import pass_state
 from leverage._internals import pass_container
-from leverage._utils import ContainerSession, CustomEntryPoint, tar_directory, AwsCredsContainer, LiveContainer
+from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer, ExitError
 from leverage.container import get_docker_client, raw_logger
 from leverage.container import TerraformContainer
 
@@ -315,14 +315,21 @@ def _init(tf, args):
         tar_bytes = tar_directory(Path("/home/frivera/.ssh/"))
         # into /root/.ssh
         container.put_archive("/root/.ssh/", tar_bytes)
-        # correct the owner to match with the docker internal user
+        # correct the owner of the files to match with the docker internal user
         container.exec_run("chown root:root -R /root/.ssh/")
 
         with AwsCredsContainer(container, tf):
-            exit_code, outputs_ = container.exec_run(
+            exit_code, outputs = container.exec_run(
                 "terraform init " + " ".join(args), environment=tf.container_config["environment"]
             )
-            raw_logger.info(outputs_.decode("utf-8"))
+            outputs = outputs.decode("utf-8")
+            raw_logger.info(outputs)
+            if "Host key verification failed" in outputs:
+                raise ExitError(
+                    exit_code,
+                    "You should add the missing public keys of the corresponding repositories by running:\n"
+                    'e.g. "ssh-keyscan gitlab.com >> ~/.ssh/known_hosts" on your host machine.',
+                )
             if exit_code:
                 raise Exit(exit_code)
 
