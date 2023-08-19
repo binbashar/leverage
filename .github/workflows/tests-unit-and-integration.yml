@@ -142,7 +142,7 @@ jobs:
           printf "[INFO] Testing terraform\n"
 
           printf "[INFO]     Initializing layer\n"
-          leverage tf init --skip-validation
+          leverage --verbose tf init --skip-validation
 
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
