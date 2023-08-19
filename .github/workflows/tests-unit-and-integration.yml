@@ -139,6 +139,7 @@ jobs:
 
       - name: Test Terraform
         run: |
+          docker version
           printf "[INFO] Testing terraform\n"
 
           printf "[INFO]     Initializing layer\n"
