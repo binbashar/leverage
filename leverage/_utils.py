@@ -170,11 +170,9 @@ class LiveContainer(ContainerSession):
     A container that run a command that "do nothing". The idea is to keep the container alive.
     """
 
-    COMMAND = "tail -f /dev/null"
-
     def __init__(self, leverage_container):
-        with CustomEntryPoint(leverage_container, self.COMMAND):
-            container_data = leverage_container._create_container(False)
+        with CustomEntryPoint(leverage_container, "tail"):
+            container_data = leverage_container._create_container(False, "-f /dev/null")
         super().__init__(leverage_container.client, container_data)
 
 
