@@ -42,10 +42,7 @@ def test__prepare_tasks_to_run_checks_task_existence():
         ),
     ],
 )
-def test__prepare_tasks_to_run_handles_bad_arguments(input_task, message, caplog, with_click_context):
-    _configure_logger(logger=_leverage_logger)
-    _leverage_logger.propagate = True
-
+def test__prepare_tasks_to_run_handles_bad_arguments(input_task, message, muted_click_context, propagate_logs, caplog):
     with pytest.raises(Exit):
         _prepare_tasks_to_run(module=None, input_tasks=[input_task])
 
