@@ -312,7 +312,7 @@ def _init(tf, args):
         # create the .ssh directory
         container.exec_run("mkdir -p /root/.ssh")
         # copy the entire ~/.ssh/ folder
-        tar_bytes = tar_directory(Path("/home/frivera/.ssh/"))
+        tar_bytes = tar_directory(tf.home / ".ssh")
         # into /root/.ssh
         container.put_archive("/root/.ssh/", tar_bytes)
         # correct the owner of the files to match with the docker internal user
