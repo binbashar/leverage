@@ -38,7 +38,7 @@ jobs:
         shell: bash
 
   integration_tests_cli_refarch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       max-parallel: 1
       matrix:
