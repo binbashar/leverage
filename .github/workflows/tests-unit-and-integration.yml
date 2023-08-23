@@ -38,7 +38,7 @@ jobs:
         shell: bash
 
   integration_tests_cli_refarch:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       max-parallel: 1
       matrix:
@@ -139,11 +139,10 @@ jobs:
 
       - name: Test Terraform
         run: |
-          docker version
           printf "[INFO] Testing terraform\n"
 
           printf "[INFO]     Initializing layer\n"
-          leverage --verbose tf init --skip-validation
+          leverage tf init --skip-validation
 
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
 
