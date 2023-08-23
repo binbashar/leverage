@@ -170,7 +170,7 @@ class ContainerSession:
 
 class LiveContainer(ContainerSession):
     """
-    A container that run a command that "do nothing". The idea is to keep the container alive.
+    A container that run a command that "do nothing" indefinitely. The idea is to keep the container alive.
     """
 
     COMMAND = "tail -f /dev/null"
