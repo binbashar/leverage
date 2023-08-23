@@ -128,6 +128,9 @@ class AwsCredsContainer:
 
     def __enter__(self):
         auth_method = self.tf_container.auth_method()
+        if not auth_method:
+            return
+
         exit_code, output = self.container.exec_run(auth_method, environment=self.tf_container.environment)
         raw_logger.info(output.decode("utf-8"))
 
