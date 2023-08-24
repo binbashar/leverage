@@ -1,6 +1,7 @@
 """
     Module for managing Leverage projects.
 """
+import re
 from pathlib import Path
 from shutil import copy2
 from shutil import copytree
@@ -17,7 +18,7 @@ from leverage import logger
 from leverage.logger import console
 from leverage.path import get_root_path
 from leverage.path import NotARepositoryError
-from leverage._utils import git
+from leverage._utils import git, ExitError
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
 
@@ -279,6 +280,16 @@ def load_project_config():
         raise Exit(1)
 
 
+def validate_config(config: dict):
+    """
+    Run a battery of validations over the config file (project.yaml).
+    """
+    if not re.match(r"^\w+$", config["project_name"]):
+        raise ExitError(1, "Project name is not valid. Only alphanumerics characters are allowed.")
+
+    return True
+
+
 @project.command()
 def create():
     """Create the directory structure required by the project configuration and set up each account accordingly."""
@@ -294,6 +305,8 @@ def create():
     if (PROJECT_ROOT / "config").exists():
         logger.error("Project has already been created.")
         return
+
+    validate_config(config)
 
     # Make project structure
     _copy_project_template(config=config)
