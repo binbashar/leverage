@@ -319,9 +319,12 @@ def _init(tf, args):
         container.exec_run("chown root:root -R /root/.ssh/")
 
         with AwsCredsContainer(container, tf):
-            exit_code, outputs = container.exec_run(
-                "terraform init " + " ".join(args), environment=tf.container_config["environment"]
-            )
+            try:
+                exit_code, outputs = container.exec_run(
+                    "terraform init " + " ".join(args), environment=tf.container_config["environment"]
+                )
+            except TimeoutError as exc:
+                raise ExitError(1, str(exc))
             outputs = outputs.decode("utf-8")
             raw_logger.info(outputs)
             if "Host key verification failed" in outputs:

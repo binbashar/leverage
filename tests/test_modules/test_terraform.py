@@ -82,3 +82,20 @@ def test_failed(terraform_container, caplog):
             _init([])
 
     assert caplog.messages[0] == "Some random tf init failure"
+
+
+def test_timeout(terraform_container, caplog):
+    """
+    Test a timeout error from the tf init command.
+    """
+
+    def side_effect(arg1: str, *args, **kwargs):
+        if arg1.startswith("terraform init"):
+            # we only want to raise the error on the init call
+            raise TimeoutError("timed out")
+
+    live_container = Mock()
+    live_container.exec_run = Mock(side_effect=side_effect)
+    with patch("leverage._utils.LiveContainer.__enter__", return_value=live_container):
+        with pytest.raises(ExitError, match="timed out"):
+            _init([])
