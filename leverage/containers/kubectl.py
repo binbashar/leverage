@@ -40,7 +40,7 @@ class KubeCtlContainer(TerraformContainer):
 
     def configure(self):
         # make sure we are on the cluster layer
-        self.check_for_layer_location()
+        self.check_for_cluster_layer()
 
         logger.info("Retrieving k8s cluster information...")
         # generate the command that will configure the new cluster
@@ -67,8 +67,8 @@ class KubeCtlContainer(TerraformContainer):
         aws_eks_cmd = next(op for op in output.split("\r\n") if op.startswith("aws eks update-kubeconfig"))
         return aws_eks_cmd + f" --region {self.region}"
 
-    def check_for_layer_location(self):
-        super(KubeCtlContainer, self).check_for_layer_location()
+    def check_for_cluster_layer(self):
+        self.check_for_layer_location()
         # assuming the "cluster" layer will contain the expected EKS outputs
         if self.cwd.parts[-1] != "cluster":
             logger.error("This command can only run at the [bold]cluster layer[/bold].")

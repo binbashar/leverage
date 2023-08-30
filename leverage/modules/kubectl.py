@@ -18,6 +18,7 @@ def kubectl(context, state, args):
     """Run Kubectl commands in a custom containerized environment."""
     state.container = KubeCtlContainer(get_docker_client())
     state.container.ensure_image()
+    state.container.check_for_layer_location()
     _handle_subcommand(context=context, cli_container=state.container, args=args)
 
 

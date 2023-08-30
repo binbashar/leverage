@@ -39,14 +39,14 @@ def test_get_eks_kube_config_tf_output_error(kubectl_container):
             kubectl_container._get_eks_kube_config()
 
 
-def test_check_for_layer_location(kubectl_container, propagate_logs, caplog):
+def test_check_for_cluster_layer(kubectl_container, propagate_logs, caplog):
     """
     Test that if we are not on a cluster layer, we raise an error.
     """
     with patch.object(TerraformContainer, "check_for_layer_location"):  # assume parent method is already tested
         with pytest.raises(Exit):
             kubectl_container.cwd = Path("/random")
-            kubectl_container.check_for_layer_location()
+            kubectl_container.check_for_cluster_layer()
 
     assert caplog.messages[0] == "This command can only run at the [bold]cluster layer[/bold]."
 
@@ -80,7 +80,7 @@ def test_start_shell(kubectl_container):
 
 
 # don't rely on the filesystem
-@patch.object(KubeCtlContainer, "check_for_layer_location", Mock())
+@patch.object(KubeCtlContainer, "check_for_cluster_layer", Mock())
 # nor terraform
 @patch.object(KubeCtlContainer, "_get_eks_kube_config", Mock(return_value=AWS_EKS_UPDATE_KUBECONFIG))
 def test_configure(kubectl_container, fake_os_user):
