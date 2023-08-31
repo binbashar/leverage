@@ -285,7 +285,7 @@ def validate_config(config: dict):
     Run a battery of validations over the config file (project.yaml).
     """
     if not re.match(r"^[a-z0-9]([a-z0-9]|-){1,23}[a-z0-9]$", config["project_name"]):
-        raise ExitError(1, "Project name is not valid. Only lower case alphanumeric characters are allowed.")
+        raise ExitError(1, "Project name is not valid. Only lowercase alphanumeric characters are allowed.")
 
     return True
 
