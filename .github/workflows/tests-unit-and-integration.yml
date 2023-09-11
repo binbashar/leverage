@@ -82,7 +82,7 @@ jobs:
       - name: Set project file and create
         run: |
           printf "[INFO] Setting Project file\n"
-          sed 's/<project name>/The Adam Project/' -i project.yaml
+          sed 's/<project name>/the-adam-project/' -i project.yaml
           sed 's/<short project name>/bb/' -i project.yaml
           sed 's/<management email address>/bb@domainmgmt/' -i project.yaml
           sed 's/<security email address>/bb@domainsec/' -i project.yaml
