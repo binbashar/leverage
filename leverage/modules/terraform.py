@@ -1,6 +1,6 @@
 import re
-from pathlib import Path
 
+import dockerpty
 import hcl2
 import click
 from click.exceptions import Exit
@@ -8,8 +8,8 @@ from click.exceptions import Exit
 from leverage import logger
 from leverage._internals import pass_state
 from leverage._internals import pass_container
-from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer, ExitError
-from leverage.container import get_docker_client, raw_logger
+from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer
+from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
 
 REGION = (
@@ -319,22 +319,11 @@ def _init(tf, args):
         container.exec_run("chown root:root -R /root/.ssh/")
 
         with AwsCredsContainer(container, tf):
-            try:
-                exit_code, outputs = container.exec_run(
-                    "terraform init " + " ".join(args), environment=tf.container_config["environment"]
-                )
-            except TimeoutError as exc:
-                raise ExitError(1, str(exc))
-            outputs = outputs.decode("utf-8")
-            raw_logger.info(outputs)
-            if "Host key verification failed" in outputs:
-                raise ExitError(
-                    exit_code,
-                    "You should add the missing public keys of the corresponding repositories by running:\n"
-                    'e.g. "ssh-keyscan gitlab.com >> ~/.ssh/known_hosts" on your host machine.',
-                )
-            if exit_code:
-                raise Exit(exit_code)
+            dockerpty.exec_command(
+                client=tf.client.api,
+                container=container.id,
+                command="terraform init " + " ".join(args),
+            )
 
 
 @pass_container
