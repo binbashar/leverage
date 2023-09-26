@@ -138,6 +138,8 @@ jobs:
         working-directory: ../theadamproject
 
       - name: Test Terraform
+        env:
+          LEVERAGE_INTERACTIVE: 0
         run: |
           printf "[INFO] Testing terraform\n"
 
@@ -194,6 +196,8 @@ jobs:
         working-directory: ../theblairwitchproject
 
       - name: Test Testing Reference Architecture
+        env:
+          LEVERAGE_INTERACTIVE: 0
         run: |
 
           printf "[INFO] Initializing layer\n"

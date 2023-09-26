@@ -1,3 +1,4 @@
+import os
 import re
 
 import dockerpty
@@ -323,7 +324,7 @@ def _init(tf, args):
                 client=tf.client.api,
                 container=container.id,
                 command="terraform init " + " ".join(args),
-                interactive=False,
+                interactive=bool(int(os.environ.get("LEVERAGE_INTERACTIVE", 1))),
             )
 
 
