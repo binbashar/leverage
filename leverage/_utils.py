@@ -175,9 +175,9 @@ class LiveContainer(ContainerSession):
 
     COMMAND = "tail -f /dev/null"
 
-    def __init__(self, leverage_container):
+    def __init__(self, leverage_container, tty=True):
         with CustomEntryPoint(leverage_container, self.COMMAND):
-            container_data = leverage_container._create_container(False)
+            container_data = leverage_container._create_container(tty)
         super().__init__(leverage_container.client, container_data)
 
 
