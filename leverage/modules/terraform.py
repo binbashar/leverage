@@ -323,6 +323,7 @@ def _init(tf, args):
                 client=tf.client.api,
                 container=container.id,
                 command="terraform init " + " ".join(args),
+                interactive=False,
             )
 
 
