@@ -4,7 +4,7 @@
 # pylint: disable=wrong-import-position
 
 __version__ = "0.0.0"
-__toolbox_version__ = "1.2.7-0.1.10"
+__toolbox_version__ = "1.2.7-0.1.12"
 
 import sys
 from shutil import which
