@@ -24,3 +24,14 @@ def test_tf_plugin_cache_dir(terraform_container):
 
     # and the cache folder mounted
     assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/home/testing/.terraform/cache")
+
+
+def test_refresh_credentials(terraform_container):
+    terraform_container.enable_sso()
+    terraform_container.refresh_credentials()
+    container_args = terraform_container.client.api.create_container.call_args_list[0][1]
+
+    # we want a shell, so -> /bin/bash with no entrypoint
+    assert container_args["command"] == 'echo "Done."'
+    # import ipdb; ipdb.set_trace()
+    assert container_args["entrypoint"] == "/root/scripts/aws-sso/aws-sso-entrypoint.sh -- "

@@ -661,6 +661,11 @@ class TerraformContainer(LeverageContainer):
             logger.error("This command can only run at [bold]layer[/bold] level.")
             raise Exit(1)
 
+    def refresh_credentials(self):
+        with AwsCredsEntryPoint(self, override_entrypoint=""):
+            if exit_code := self._start('echo "Done."'):
+                return exit_code
+
     def start(self, command, *arguments):
         with AwsCredsEntryPoint(self, self.entrypoint):
             return self._start(command, *arguments)
