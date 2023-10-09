@@ -1,5 +1,7 @@
+import os
 import re
 
+import dockerpty
 import hcl2
 import click
 from click.exceptions import Exit
@@ -7,6 +9,7 @@ from click.exceptions import Exit
 from leverage import logger
 from leverage._internals import pass_state
 from leverage._internals import pass_container
+from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
 
@@ -304,10 +307,25 @@ def _init(tf, args):
     ]
     args.append(f"-backend-config={tf.backend_tfvars}")
 
-    exit_code = tf.start_in_layer("init", *args)
+    tf.check_for_layer_location()
 
-    if exit_code:
-        raise Exit(exit_code)
+    with LiveContainer(tf) as container:
+        # create the .ssh directory
+        container.exec_run("mkdir -p /root/.ssh")
+        # copy the entire ~/.ssh/ folder
+        tar_bytes = tar_directory(tf.home / ".ssh")
+        # into /root/.ssh
+        container.put_archive("/root/.ssh/", tar_bytes)
+        # correct the owner of the files to match with the docker internal user
+        container.exec_run("chown root:root -R /root/.ssh/")
+
+        with AwsCredsContainer(container, tf):
+            dockerpty.exec_command(
+                client=tf.client.api,
+                container=container.id,
+                command="terraform init " + " ".join(args),
+                interactive=bool(int(os.environ.get("LEVERAGE_INTERACTIVE", 1))),
+            )
 
 
 @pass_container

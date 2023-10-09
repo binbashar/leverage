@@ -1,6 +1,5 @@
 import json
 import os
-import pwd
 import re
 import webbrowser
 from pathlib import Path
@@ -13,7 +12,7 @@ import dockerpty
 from docker import DockerClient
 from docker.errors import APIError, NotFound
 from docker.types import Mount
-from typing import Tuple, Union, List
+from typing import Tuple, Union
 
 from leverage import __toolbox_version__
 from leverage import logger
@@ -35,8 +34,6 @@ REGION = (
     # end region
     r"(.*)"  # layer
 )
-
-raw_logger = raw_logger()
 
 
 def get_docker_client():
@@ -553,6 +550,29 @@ class TerraformContainer(LeverageContainer):
         self._backend_key = None
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
+
+    def auth_method(self) -> str:
+        """
+        Return the expected auth method based on the SSO or MFA flags.
+
+        In the case of MFA, we also need to tweak some env variables for AWS credentials.
+        Once you are done with authentication, remember to revert the env var changes.
+        """
+        if self.sso_enabled:
+            self._check_sso_token()
+            return f"{self.TF_SSO_ENTRYPOINT} -- "
+        elif self.mfa_enabled:
+            self.environment.update(
+                {
+                    "AWS_SHARED_CREDENTIALS_FILE": self.environment["AWS_SHARED_CREDENTIALS_FILE"].replace(
+                        "tmp", ".aws"
+                    ),
+                    "AWS_CONFIG_FILE": self.environment["AWS_CONFIG_FILE"].replace("tmp", ".aws"),
+                }
+            )
+            return f"{self.TF_MFA_ENTRYPOINT} -- "
+
+        return ""
 
     @property
     def tf_cache_dir(self):
