@@ -190,6 +190,15 @@ def _import(tf, address, _id):
         raise Exit(exit_code)
 
 
+@terraform.command("refresh-credentials")
+@pass_container
+def refresh_credentials(tf):
+    """Refresh the AWS credentials used on the current layer."""
+    tf.check_for_layer_location()
+    if exit_code := tf.refresh_credentials():
+        raise Exit(exit_code)
+
+
 # ###########################################################################
 # HANDLER FOR MANAGING THE BASE COMMANDS (init, plan, apply, destroy, output)
 # ###########################################################################

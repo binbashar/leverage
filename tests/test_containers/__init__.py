@@ -18,4 +18,5 @@ def container_fixture_factory(container_class):
     with patch("leverage.container.load_env", return_value=FAKE_ENV):
         container = container_class(mocked_client)
         container._run = Mock()
+        container._check_sso_token = Mock()
         return container
