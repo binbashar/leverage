@@ -9,6 +9,7 @@ Leverage CLI is the tool used to manage and interact with any Leverage project.
 It transparently handles the most complex and error prone tasks that arise from working with a state-of-the-art infrastructure definition like our Leverage Reference Architecture. Leverage CLI uses a dockerized approach to encapsulate the tools needed to perform such tasks and to free the user from having to deal with the configuration and management of said tools.
 Provides the means to interact with your Leverage project and allows you to define custom tasks to run.
 
+Reviewing and implementing the [Binbash Leverage Landing Zone for AWS](https://leverage.binbash.co/try-leverage/) would be a very good place to start!
 
 ## Documentation
 For installation instructions and all documentation regarding Leverage CLI, please refer to [this page](https://leverage.binbash.co/user-guide/leverage-cli/installation/).
