@@ -659,7 +659,10 @@ class TerraformContainer(LeverageContainer):
         renewal = datetime.utcnow()
 
         if expiry < renewal:
-            logger.error("AWS SSO token has expired, please log back in.")
+            logger.error(
+                "AWS SSO token has expired, please log back in by running [bold]leverage aws sso login[/bold]"
+                " to refresh your credentials before re-running the last command."
+            )
             raise Exit(1)
 
         self.entrypoint = entrypoint
