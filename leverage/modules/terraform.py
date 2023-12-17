@@ -82,10 +82,10 @@ def init(context, tf: TerraformContainer, skip_validation, layers, args):
 
     # now change ownership on all the downloaded modules and providers
     for layer in layers:
-        tf.change_file_ownership(tf.guest_base_path / layer.relative_to(tf.root_dir) / ".terraform")
+        tf.change_file_ownership(tf.paths.guest_base_path / layer.relative_to(tf.paths.root_dir) / ".terraform")
     # and then providers in the cache folder
-    if tf.tf_cache_dir:
-        tf.change_file_ownership(tf.tf_cache_dir)
+    if tf.paths.tf_cache_dir:
+        tf.change_file_ownership(tf.paths.tf_cache_dir)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -194,7 +194,7 @@ def _import(tf, address, _id):
 @pass_container
 def refresh_credentials(tf):
     """Refresh the AWS credentials used on the current layer."""
-    tf.check_for_layer_location()
+    tf.paths.check_for_layer_location()
     if exit_code := tf.refresh_credentials():
         raise Exit(exit_code)
 
@@ -314,15 +314,15 @@ def _init(tf, args):
         for index, arg in enumerate(args)
         if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"
     ]
-    args.append(f"-backend-config={tf.backend_tfvars}")
+    args.append(f"-backend-config={tf.paths.backend_tfvars}")
 
-    tf.check_for_layer_location()
+    tf.paths.check_for_layer_location()
 
     with LiveContainer(tf) as container:
         # create the .ssh directory
         container.exec_run("mkdir -p /root/.ssh")
         # copy the entire ~/.ssh/ folder
-        tar_bytes = tar_directory(tf.home / ".ssh")
+        tar_bytes = tar_directory(tf.paths.home / ".ssh")
         # into /root/.ssh
         container.put_archive("/root/.ssh/", tar_bytes)
         # correct the owner of the files to match with the docker internal user
@@ -449,7 +449,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
 
 @pass_container
 def _validate_layout(tf):
-    tf.check_for_layer_location()
+    tf.paths.check_for_layer_location()
 
     # Check for `environment = <account name>` in account.tfvars
     account_name = tf.account_conf.get("environment")

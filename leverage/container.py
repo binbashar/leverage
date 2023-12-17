@@ -19,11 +19,7 @@ from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, CustomEntryPoint, ExitError, ContainerSession
 from leverage.logger import console, raw_logger
 from leverage.logger import get_script_log_level
-from leverage.path import get_root_path
-from leverage.path import get_account_path
-from leverage.path import get_global_config_path
-from leverage.path import get_account_config_path
-from leverage.path import NotARepositoryError
+from leverage.path import PathsHandler
 from leverage.conf import load as load_env
 
 REGION = (
@@ -68,11 +64,6 @@ class LeverageContainer:
     """
 
     LEVERAGE_IMAGE = "binbash/leverage-toolbox"
-
-    COMMON_TFVARS = "common.tfvars"
-    ACCOUNT_TFVARS = "account.tfvars"
-    BACKEND_TFVARS = "backend.tfvars"
-
     SHELL = "/bin/bash"
 
     def __init__(self, client):
@@ -82,26 +73,11 @@ class LeverageContainer:
             client (docker.DockerClient): Client to interact with Docker daemon.
         """
         self.client = client
-
-        self.home = Path.home()
-        self.cwd = Path.cwd()
-        try:
-            self.root_dir = Path(get_root_path())
-            self.account_dir = Path(get_account_path())
-            self.common_config_dir = Path(get_global_config_path())
-            self.account_config_dir = Path(get_account_config_path())
-        except NotARepositoryError:
-            logger.error("Out of Leverage project context. Please cd into a Leverage project directory first.")
-            raise Exit(1)
-
         # Load configs
         self.env_conf = load_env()
 
-        common_config = self.common_config_dir / self.COMMON_TFVARS
-        self.common_conf = hcl2.loads(common_config.read_text()) if common_config.exists() else {}
-
-        account_config = self.account_config_dir / self.ACCOUNT_TFVARS
-        self.account_conf = hcl2.loads(account_config.read_text()) if account_config.exists() else {}
+        self.paths = PathsHandler(self.env_conf)
+        self.project = self.paths.project
 
         # Set image to use
         self.image = self.env_conf.get("TERRAFORM_IMAGE", self.LEVERAGE_IMAGE)
@@ -113,21 +89,6 @@ class LeverageContainer:
             )
             raise Exit(1)
 
-        # Get project name
-        self.project = self.common_conf.get("project", self.env_conf.get("PROJECT", False))
-        if not self.project:
-            logger.error("Project name has not been set. Exiting.")
-            raise Exit(1)
-
-        # Project mount location
-        self.guest_base_path = f"/{self.common_conf.get('project_long', 'project')}"
-
-        # Ensure credentials directory
-        self.host_aws_credentials_dir = self.home / ".aws" / self.project
-        if not self.host_aws_credentials_dir.exists():
-            self.host_aws_credentials_dir.mkdir(parents=True)
-        self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
-
         self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=[])
         self.container_config = {
             "image": f"{self.image}:{self.image_tag}",
@@ -135,7 +96,7 @@ class LeverageContainer:
             "stdin_open": True,
             "environment": {},
             "entrypoint": "",
-            "working_dir": f"{self.guest_base_path}/{self.cwd.relative_to(self.root_dir).as_posix()}",
+            "working_dir": f"{self.paths.guest_base_path}/{self.paths.cwd.relative_to(self.paths.root_dir).as_posix()}",
             "host_config": self.host_config,
         }
 
@@ -164,36 +125,15 @@ class LeverageContainer:
         self.container_config["host_config"]["Mounts"] = value
 
     @property
-    def guest_account_base_path(self):
-        return f"{self.guest_base_path}/{self.account_dir.relative_to(self.root_dir).as_posix()}"
-
-    @property
-    def common_tfvars(self):
-        return f"{self.guest_base_path}/config/{self.COMMON_TFVARS}"
-
-    @property
-    def account_tfvars(self):
-        return f"{self.guest_account_base_path}/config/{self.ACCOUNT_TFVARS}"
-
-    @property
-    def backend_tfvars(self):
-        return f"{self.guest_account_base_path}/config/{self.BACKEND_TFVARS}"
-
-    @property
-    def guest_aws_credentials_dir(self):
-        return f"/root/tmp/{self.project}"
-
-    @property
     def region(self):
         """
         Return the region of the layer.
         """
-        if matches := re.match(REGION, self.cwd.as_posix()):
+        if matches := re.match(REGION, self.paths.cwd.as_posix()):
             # the region (group 1) is between the projects folders (group 0) and the layers (group 2)
             return matches.groups()[1]
 
-        logger.exception(f"No valid region could be found at: {self.cwd.as_posix()}")
-        raise Exit(1)
+        raise ExitError(1, f"No valid region could be found at: {self.paths.cwd.as_posix()}")
 
     def ensure_image(self):
         """Make sure the required Docker image is available in the system. If not, pull it from registry."""
@@ -342,29 +282,6 @@ class LeverageContainer:
     def docker_logs(self, container):
         return self.client.api.logs(container).decode("utf-8")
 
-    def get_location_type(self):
-        """
-        Returns the location type:
-        - root
-        - account
-        - config
-        - layer
-        - sublayer
-        - not a project
-        """
-        if self.cwd == self.root_dir:
-            return "root"
-        elif self.cwd == self.account_dir:
-            return "account"
-        elif self.cwd in (self.common_config_dir, self.account_config_dir):
-            return "config"
-        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and list(self.cwd.glob("*.tf")):
-            return "layer"
-        elif (self.cwd.as_posix().find(self.account_dir.as_posix()) >= 0) and not list(self.cwd.glob("*.tf")):
-            return "layers-group"
-        else:
-            return "not a project"
-
     def change_ownership_cmd(self, path: Union[Path, str], recursive=True) -> str:
         recursive = "-R " if recursive else ""
         user_id = os.getuid()
@@ -390,7 +307,6 @@ class AWSCLIContainer(LeverageContainer):
     # SSO scripts
     AWS_SSO_LOGIN_SCRIPT = "/root/scripts/aws-sso/aws-sso-login.sh"
     AWS_SSO_LOGOUT_SCRIPT = "/root/scripts/aws-sso/aws-sso-logout.sh"
-    AWS_SSO_CONFIGURE_SCRIPT = "/root/scripts/aws-sso/aws-sso-configure.sh"
 
     # SSO constants
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
@@ -402,18 +318,22 @@ class AWSCLIContainer(LeverageContainer):
         super().__init__(client)
 
         self.environment = {
-            "COMMON_CONFIG_FILE": self.common_tfvars,
-            "ACCOUNT_CONFIG_FILE": self.account_tfvars,
-            "BACKEND_CONFIG_FILE": self.backend_tfvars,
-            "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
-            "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
-            "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
+            "COMMON_CONFIG_FILE": self.paths.common_tfvars,
+            "ACCOUNT_CONFIG_FILE": self.paths.account_tfvars,
+            "BACKEND_CONFIG_FILE": self.paths.backend_tfvars,
+            "AWS_SHARED_CREDENTIALS_FILE": f"{self.paths.guest_aws_credentials_dir}/credentials",
+            "AWS_CONFIG_FILE": f"{self.paths.guest_aws_credentials_dir}/config",
+            "SSO_CACHE_DIR": f"{self.paths.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
         }
         self.entrypoint = self.AWS_CLI_BINARY
         self.mounts = [
-            Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
-            Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
+            Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
+            Mount(
+                source=self.paths.host_aws_credentials_dir.as_posix(),
+                target=self.paths.guest_aws_credentials_dir,
+                type="bind",
+            ),
         ]
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
@@ -485,9 +405,13 @@ class AWSCLIContainer(LeverageContainer):
             exit_code = self.client.api.wait(container)["StatusCode"]
             raw_logger.info(self.docker_logs(container))
             # now return ownership of the token file back to the user
-            self.change_file_ownership(self.guest_aws_credentials_dir)
+            self.change_file_ownership(self.paths.guest_aws_credentials_dir)
 
         return exit_code
+
+    def get_sso_access_token(self):
+        with open(f"{self.paths.sso_cache}/token") as token_file:
+            return json.loads(token_file.read())["accessToken"]
 
 
 class TerraformContainer(LeverageContainer):
@@ -502,12 +426,10 @@ class TerraformContainer(LeverageContainer):
     def __init__(self, client):
         super().__init__(client)
 
-        if self.root_dir == self.account_dir == self.common_config_dir == self.account_config_dir == self.cwd:
-            logger.error("Not running in a Leverage project. Exiting.")
-            raise Exit(1)
+        self.paths.assert_running_leverage_project()
 
         # Set authentication methods
-        self.sso_enabled = self.common_conf.get("sso_enabled", False)
+        self.sso_enabled = self.paths.common_conf.get("sso_enabled", False)
         self.mfa_enabled = (
             self.env_conf.get("MFA_ENABLED", "false") == "true"
         )  # TODO: Convert values to bool upon loading
@@ -516,34 +438,38 @@ class TerraformContainer(LeverageContainer):
         SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
 
         self.environment = {
-            "COMMON_CONFIG_FILE": self.common_tfvars,
-            "ACCOUNT_CONFIG_FILE": self.account_tfvars,
-            "BACKEND_CONFIG_FILE": self.backend_tfvars,
-            "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
-            "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
-            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",  # Legacy?
-            "SRC_AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",  # Legacy?
-            "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
-            "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
+            "COMMON_CONFIG_FILE": self.paths.common_tfvars,
+            "ACCOUNT_CONFIG_FILE": self.paths.account_tfvars,
+            "BACKEND_CONFIG_FILE": self.paths.backend_tfvars,
+            "AWS_SHARED_CREDENTIALS_FILE": f"{self.paths.guest_aws_credentials_dir}/credentials",
+            "AWS_CONFIG_FILE": f"{self.paths.guest_aws_credentials_dir}/config",
+            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.paths.guest_aws_credentials_dir}/credentials",  # Legacy?
+            "SRC_AWS_CONFIG_FILE": f"{self.paths.guest_aws_credentials_dir}/config",  # Legacy?
+            "AWS_CACHE_DIR": f"{self.paths.guest_aws_credentials_dir}/cache",
+            "SSO_CACHE_DIR": f"{self.paths.guest_aws_credentials_dir}/sso/cache",
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
             "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
             "SSH_AUTH_SOCK": "" if SSH_AUTH_SOCK is None else "/ssh-agent",
         }
         self.entrypoint = self.TF_BINARY
         self.mounts = [
-            Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
-            Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
-            Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
+            Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
+            Mount(
+                source=self.paths.host_aws_credentials_dir.as_posix(),
+                target=self.paths.guest_aws_credentials_dir,
+                type="bind",
+            ),
+            Mount(source=(self.paths.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
         ]
         # if you have set the tf plugin cache locally
-        if self.tf_cache_dir:
+        if self.paths.tf_cache_dir:
             # then mount it too into the container
-            self.environment["TF_PLUGIN_CACHE_DIR"] = self.tf_cache_dir
+            self.environment["TF_PLUGIN_CACHE_DIR"] = self.paths.tf_cache_dir
             # given that terraform use symlinks to point from the .terraform folder into the plugin folder
             # we need to use the same directory inside the container
             # otherwise symlinks will be broken once outside the container
             # which will break terraform usage outside Leverage
-            self.mounts.append(Mount(source=self.tf_cache_dir, target=self.tf_cache_dir, type="bind"))
+            self.mounts.append(Mount(source=self.paths.tf_cache_dir, target=self.paths.tf_cache_dir, type="bind"))
         if SSH_AUTH_SOCK is not None:
             self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
 
@@ -575,41 +501,15 @@ class TerraformContainer(LeverageContainer):
         return ""
 
     @property
-    def tf_cache_dir(self):
-        return os.getenv("TF_PLUGIN_CACHE_DIR")
-
-    def _guest_config_file(self, file):
-        """Map config file in host to location in guest.
-
-        Args:
-            file (pathlib.Path): File in host to map
-
-        Raises:
-            Exit: If file is not contained in any valid config directory
-
-        Returns:
-            str: Path in guest to config file
-        """
-        file_name = file.name
-
-        if file.parent == self.account_config_dir:
-            return f"{self.guest_account_base_path}/config/{file_name}"
-        if file.parent == self.common_config_dir:
-            return f"{self.guest_base_path}/config/{file_name}"
-
-        logger.error("File is not part of any config directory.")
-        raise Exit(1)
-
-    @property
     def tf_default_args(self):
         """Array of strings containing all valid config files for layer as parameters for Terraform"""
         common_config_files = [
-            f"-var-file={self._guest_config_file(common_file)}"
-            for common_file in self.common_config_dir.glob("*.tfvars")
+            f"-var-file={self.paths.guest_config_file(common_file)}"
+            for common_file in self.paths.common_config_dir.glob("*.tfvars")
         ]
         account_config_files = [
-            f"-var-file={self._guest_config_file(account_file)}"
-            for account_file in self.account_config_dir.glob("*.tfvars")
+            f"-var-file={self.paths.guest_config_file(account_file)}"
+            for account_file in self.paths.account_config_dir.glob("*.tfvars")
         ]
         return common_config_files + account_config_files
 
@@ -632,17 +532,17 @@ class TerraformContainer(LeverageContainer):
         # Adding `token` file name to this function in order to
         # meet the requirement regarding to have just one
         # token file in the sso/cache
-        sso_role = self.account_conf.get("sso_role")
-        token_file = self.sso_cache / sso_role
+        sso_role = self.paths.account_conf.get("sso_role")
+        token_file = self.paths.sso_cache / sso_role
 
-        token_files = list(self.sso_cache.glob("*"))
+        token_files = list(self.paths.sso_cache.glob("*"))
         if not token_files:
             logger.error("No AWS SSO token found. Please log in or configure SSO.")
             raise Exit(1)
 
         if token_file not in token_files:
             sso_role = "token"
-            token_file = self.sso_cache / sso_role
+            token_file = self.paths.sso_cache / sso_role
             if token_file not in token_files:
                 logger.error(
                     "No valid AWS SSO token found for current account.\n"
@@ -664,23 +564,6 @@ class TerraformContainer(LeverageContainer):
 
         self.entrypoint = entrypoint
 
-    def check_for_layer_location(self):
-        """Make sure the command is being ran at layer level. If not, bail."""
-        if self.cwd in (self.common_config_dir, self.account_config_dir):
-            logger.error("Currently in a configuration directory, no Terraform command can be run here.")
-            raise Exit(1)
-
-        if self.cwd in (self.root_dir, self.account_dir):
-            logger.error(
-                "Terraform commands cannot run neither in the root of the project or in"
-                " the root directory of an account."
-            )
-            raise Exit(1)
-
-        if not list(self.cwd.glob("*.tf")):
-            logger.error("This command can only run at [bold]layer[/bold] level.")
-            raise Exit(1)
-
     def refresh_credentials(self):
         with AwsCredsEntryPoint(self, override_entrypoint=""):
             if exit_code := self._start('echo "Done."'):
@@ -692,7 +575,7 @@ class TerraformContainer(LeverageContainer):
 
     def start_in_layer(self, command, *arguments):
         """Run a command that can only be performed in layer level."""
-        self.check_for_layer_location()
+        self.paths.check_for_layer_location()
 
         return self.start(command, *arguments)
 
@@ -713,7 +596,7 @@ class TerraformContainer(LeverageContainer):
     def start_shell(self):
         """Launch a shell in the container."""
         if self.mfa_enabled or self.sso_enabled:
-            self.check_for_layer_location()
+            self.paths.check_for_layer_location()
 
         with AwsCredsEntryPoint(self, override_entrypoint=""):
             self._start(self.SHELL)
@@ -727,7 +610,7 @@ class TerraformContainer(LeverageContainer):
         # 2           |  true             |  false       |  false/true       |  set the key
         # 3           |  true             |  true        |  false/true       |  read the key
         try:
-            config_tf_file = self.cwd / "config.tf"
+            config_tf_file = self.paths.cwd / "config.tf"
             config_tf = hcl2.loads(config_tf_file.read_text()) if config_tf_file.exists() else {}
             if (
                 "terraform" in config_tf
@@ -738,12 +621,14 @@ class TerraformContainer(LeverageContainer):
                     backend_key = config_tf["terraform"][0]["backend"][0]["s3"]["key"]
                     self._backend_key = backend_key
                 else:
-                    self._backend_key = f"{self.cwd.relative_to(self.root_dir).as_posix()}/terraform.tfstate".replace(
-                        "/base-", "/"
-                    ).replace("/tools-", "/")
+                    self._backend_key = (
+                        f"{self.paths.cwd.relative_to(self.paths.root_dir).as_posix()}/terraform.tfstate".replace(
+                            "/base-", "/"
+                        ).replace("/tools-", "/")
+                    )
 
                     in_container_file_path = (
-                        f"{self.guest_base_path}/{config_tf_file.relative_to(self.root_dir).as_posix()}"
+                        f"{self.paths.guest_base_path}/{config_tf_file.relative_to(self.paths.root_dir).as_posix()}"
                     )
                     resp = self.system_exec(
                         "hcledit "
@@ -793,7 +678,7 @@ class TFautomvContainer(TerraformContainer):
 
     def start_in_layer(self, *arguments):
         """Run a command that can only be performed in layer level."""
-        self.check_for_layer_location()
+        self.paths.check_for_layer_location()
 
         return self.start(*arguments)
 

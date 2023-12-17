@@ -4,7 +4,7 @@ from click.exceptions import Exit
 from docker.types import Mount
 
 from leverage import logger
-from leverage._utils import chain_commands, AwsCredsEntryPoint
+from leverage._utils import chain_commands, AwsCredsEntryPoint, ExitError
 from leverage.container import TerraformContainer
 
 
@@ -40,7 +40,7 @@ class KubeCtlContainer(TerraformContainer):
 
     def configure(self):
         # make sure we are on the cluster layer
-        self.check_for_cluster_layer()
+        self.paths.check_for_cluster_layer()
 
         logger.info("Retrieving k8s cluster information...")
         # generate the command that will configure the new cluster
@@ -61,15 +61,7 @@ class KubeCtlContainer(TerraformContainer):
     def _get_eks_kube_config(self) -> str:
         exit_code, output = self._start_with_output(f"{self.TF_BINARY} output -no-color")  # TODO: override on CM?
         if exit_code:
-            logger.error(output)
-            raise Exit(exit_code)
+            raise ExitError(exit_code, output)
 
         aws_eks_cmd = next(op for op in output.split("\r\n") if op.startswith("aws eks update-kubeconfig"))
         return aws_eks_cmd + f" --region {self.region}"
-
-    def check_for_cluster_layer(self):
-        self.check_for_layer_location()
-        # assuming the "cluster" layer will contain the expected EKS outputs
-        if self.cwd.parts[-1] != "cluster":
-            logger.error("This command can only run at the [bold]cluster layer[/bold].")
-            raise Exit(1)

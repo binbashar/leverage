@@ -109,7 +109,7 @@ class AwsCredsEntryPoint(CustomEntryPoint):
                 }
             )
         # now return file ownership on the aws credentials files
-        self.container.change_file_ownership(self.container.guest_aws_credentials_dir)
+        self.container.change_file_ownership(self.container.paths.guest_aws_credentials_dir)
 
 
 class AwsCredsContainer:
@@ -136,7 +136,7 @@ class AwsCredsContainer:
 
     def __exit__(self, *args, **kwargs):
         # now return file ownership on the aws credentials files
-        self.tf_container.change_file_ownership(self.tf_container.guest_aws_credentials_dir)
+        self.tf_container.change_file_ownership(self.tf_container.paths.guest_aws_credentials_dir)
 
 
 class ExitError(Exit):
