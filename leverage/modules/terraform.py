@@ -9,7 +9,7 @@ from click.exceptions import Exit
 from leverage import logger
 from leverage._internals import pass_state
 from leverage._internals import pass_container
-from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer
+from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer, ExitError
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
 
@@ -217,34 +217,32 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
     layers = layers.split(",") if len(layers) > 0 else []
 
     # based on the location type manage the layers parameter
-    if tf.get_location_type() == "layer" and len(layers) == 0:
+    location_type = tf.paths.get_location_type()
+    if location_type == "layer" and len(layers) == 0:
         # running on a layer
-        layers = [tf.cwd]
-    elif tf.get_location_type() == "layer":
+        layers = [tf.paths.cwd]
+    elif location_type == "layer":
         # running on a layer but --layers was set
-        logger.error("Can not set [bold]--layers[/bold] inside a layer.")
-        raise Exit(1)
-    elif tf.get_location_type() in ["account", "layers-group"] and len(layers) == 0:
+        raise ExitError(1, "Can not set [bold]--layers[/bold] inside a layer.")
+    elif location_type in ["account", "layers-group"] and len(layers) == 0:
         # running on an account but --layers was not set
-        logger.error("[bold]--layers[/bold] has to be set.")
-        raise Exit(1)
-    elif not tf.get_location_type() in ["account", "layer", "layers-group"]:
+        raise ExitError(1, "[bold]--layers[/bold] has to be set.")
+    elif location_type not in ["account", "layer", "layers-group"]:
         # running outside a layer and account
-        logger.error("This command has to be run inside a layer or account directory.")
-        raise Exit(1)
+        raise ExitError(1, "This command has to be run inside a layer or account directory.")
     else:
         # running on an account with --layers set
-        layers = [tf.cwd / x for x in layers]
+        layers = [tf.paths.cwd / x for x in layers]
 
     # get current location
-    original_location = tf.cwd
+    original_location = tf.paths.cwd
     original_working_dir = tf.container_config["working_dir"]
 
     # validate each layer before calling the execute command
     for layer in layers:
         logger.debug(f"Checking for layer {layer}...")
         # change to current dir and set it in the container
-        tf.cwd = layer
+        tf.paths.cwd = layer
 
         # check layers existence
         if not layer.is_dir():
@@ -258,7 +256,7 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         validate_for_all_commands(layer, skip_validation=skip_validation)
 
         # change to original dir and set it in the container
-        tf.cwd = original_location
+        tf.paths.cwd = original_location
 
     # check layers existence
     for layer in layers:
@@ -266,16 +264,17 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
             logger.info(f"Invoking command for layer {layer}...")
 
         # change to current dir and set it in the container
-        tf.cwd = layer
+        tf.paths.cwd = layer
 
         # set the working dir
-        tf.container_config["working_dir"] = f"{tf.guest_base_path}/{tf.cwd.relative_to(tf.root_dir).as_posix()}"
+        working_dir = f"{tf.paths.guest_base_path}/{tf.paths.cwd.relative_to(tf.paths.root_dir).as_posix()}"
+        tf.container_config["working_dir"] = working_dir
 
         # execute the actual command
         command(args=args)
 
         # change to original dir and set it in the container
-        tf.cwd = original_location
+        tf.paths.cwd = original_location
 
         # change to original workgindir
         tf.container_config["working_dir"] = original_working_dir
@@ -448,11 +447,11 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
 
 
 @pass_container
-def _validate_layout(tf):
+def _validate_layout(tf: TerraformContainer):
     tf.paths.check_for_layer_location()
 
     # Check for `environment = <account name>` in account.tfvars
-    account_name = tf.account_conf.get("environment")
+    account_name = tf.paths.account_conf.get("environment")
     logger.info("Checking environment name definition in [bold]account.tfvars[/bold]...")
     if account_name is None:
         logger.error("[red]✘ FAILED[/red]\n")
@@ -460,10 +459,10 @@ def _validate_layout(tf):
     logger.info("[green]✔ OK[/green]\n")
 
     # Check if account directory name matches with environment name
-    if tf.account_dir.stem != account_name:
+    if tf.paths.account_dir.stem != account_name:
         logger.warning(
             "[yellow]‼[/yellow] Account directory name does not match environment name.\n"
-            f"  Expected [bold]{account_name}[/bold], found [bold]{tf.account_dir.stem}[/bold]\n"
+            f"  Expected [bold]{account_name}[/bold], found [bold]{tf.paths.account_dir.stem}[/bold]\n"
         )
 
     backend_key = tf.backend_key.split("/")
@@ -472,7 +471,7 @@ def _validate_layout(tf):
     valid_layout = True
 
     # Check backend bucket key
-    expected_backend_keys = _make_layer_backend_key(tf.cwd, tf.account_dir, account_name)
+    expected_backend_keys = _make_layer_backend_key(tf.paths.cwd, tf.paths.account_dir, account_name)
     logger.info("Checking backend key...")
     logger.info(f"Found: '{'/'.join(backend_key)}'")
     backend_key = backend_key[:-1]
@@ -485,7 +484,7 @@ def _validate_layout(tf):
         logger.error("[red]✘ FAILED[/red]\n")
         valid_layout = False
 
-    backend_tfvars = tf.account_config_dir / tf.BACKEND_TFVARS
+    backend_tfvars = tf.paths.account_config_dir / tf.paths.BACKEND_TF_VARS  # TODO use paths.backend_tfvars instead?
     backend_tfvars = hcl2.loads(backend_tfvars.read_text()) if backend_tfvars.exists() else {}
 
     logger.info("Checking [bold]backend.tfvars[/bold]:\n")

@@ -6,6 +6,7 @@ from leverage._internals import pass_state
 from leverage._internals import pass_container
 from leverage.container import get_docker_client
 from leverage.container import AWSCLIContainer
+from leverage.containers.aws import configure_sso_profiles
 from leverage.modules.utils import _handle_subcommand
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
@@ -38,20 +39,14 @@ def configure(context, cli, args):
 @click.pass_context
 def _sso(context, cli):
     """configure sso"""
-    if (
-        cli.cwd in (cli.root_dir, cli.account_dir)
-        or cli.account_dir.parent != cli.root_dir
-        or not list(cli.cwd.glob("*.tf"))
-    ):
-        logger.error("SSO configuration can only be performed at [bold]layer[/bold] level.")
-        raise Exit(1)
+    cli.paths.check_for_layer_location()
 
     # region_primary was added in refarch v1
     # for v2 it was replaced by region at project level
     region_primary = "region_primary"
-    if not "region_primary" in cli.common_conf:
+    if "region_primary" not in cli.paths.common_conf:
         region_primary = "region"
-    default_region = cli.common_conf.get(region_primary, cli.common_conf.get("sso_region"))
+    default_region = cli.paths.common_conf.get(region_primary, cli.paths.common_conf.get("sso_region"))
     if default_region is None:
         logger.error("No primary region configured in global config file.")
         raise Exit(1)
@@ -61,34 +56,34 @@ def _sso(context, cli):
     for key, value in default_profile.items():
         cli.exec(f"configure set {key} {value}", profile="default")
 
-    if not all(sso_key in cli.common_conf for sso_key in ("sso_start_url", "sso_region")):
+    if not all(sso_key in cli.paths.common_conf for sso_key in ("sso_start_url", "sso_region")):
         logger.error("Missing configuration values for SSO in global config file.")
         raise Exit(1)
 
-    sso_role = cli.account_conf.get("sso_role")
+    sso_role = cli.paths.account_conf.get("sso_role")
     if not sso_role:
         logger.error("Missing SSO role in account config file.")
         raise Exit(1)
 
-    current_account = cli.account_conf.get("environment")
+    current_account = cli.paths.account_conf.get("environment")
     try:
         # this is for refarch v1
-        account_id = cli.common_conf.get("accounts").get(current_account).get("id")
+        account_id = cli.paths.common_conf.get("accounts").get(current_account).get("id")
     except AttributeError:
         # this is for refarch v2
         try:
             # this is for accounts with no org unit on top of it
-            account_id = cli.common_conf.get("organization").get("accounts").get(current_account).get("id")
+            account_id = cli.paths.common_conf.get("organization").get("accounts").get(current_account).get("id")
         except AttributeError:
             try:
                 # this is for accounts with no org unit on top of it
                 found = False
-                for ou in cli.common_conf.get("organization").get("organizational_units"):
-                    if current_account in cli.common_conf.get("organization").get("organizational_units").get(ou).get(
-                        "accounts"
-                    ):
+                for ou in cli.paths.common_conf.get("organization").get("organizational_units"):
+                    if current_account in cli.paths.common_conf.get("organization").get("organizational_units").get(
+                        ou
+                    ).get("accounts"):
                         account_id = (
-                            cli.common_conf.get("organization")
+                            cli.paths.common_conf.get("organization")
                             .get("organizational_units")
                             .get(ou)
                             .get("accounts")
@@ -108,8 +103,8 @@ def _sso(context, cli):
 
     logger.info(f"Configuring [bold]{cli.project}-sso[/bold] profile.")
     sso_profile = {
-        "sso_start_url": cli.common_conf.get("sso_start_url"),
-        "sso_region": cli.common_conf.get("sso_region", cli.common_conf.get(region_primary)),
+        "sso_start_url": cli.paths.common_conf.get("sso_start_url"),
+        "sso_region": cli.paths.common_conf.get("sso_region", cli.paths.common_conf.get(region_primary)),
         "sso_account_id": account_id,
         "sso_role_name": sso_role,
     }
@@ -119,9 +114,7 @@ def _sso(context, cli):
     context.invoke(login)
 
     logger.info("Storing account information.")
-    exit_code = cli.system_start(cli.AWS_SSO_CONFIGURE_SCRIPT)
-    if exit_code:
-        raise Exit(exit_code)
+    configure_sso_profiles(cli)
 
 
 @aws.group(invoke_without_command=True, add_help_option=False, context_settings=CONTEXT_SETTINGS)
@@ -142,7 +135,7 @@ def login(cli):
     # - when this cond meets:
     #   - no account dir
     #   - no layer dir
-    if not cli.get_location_type() in ["account", "layer", "layers-group"]:
+    if not cli.paths.get_location_type() in ["account", "layer", "layers-group"]:
         logger.error("SSO configuration can only be performed at [bold]layer[/bold] or [bold]account[/bold] level.")
         raise Exit(1)
 
@@ -164,6 +157,6 @@ def logout(cli):
         raise Exit(exit_code)
 
     logger.info(
-        f"Don't forget to log out of your [bold]AWS SSO[/bold] start page {cli.common_conf.get('sso_start_url')}"
+        f"Don't forget to log out of your [bold]AWS SSO[/bold] start page {cli.paths.common_conf.get('sso_start_url')}"
         " and your external identity provider portal."
     )

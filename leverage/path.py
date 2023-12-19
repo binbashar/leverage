@@ -7,7 +7,7 @@ from subprocess import run
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-from hcl2.parser import hcl2
+import hcl2
 
 from leverage._utils import ExitError
 
@@ -157,7 +157,8 @@ class PathsHandler:
             raise ExitError(1, "Project name has not been set. Exiting.")
 
         # Project mount location
-        self.guest_base_path = f"/{self.common_conf.get('project_long', 'project')}"
+        self.project_long = self.common_conf.get("project_long", "project")
+        self.guest_base_path = f"/{self.project_long}"
 
         # Ensure credentials directory
         self.host_aws_credentials_dir = self.home / ".aws" / self.project
@@ -184,6 +185,14 @@ class PathsHandler:
     @property
     def guest_aws_credentials_dir(self):
         return f"/root/tmp/{self.project}"
+
+    @property
+    def host_aws_profiles_file(self):
+        return f"{self.host_aws_credentials_dir}/config"
+
+    @property
+    def sso_token_file(self):
+        return f"{self.sso_cache}/token"
 
     def get_location_type(self):
         """

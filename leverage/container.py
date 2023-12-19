@@ -410,7 +410,7 @@ class AWSCLIContainer(LeverageContainer):
         return exit_code
 
     def get_sso_access_token(self):
-        with open(f"{self.paths.sso_cache}/token") as token_file:
+        with open(self.paths.sso_token_file) as token_file:
             return json.loads(token_file.read())["accessToken"]
 
 
