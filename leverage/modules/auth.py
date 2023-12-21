@@ -9,8 +9,31 @@ from leverage import logger
 from leverage._utils import key_finder, ExitError, get_or_create_section
 
 
-def get_layer_profile():
-    pass
+def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profile: str, project: str):
+    # if it is exactly that variable, we already know the layer profile is tf_profile
+    layer_profile = tf_profile if raw_profile == "${var.profile}" else None
+
+    # replace variables with their corresponding values
+    raw = raw_profile.replace("${var.profile}", tf_profile).replace("${var.project}", project)
+
+    # the project and the role are at the beginning and end of the string
+    _, *account_name, _ = raw.split("-")
+    account_name = "-".join(account_name)
+    logger.info(f"Attempting to get temporary credentials for {account_name} account.")
+
+    sso_profile = f"{project}-sso-{account_name}"
+    # if profile wasn't configured during configuration step
+    # it means we do not have permissions for the role in the account
+    try:
+        account_id = config_updater.get(f"profile {sso_profile}", "account_id").value
+        sso_role = config_updater.get(f"profile {sso_profile}", "role_name").value
+    except NoSectionError:
+        raise ExitError(40, f"Missing {sso_profile} permission for account {account_name}.")
+
+    # if we are processing a profile from a different layer, we need to built it
+    layer_profile = layer_profile or f"{project}-{account_name}-{sso_role.lower()}"
+
+    return account_id, account_name, sso_role, layer_profile
 
 
 def refresh_layer_credentials(cli):
@@ -35,50 +58,31 @@ def refresh_layer_credentials(cli):
 
     client = boto3.client("sso", region_name=cli.sso_region_from_main_profile)
     for raw in raw_profiles:
-        # if it is exactly that variable, we already know the layer profile is tf_profile
-        layer_profile = tf_profile if raw == "${var.profile}" else None
-
-        # replace variables with their corresponding values
-        raw = raw.replace("${var.profile}", tf_profile).replace("${var.project}", cli.project)
-
-        # the project and the role are at the beginning and end of the string
-        project, *account_name, role = raw.split("-")
-        account_name = "-".join(account_name)
-        logger.info(f"Attempting to get temporary credentials for {account_name} account.")
-
-        sso_profile = f"{project}-sso-{account_name}"
-        # if profile wasn't configured during configuration step
-        # it means we do not have permissions for the role in the account
-        try:
-            account_id = config_updater.get(f"profile {sso_profile}", "account_id").value
-            sso_role = config_updater.get(f"profile {sso_profile}", "role_name").value
-        except NoSectionError:
-            raise ExitError(40, f"Missing {sso_profile} permission for account {account_name}.")
+        account_id, account_name, sso_role, layer_profile = get_layer_profile(
+            raw, config_updater, tf_profile, cli.project
+        )
 
         # check if credentials need to be renewed
         try:
-            expiration = int(config_updater.get(tf_profile, "expiration").value) / 1000
+            expiration = int(config_updater.get(f"profile {layer_profile}", "expiration").value) / 1000
         except (NoSectionError, NoOptionError):
             # first time using this profile, skip into the credential's retrieval step
-            pass
+            logger.debug(f"No cached credentials found.")
         else:
-            # we got temporal credentials with an expiration, let's check if they are still valids
-            renewal_time = time.time() + (30 * 60)  # at least 30 minutes of validity, otherwise consider it expired
-            if renewal_time > expiration:
+            # we reduce the validity 30 minutes, to avoid expiration over long-standing tasks
+            now = time.time() + (30 * 60)
+            if now < expiration:
                 # still valid, nothing to do with these profile!
                 logger.info("Using already configured temporary credentials.")
                 continue
 
         # retrieve credentials
-        logger.info(f"Retrieving role credentials for {sso_role} in account {account_name}...")
+        logger.debug(f"Retrieving role credentials for {sso_role}...")
         credentials = client.get_role_credentials(
             roleName=sso_role,
             accountId=account_id,
             accessToken=cli.get_sso_access_token(),
         )["roleCredentials"]
-
-        # if we are on the same layer than the account (check we did at the , use the profile from backend.tfvars
-        layer_profile = layer_profile or f"{project}-{account_name}-{sso_role.lower()}"
 
         # update expiration on aws/<project>/config
         logger.info(f"Writing {layer_profile} profile")
