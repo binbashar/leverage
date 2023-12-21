@@ -191,6 +191,14 @@ class PathsHandler:
         return f"{self.host_aws_credentials_dir}/config"
 
     @property
+    def host_aws_credentials_file(self):
+        return self.host_aws_credentials_dir / "credentials"
+
+    @property
+    def local_backend_tfvars(self):
+        return self.account_config_dir / self.BACKEND_TF_VARS
+
+    @property
     def sso_token_file(self):
         return f"{self.sso_cache}/token"
 

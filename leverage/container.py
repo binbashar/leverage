@@ -9,6 +9,7 @@ from time import sleep
 import hcl2
 from click.exceptions import Exit
 import dockerpty
+from configupdater import ConfigUpdater
 from docker import DockerClient
 from docker.errors import APIError, NotFound
 from docker.types import Mount
@@ -17,6 +18,7 @@ from typing import Tuple, Union
 from leverage import __toolbox_version__
 from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, CustomEntryPoint, ExitError, ContainerSession
+from leverage.modules.auth import refresh_layer_credentials
 from leverage.logger import console, raw_logger
 from leverage.logger import get_script_log_level
 from leverage.path import PathsHandler
@@ -299,7 +301,22 @@ class LeverageContainer:
             self._exec(cmd)
 
 
-class AWSCLIContainer(LeverageContainer):
+class SSOContainer(LeverageContainer):
+    def get_sso_access_token(self):
+        with open(self.paths.sso_token_file) as token_file:
+            return json.loads(token_file.read())["accessToken"]
+
+    @property
+    def sso_region_from_main_profile(self):
+        """
+        Same than AWSCLIContainer.get_sso_region but without using a container.
+        """
+        conf = ConfigUpdater()
+        conf.read(self.paths.host_aws_profiles_file)
+        return conf.get(f"profile {self.project}-sso", "sso_region").value
+
+
+class AWSCLIContainer(SSOContainer):
     """Leverage Container specially tailored to run AWS CLI commands."""
 
     AWS_CLI_BINARY = "/usr/local/bin/aws"
@@ -409,12 +426,8 @@ class AWSCLIContainer(LeverageContainer):
 
         return exit_code
 
-    def get_sso_access_token(self):
-        with open(self.paths.sso_token_file) as token_file:
-            return json.loads(token_file.read())["accessToken"]
 
-
-class TerraformContainer(LeverageContainer):
+class TerraformContainer(SSOContainer):
     """Leverage container specifically tailored to run Terraform commands.
     It handles authentication and some checks regarding where the command is being executed."""
 
@@ -433,6 +446,7 @@ class TerraformContainer(LeverageContainer):
         self.mfa_enabled = (
             self.env_conf.get("MFA_ENABLED", "false") == "true"
         )  # TODO: Convert values to bool upon loading
+        self.refresh_sso_credentials = False
 
         # SSH AGENT
         SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
@@ -477,6 +491,16 @@ class TerraformContainer(LeverageContainer):
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
+    def _run(self, *args, **kwargs):
+        # sso credentials needs to be refreshed right before we execute our command on the container
+        if self.refresh_sso_credentials:
+            # so we do it
+            refresh_layer_credentials(self)
+            # and then deactivate the flag
+            self.refresh_sso_credentials = False
+
+        return super()._run(*args, **kwargs)
+
     def auth_method(self) -> str:
         """
         Return the expected auth method based on the SSO or MFA flags.
@@ -486,7 +510,7 @@ class TerraformContainer(LeverageContainer):
         """
         if self.sso_enabled:
             self._check_sso_token()
-            return f"{self.TF_SSO_ENTRYPOINT} -- "
+            self.refresh_sso_credentials = True
         elif self.mfa_enabled:
             self.environment.update(
                 {

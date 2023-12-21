@@ -4,7 +4,8 @@ import boto3
 from configupdater import ConfigUpdater
 
 from leverage import logger
-from leverage.container import AWSCLIContainer
+from leverage._utils import get_or_create_section
+from leverage.container import SSOContainer
 
 
 def get_account_roles(sso_region: str, access_token: str) -> dict:
@@ -36,10 +37,7 @@ def add_sso_profile(
     """
     Add a profile to the config file.
     """
-    if not config_updater.has_section(section_name):
-        config_updater.add_section(section_name)
-    # add_section doesn't return the section object, so we need to retrieve it either case
-    section = config_updater.get_section(section_name)
+    section = get_or_create_section(config_updater, section_name)
 
     data = {
         "role_name": role_name,
@@ -52,7 +50,7 @@ def add_sso_profile(
         section[k] = v
 
 
-def configure_sso_profiles(cli: AWSCLIContainer):
+def configure_sso_profiles(cli: SSOContainer):
     """
     Populate the ~./aws/<project>/config file with the sso profiles from the accounts.
     """
