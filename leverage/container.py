@@ -75,7 +75,7 @@ class LeverageContainer:
 
     SHELL = "/bin/bash"
 
-    def __init__(self, client):
+    def __init__(self, client, mounts: dict = None, env_vars: dict = None):
         """Project related paths are determined and stored. Project configuration is loaded.
 
         Args:
@@ -128,12 +128,13 @@ class LeverageContainer:
             self.host_aws_credentials_dir.mkdir(parents=True)
         self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
 
-        self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=[])
+        mounts = [Mount(source=source, target=target, type="bind") for source, target in mounts] if mounts else []
+        self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=mounts)
         self.container_config = {
             "image": f"{self.image}:{self.image_tag}",
             "command": "",
             "stdin_open": True,
-            "environment": {},
+            "environment": env_vars or {},
             "entrypoint": "",
             "working_dir": f"{self.guest_base_path}/{self.cwd.relative_to(self.root_dir).as_posix()}",
             "host_config": self.host_config,
