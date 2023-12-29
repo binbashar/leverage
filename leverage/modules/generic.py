@@ -1,7 +1,7 @@
 import click
 
-from leverage._utils import AwsCredsEntryPoint, CustomEntryPoint
-from leverage.container import LeverageContainer, get_docker_client, TerraformContainer
+from leverage._utils import CustomEntryPoint
+from leverage.container import get_docker_client, TerraformContainer
 
 
 @click.command()
