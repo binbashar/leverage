@@ -10,4 +10,6 @@ ruamel.yaml==0.17.10
 docker==5.0.0
 dockerpty==0.4.1
 questionary==1.10.0
-python-hcl2 == 3.0.1
+python-hcl2==3.0.1
+configupdater==3.2
+boto3==1.33.2
