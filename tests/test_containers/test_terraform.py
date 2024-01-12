@@ -31,7 +31,6 @@ def test_refresh_credentials(terraform_container):
     terraform_container.refresh_credentials()
     container_args = terraform_container.client.api.create_container.call_args_list[0][1]
 
-    # we want a shell, so -> /bin/bash with no entrypoint
+    # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == 'echo "Done."'
-    # import ipdb; ipdb.set_trace()
-    assert container_args["entrypoint"] == "/root/scripts/aws-sso/aws-sso-entrypoint.sh -- "
+    assert terraform_container.refresh_sso_credentials

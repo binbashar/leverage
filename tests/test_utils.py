@@ -36,7 +36,7 @@ def test_key_finder_real_scenario():
     }
     found = key_finder(data, "profile")
 
-    assert found == []
+    assert found == ["${var.profile}", "${var.profile}"]
 
 
 def test_key_finder_simple_scenario():
@@ -50,4 +50,4 @@ def test_key_finder_simple_scenario():
     }
     found = key_finder(data, "profile")
 
-    assert found == []
+    assert found == ["1a", "1b", "2", "3"]

@@ -105,16 +105,16 @@ def test_start_shell_mfa(kubectl_container):
 
 def test_start_shell_sso(kubectl_container):
     """
-    Make sure the command is executed through the proper SSO script.
+    Make sure the SSO flag is set properly before the command.
     """
     kubectl_container.enable_sso()
     kubectl_container._check_sso_token = Mock(return_value=True)
     kubectl_container.start_shell()
     container_args = kubectl_container.client.api.create_container.call_args_list[0][1]
 
-    # we want a shell, so -> /bin/bash with no entrypoint
+    # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == "/bin/bash"
-    assert container_args["entrypoint"] == "/root/scripts/aws-sso/aws-sso-entrypoint.sh -- "
+    assert kubectl_container.refresh_sso_credentials
 
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"
