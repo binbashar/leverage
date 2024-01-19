@@ -9,7 +9,16 @@ from leverage import logger
 from leverage._utils import key_finder, ExitError, get_or_create_section
 
 
+class SkipProfile(Exception):
+    pass
+
+
 def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profile: str, project: str):
+    if "local." in raw_profile:
+        # ignore values referencing to local variables
+        # we will search for profiles directly in locals.tf instead
+        raise SkipProfile
+
     # if it is exactly that variable, we already know the layer profile is tf_profile
     layer_profile = tf_profile if raw_profile == "${var.profile}" else None
 
@@ -37,12 +46,13 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
 
 
 def refresh_layer_credentials(cli):
-    # this is the config.tf file from the layer we are currently on
-    with open("config.tf") as tf_config_file:
-        tf_config = hcl2.load(tf_config_file)
-
-    # get all the "profile" references from the config file
-    raw_profiles = set(key_finder(tf_config, "profile"))
+    raw_profiles = set()
+    # these are files from the layer we are currently on
+    for name in ("config.tf", "locals.tf"):
+        with open(name) as tf_file:
+            tf_config = hcl2.load(tf_file)
+        # get all the "profile" references from the file
+        raw_profiles.update(set(key_finder(tf_config, "profile")))
 
     # the profile value from <layer>/config/backend.tfvars
     with open(cli.paths.local_backend_tfvars) as backend_config_file:
@@ -58,9 +68,15 @@ def refresh_layer_credentials(cli):
 
     client = boto3.client("sso", region_name=cli.sso_region_from_main_profile)
     for raw in raw_profiles:
-        account_id, account_name, sso_role, layer_profile = get_layer_profile(
-            raw, config_updater, tf_profile, cli.project
-        )
+        try:
+            account_id, account_name, sso_role, layer_profile = get_layer_profile(
+                raw,
+                config_updater,
+                tf_profile,
+                cli.project,
+            )
+        except SkipProfile:
+            continue
 
         # check if credentials need to be renewed
         try:

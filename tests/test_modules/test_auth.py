@@ -1,10 +1,13 @@
 from collections import namedtuple
+from configparser import NoSectionError
 from unittest import mock
 from unittest.mock import Mock, MagicMock
 
 import pytest
+from configupdater import ConfigUpdater
 
 from leverage.container import SSOContainer
+from leverage.modules.auth import refresh_layer_credentials, get_layer_profile, SkipProfile
 from leverage.modules.aws import get_account_roles, add_sso_profile, configure_sso_profiles
 from tests.test_containers import container_fixture_factory
 
@@ -92,3 +95,37 @@ def test_configure_sso_profiles(mocked_boto, sso_container):
     )
     # and the file was saved
     assert mocked_updater.update_file.called
+
+
+@pytest.mark.parametrize("profile", ["local.account.profile", "${local.profile}-test-devops"])
+def test_get_layer_profile_skip_profile(profile):
+    with pytest.raises(SkipProfile):
+        get_layer_profile(profile, Mock(), "DevOps", "project")
+
+
+def test_get_layer_profile_no_section_error(muted_click_context):
+    updater = ConfigUpdater()  # empty config -> no sections
+    with pytest.raises(NoSectionError):
+        get_layer_profile("project-acc123-devops", updater, "DevOps", "project")
+
+
+def test_get_layer_profile(muted_click_context):
+    updater = ConfigUpdater()
+    updater_values = [
+        UpdaterAttr(value="123"),  # first call: account
+        UpdaterAttr(value="devops"),  # second call: role
+    ]
+
+    with mock.patch.object(updater, "get", side_effect=updater_values):
+        acc_id, acc_name, sso_role, layer_profile = get_layer_profile(
+            "project-acc123-devops", updater, "DevOps", "project"
+        )
+
+    assert acc_id == "123"
+    assert acc_name == "acc123"
+    assert sso_role == "devops"
+    assert layer_profile == "project-acc123-devops"
+
+
+# def test_refresh_layer_credentials():
+#     refresh_layer_credentials()
