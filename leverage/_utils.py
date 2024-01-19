@@ -216,7 +216,7 @@ def key_finder(d: dict, target):
             values.extend(key_finder(value, target))
         elif isinstance(value, list):
             # not a dict but a list? it must be a list of dicts, keep iterating recursively
-            for dict_ in value:
+            for dict_ in [d_ for d_ in value if isinstance(d_, dict)]:
                 values.extend(key_finder(dict_, target))
         elif key == target:
             # found the target key, store the value

@@ -51,3 +51,15 @@ def test_key_finder_simple_scenario():
     found = key_finder(data, "profile")
 
     assert found == ["1a", "1b", "2", "3"]
+
+
+def test_key_finder_skip_non_dict_values_in_lists():
+    data = {
+        "test1": {
+            "a": {"profile": "1a"},
+            "b": {"wrong": ["1b", "1c", "1d"]},
+        },
+    }
+    found = key_finder(data, "profile")
+
+    assert found == ["1a"]
