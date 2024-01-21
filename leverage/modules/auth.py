@@ -45,7 +45,21 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
     return account_id, account_name, sso_role, layer_profile
 
 
-def refresh_layer_credentials(cli):
+def update_config_section(updater: ConfigUpdater, layer_profile: str, data: dict):
+    """
+    Update the <layer_profile> section with the values given on <data>.
+    """
+    section = get_or_create_section(updater, layer_profile)
+    for key, value in data.items():
+        section.set(key, value)
+
+    updater.update_file()
+
+
+def get_profiles(cli):
+    """
+    Get the AWS profiles present on the layer by parsing some tf files.
+    """
     raw_profiles = set()
     # these are files from the layer we are currently on
     for name in ("config.tf", "locals.tf"):
@@ -59,12 +73,14 @@ def refresh_layer_credentials(cli):
         backend_config = hcl2.load(backend_config_file)
     tf_profile = backend_config["profile"]
 
+    return tf_profile, raw_profiles
+
+
+def refresh_layer_credentials(cli):
+    tf_profile, raw_profiles = get_profiles(cli)
+    print(tf_profile, raw_profiles)
     config_updater = ConfigUpdater()
     config_updater.read(cli.paths.host_aws_profiles_file)
-
-    credentials_updater = ConfigUpdater()
-    with open(cli.paths.host_aws_credentials_file, "a+") as credentials_file:
-        credentials_updater.read_file(credentials_file)
 
     client = boto3.client("sso", region_name=cli.sso_region_from_main_profile)
     for raw in raw_profiles:
@@ -86,8 +102,10 @@ def refresh_layer_credentials(cli):
             logger.debug(f"No cached credentials found.")
         else:
             # we reduce the validity 30 minutes, to avoid expiration over long-standing tasks
-            now = time.time() + (30 * 60)
-            if now < expiration:
+            renewal = time.time() + (30 * 60)
+            logger.debug(f"Token expiration time: {expiration}")
+            logger.debug(f"Token renewal time: {renewal}")
+            if renewal < expiration:
                 # still valid, nothing to do with these profile!
                 logger.info("Using already configured temporary credentials.")
                 continue
@@ -102,15 +120,25 @@ def refresh_layer_credentials(cli):
 
         # update expiration on aws/<project>/config
         logger.info(f"Writing {layer_profile} profile")
-        config_section = get_or_create_section(config_updater, f"profile {layer_profile}")
-        config_section.set("expiration", credentials["expiration"])
-        config_updater.update_file()
-
+        update_config_section(
+            config_updater,
+            f"profile {layer_profile}",
+            data={
+                "expiration": credentials["expiration"],
+            },
+        )
         # write credentials on aws/<project>/credentials
-        credentials_section = get_or_create_section(credentials_updater, layer_profile)
-        credentials_section.set("aws_access_key_id", credentials["accessKeyId"])
-        credentials_section.set("aws_secret_access_key", credentials["secretAccessKey"])
-        credentials_section.set("aws_session_token", credentials["sessionToken"])
-        credentials_updater.update_file()
+        credentials_updater = ConfigUpdater()
+        with open(cli.paths.host_aws_credentials_file, "a+") as credentials_file:
+            credentials_updater.read_file(credentials_file)
 
+        update_config_section(
+            credentials_updater,
+            layer_profile,
+            data={
+                "aws_access_key_id": credentials["accessKeyId"],
+                "aws_secret_access_key": credentials["secretAccessKey"],
+                "aws_session_token": credentials["sessionToken"],
+            },
+        )
         logger.info(f"Credentials for {account_name} account written successfully.")
