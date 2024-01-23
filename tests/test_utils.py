@@ -63,3 +63,24 @@ def test_key_finder_skip_non_dict_values_in_lists():
     found = key_finder(data, "profile")
 
     assert found == ["1a"]
+
+
+def test_key_finder_avoid_lookup():
+    data = {
+        "terraform_remote_state": {
+            "shared-vpcs": {
+                "for_each": "${local.shared-vpcs}",
+                "backend": "s3",
+                "config": {
+                    "region": '${lookup(each.value,"region")}',
+                    "profile": '${lookup(each.value,"profile")}',
+                    "bucket": '${lookup(each.value,"bucket")}',
+                    "key": '${lookup(each.value,"key")}',
+                },
+            }
+        },
+        "profile": "valid",
+    }
+    found = key_finder(data, "profile", avoid="lookup")
+
+    assert found == ["valid"]

@@ -203,7 +203,7 @@ def tar_directory(host_dir_path: Path) -> bytes:
     return bytes_array.read()
 
 
-def key_finder(d: dict, target):
+def key_finder(d: dict, target: str, avoid: str = None):
     """
     Iterate over a dict of dicts and/or lists of dicts, looking for a key with value "target".
     Collect and return all the values that matches "target" as key.
@@ -213,12 +213,15 @@ def key_finder(d: dict, target):
     for key, value in d.items():
         if isinstance(value, dict):
             # not the target but a dict? keep iterating recursively
-            values.extend(key_finder(value, target))
+            values.extend(key_finder(value, target, avoid))
         elif isinstance(value, list):
             # not a dict but a list? it must be a list of dicts, keep iterating recursively
             for dict_ in [d_ for d_ in value if isinstance(d_, dict)]:
-                values.extend(key_finder(dict_, target))
+                values.extend(key_finder(dict_, target, avoid))
         elif key == target:
+            if avoid and avoid in value:
+                # we found a key but the value contains <avoid> so skip it
+                continue
             # found the target key, store the value
             return [value]  # return it as an 1-item array to avoid .extend() to split the string
 

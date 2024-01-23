@@ -63,10 +63,15 @@ def get_profiles(cli):
     raw_profiles = set()
     # these are files from the layer we are currently on
     for name in ("config.tf", "locals.tf"):
-        with open(name) as tf_file:
-            tf_config = hcl2.load(tf_file)
+        try:
+            with open(name) as tf_file:
+                tf_config = hcl2.load(tf_file)
+        except FileNotFoundError:
+            continue
+
         # get all the "profile" references from the file
-        raw_profiles.update(set(key_finder(tf_config, "profile")))
+        # but avoid lookup references (we will catch those profiles from locals.tf instead)
+        raw_profiles.update(set(key_finder(tf_config, "profile", "lookup")))
 
     # the profile value from <layer>/config/backend.tfvars
     with open(cli.paths.local_backend_tfvars) as backend_config_file:
@@ -78,7 +83,6 @@ def get_profiles(cli):
 
 def refresh_layer_credentials(cli):
     tf_profile, raw_profiles = get_profiles(cli)
-    print(tf_profile, raw_profiles)
     config_updater = ConfigUpdater()
     config_updater.read(cli.paths.host_aws_profiles_file)
 
