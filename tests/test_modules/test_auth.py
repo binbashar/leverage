@@ -222,6 +222,7 @@ b3_client.get_role_credentials = Mock(
 @mock.patch("leverage.modules.aws.ConfigUpdater.update_file", new=Mock())
 @mock.patch("builtins.open", side_effect=open_side_effect)
 @mock.patch("boto3.client", return_value=b3_client)
+@mock.patch("pathlib.Path.touch", new=Mock())
 def test_refresh_layer_credentials_first_time(mock_open, mock_boto, sso_container, caplog):
     refresh_layer_credentials(sso_container)
 
@@ -250,6 +251,7 @@ def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_contain
 @mock.patch("builtins.open", side_effect=open_side_effect)
 @mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("pathlib.Path.touch", new=Mock())
 def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_container, propagate_logs):
     refresh_layer_credentials(sso_container)
 

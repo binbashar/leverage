@@ -1,5 +1,6 @@
 import time
 from configparser import NoSectionError, NoOptionError
+from pathlib import Path
 
 import boto3
 import hcl2
@@ -131,10 +132,11 @@ def refresh_layer_credentials(cli):
                 "expiration": credentials["expiration"],
             },
         )
-        # write credentials on aws/<project>/credentials
+        # write credentials on aws/<project>/credentials (create the file if it doesn't exist first)
+        creds_path = Path(cli.paths.host_aws_credentials_file)
+        creds_path.touch(exist_ok=True)
         credentials_updater = ConfigUpdater()
-        with open(cli.paths.host_aws_credentials_file, "a+") as credentials_file:
-            credentials_updater.read_file(credentials_file)
+        credentials_updater.read(cli.paths.host_aws_credentials_file)
 
         update_config_section(
             credentials_updater,
