@@ -103,7 +103,8 @@ def test_start_shell_mfa(kubectl_container):
     assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/.aws/test/credentials"
 
 
-def test_start_shell_sso(kubectl_container):
+@patch("leverage.container.refresh_layer_credentials")
+def test_start_shell_sso(mock_refresh, kubectl_container):
     """
     Make sure the SSO flag is set properly before the command.
     """
@@ -114,7 +115,7 @@ def test_start_shell_sso(kubectl_container):
 
     # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == "/bin/bash"
-    assert kubectl_container.refresh_sso_credentials
+    assert mock_refresh.called_once
 
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"

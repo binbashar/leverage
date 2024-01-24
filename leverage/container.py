@@ -446,7 +446,6 @@ class TerraformContainer(SSOContainer):
         self.mfa_enabled = (
             self.env_conf.get("MFA_ENABLED", "false") == "true"
         )  # TODO: Convert values to bool upon loading
-        self.refresh_sso_credentials = False
 
         # SSH AGENT
         SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
@@ -491,16 +490,6 @@ class TerraformContainer(SSOContainer):
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
-    def _run(self, *args, **kwargs):
-        # sso credentials needs to be refreshed right before we execute our command on the container
-        if self.refresh_sso_credentials:
-            # so we do it
-            refresh_layer_credentials(self)
-            # and then deactivate the flag
-            self.refresh_sso_credentials = False
-
-        return super()._run(*args, **kwargs)
-
     def auth_method(self) -> str:
         """
         Return the expected auth method based on the SSO or MFA flags.
@@ -510,7 +499,8 @@ class TerraformContainer(SSOContainer):
         """
         if self.sso_enabled:
             self._check_sso_token()
-            self.refresh_sso_credentials = True
+            # sso credentials needs to be refreshed right before we execute our command on the container
+            refresh_layer_credentials(self)
         elif self.mfa_enabled:
             self.environment.update(
                 {
