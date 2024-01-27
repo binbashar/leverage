@@ -75,7 +75,7 @@ class LeverageContainer:
 
     SHELL = "/bin/bash"
 
-    def __init__(self, client):
+    def __init__(self, client, mounts: dict = None, env_vars: dict = None):
         """Project related paths are determined and stored. Project configuration is loaded.
 
         Args:
@@ -128,12 +128,13 @@ class LeverageContainer:
             self.host_aws_credentials_dir.mkdir(parents=True)
         self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
 
-        self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=[])
+        mounts = [Mount(source=source, target=target, type="bind") for source, target in mounts] if mounts else []
+        self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=mounts)
         self.container_config = {
             "image": f"{self.image}:{self.image_tag}",
             "command": "",
             "stdin_open": True,
-            "environment": {},
+            "environment": env_vars or {},
             "entrypoint": "",
             "working_dir": f"{self.guest_base_path}/{self.cwd.relative_to(self.root_dir).as_posix()}",
             "host_config": self.host_config,
@@ -499,8 +500,8 @@ class TerraformContainer(LeverageContainer):
     TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
     TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
 
-    def __init__(self, client):
-        super().__init__(client)
+    def __init__(self, client, mounts=None, env_vars=None):
+        super().__init__(client, mounts=mounts, env_vars=env_vars)
 
         if self.root_dir == self.account_dir == self.common_config_dir == self.account_config_dir == self.cwd:
             logger.error("Not running in a Leverage project. Exiting.")
@@ -530,11 +531,12 @@ class TerraformContainer(LeverageContainer):
             "SSH_AUTH_SOCK": "" if SSH_AUTH_SOCK is None else "/ssh-agent",
         }
         self.entrypoint = self.TF_BINARY
-        self.mounts = [
+        extra_mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
             Mount(source=self.host_aws_credentials_dir.as_posix(), target=self.guest_aws_credentials_dir, type="bind"),
             Mount(source=(self.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
         ]
+        self.mounts.extend(extra_mounts)
         # if you have set the tf plugin cache locally
         if self.tf_cache_dir:
             # then mount it too into the container
