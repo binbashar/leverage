@@ -9,14 +9,14 @@ FAKE_HOST_CONFIG = {
 }
 
 
-def container_fixture_factory(container_class):
+def container_fixture_factory(container_class, *args, **kwargs):
     """
     Given a container class, return an instance of it with patched working variables.
     """
     mocked_client = MagicMock()
     mocked_client.api.create_host_config.return_value = FAKE_HOST_CONFIG
     with patch("leverage.container.load_env", return_value=FAKE_ENV):
-        container = container_class(mocked_client)
+        container = container_class(mocked_client, *args, **kwargs)
         container._run = Mock()
         container._check_sso_token = Mock()
         return container

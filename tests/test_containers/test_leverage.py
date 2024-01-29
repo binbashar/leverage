@@ -1,5 +1,3 @@
-from unittest.mock import patch, Mock
-
 import pytest
 
 from leverage.container import LeverageContainer
@@ -26,3 +24,22 @@ def test_change_file_ownership(leverage_container, fake_os_user):
     assert container_args["command"] == "chown 1234:5678 /tmp/file.txt"
     # we use chown directly so no entrypoint must be set
     assert container_args["entrypoint"] == ""
+
+
+def test_mounts(muted_click_context):
+    container = container_fixture_factory(
+        LeverageContainer, mounts=(("/usr/bin", "/usr/bin"), ("/tmp/file.txt", "/tmp/file.txt"))
+    )
+
+    assert container.client.api.create_host_config.call_args_list[0][1]["mounts"] == [
+        {"Target": "/usr/bin", "Source": "/usr/bin", "Type": "bind", "ReadOnly": False},
+        {"Target": "/tmp/file.txt", "Source": "/tmp/file.txt", "Type": "bind", "ReadOnly": False},
+    ]
+
+
+def test_env_vars(muted_click_context):
+    container = container_fixture_factory(LeverageContainer, env_vars={"testing": 123, "foo": "bar"})
+    container.start(container.SHELL)
+
+    container_args = container.client.api.create_container.call_args_list[0][1]
+    assert container_args["environment"] == {"foo": "bar", "testing": 123}
