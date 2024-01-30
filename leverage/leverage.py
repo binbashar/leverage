@@ -8,7 +8,7 @@ from leverage.tasks import load_tasks
 from leverage.tasks import list_tasks as _list_tasks
 from leverage._internals import pass_state
 
-from leverage.modules import aws, run, project, terraform, credentials, tfautomv, kubectl, generic
+from leverage.modules import aws, run, project, terraform, credentials, tfautomv, kubectl, shell
 
 
 @click.group(invoke_without_command=True)
@@ -52,4 +52,4 @@ leverage.add_command(aws)
 leverage.add_command(tfautomv)
 leverage.add_command(kubectl)
 leverage.add_command(kubectl, name="kc")
-leverage.add_command(generic)
+leverage.add_command(shell)

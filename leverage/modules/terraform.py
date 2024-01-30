@@ -12,6 +12,7 @@ from leverage._internals import pass_container
 from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer
 from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
+from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
 
 REGION = (
     r"global|(?:[a-z]{2}-(?:gov-)?"
@@ -23,15 +24,20 @@ REGION = (
 # CREATE THE TERRAFORM GROUP
 # ###########################################################################
 @click.group()
+@mount_option
+@env_var_option
 @pass_state
-def terraform(state):
+def terraform(state, env_var, mount):
     """Run Terraform commands in a custom containerized environment that provides extra functionality when interacting
     with your cloud provider such as handling multi factor authentication for you.
     All terraform subcommands that receive extra args will pass the given strings as is to their corresponding Terraform
     counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
     """
-    state.container = TerraformContainer(get_docker_client())
+    if env_var:
+        env_var = dict(env_var)
+
+    state.container = TerraformContainer(get_docker_client(), mounts=mount, env_vars=env_var)
     state.container.ensure_image()
 
 
@@ -137,8 +143,8 @@ def version(tf):
 
 
 @terraform.command()
-@click.option("--mfa", is_flag=True, default=False, help="Enable Multi Factor Authentication upon launching shell.")
-@click.option("--sso", is_flag=True, default=False, help="Enable SSO Authentication upon launching shell.")
+@auth_mfa
+@auth_sso
 @pass_container
 def shell(tf, mfa, sso):
     """Open a shell into the Terraform container in this layer."""
