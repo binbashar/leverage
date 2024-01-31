@@ -1,3 +1,4 @@
+import click
 from click.exceptions import Exit
 
 
@@ -32,3 +33,11 @@ def _handle_subcommand(context, cli_container, args, caller_name=None):
             context.invoke(subcommand)
         else:
             context.forward(subcommand)
+
+
+mount_option = click.option("--mount", multiple=True, type=click.Tuple([str, str]))
+env_var_option = click.option("--env-var", multiple=True, type=click.Tuple([str, str]))
+auth_mfa = click.option(
+    "--mfa", is_flag=True, default=False, help="Enable Multi Factor Authentication upon launching shell."
+)
+auth_sso = click.option("--sso", is_flag=True, default=False, help="Enable SSO Authentication upon launching shell.")

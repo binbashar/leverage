@@ -516,20 +516,22 @@ class TerraformContainer(LeverageContainer):
         # SSH AGENT
         SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
 
-        self.environment = {
-            "COMMON_CONFIG_FILE": self.common_tfvars,
-            "ACCOUNT_CONFIG_FILE": self.account_tfvars,
-            "BACKEND_CONFIG_FILE": self.backend_tfvars,
-            "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
-            "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
-            "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",  # Legacy?
-            "SRC_AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",  # Legacy?
-            "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
-            "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
-            "SCRIPT_LOG_LEVEL": get_script_log_level(),
-            "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
-            "SSH_AUTH_SOCK": "" if SSH_AUTH_SOCK is None else "/ssh-agent",
-        }
+        self.environment.update(
+            {
+                "COMMON_CONFIG_FILE": self.common_tfvars,
+                "ACCOUNT_CONFIG_FILE": self.account_tfvars,
+                "BACKEND_CONFIG_FILE": self.backend_tfvars,
+                "AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",
+                "AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",
+                "SRC_AWS_SHARED_CREDENTIALS_FILE": f"{self.guest_aws_credentials_dir}/credentials",  # Legacy?
+                "SRC_AWS_CONFIG_FILE": f"{self.guest_aws_credentials_dir}/config",  # Legacy?
+                "AWS_CACHE_DIR": f"{self.guest_aws_credentials_dir}/cache",
+                "SSO_CACHE_DIR": f"{self.guest_aws_credentials_dir}/sso/cache",
+                "SCRIPT_LOG_LEVEL": get_script_log_level(),
+                "MFA_SCRIPT_LOG_LEVEL": get_script_log_level(),  # Legacy
+                "SSH_AUTH_SOCK": "" if SSH_AUTH_SOCK is None else "/ssh-agent",
+            }
+        )
         self.entrypoint = self.TF_BINARY
         extra_mounts = [
             Mount(source=self.root_dir.as_posix(), target=self.guest_base_path, type="bind"),
