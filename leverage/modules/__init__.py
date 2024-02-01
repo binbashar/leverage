@@ -4,4 +4,4 @@ from .terraform import terraform
 from .credentials import credentials
 from .tfautomv import tfautomv
 from .kubectl import kubectl
-from .generic import generic
+from .shell import shell
