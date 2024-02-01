@@ -1,14 +1,19 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from leverage import path as lepath
-from leverage.path import get_home_path
-from leverage.path import get_working_path
-from leverage.path import get_account_path
-from leverage.path import get_build_script_path
-from leverage.path import get_global_config_path
-from leverage.path import get_account_config_path
+from leverage._utils import ExitError
+from leverage.path import (
+    get_home_path,
+    PathsHandler,
+    get_working_path,
+    get_account_config_path,
+    get_global_config_path,
+    get_build_script_path,
+    get_account_path,
+)
 
 
 def test_get_working_path():
@@ -100,3 +105,16 @@ def test_get_build_script_path(dir_structure, build_script_location):
 
 def test_get_build_script_path_no_build_script(dir_structure):
     assert get_build_script_path() is None
+
+
+def test_check_for_cluster_layer(muted_click_context, propagate_logs, caplog):
+    """
+    Test that if we are not on a cluster layer, we raise an error.
+    """
+    paths = PathsHandler({"PROJECT": "test"})
+    with patch.object(paths, "check_for_layer_location"):  # assume parent method is already tested
+        with pytest.raises(ExitError):
+            paths.cwd = Path("/random")
+            paths.check_for_cluster_layer()
+
+    assert caplog.messages[0] == "This command can only run at the [bold]cluster layer[/bold]."

@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 
 from leverage.container import TerraformContainer
@@ -26,12 +28,34 @@ def test_tf_plugin_cache_dir(terraform_container):
     assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/home/testing/.terraform/cache")
 
 
-def test_refresh_credentials(terraform_container):
+@mock.patch("leverage.container.refresh_layer_credentials")
+def test_refresh_credentials(mock_refresh, terraform_container):
     terraform_container.enable_sso()
     terraform_container.refresh_credentials()
     container_args = terraform_container.client.api.create_container.call_args_list[0][1]
 
-    # we want a shell, so -> /bin/bash with no entrypoint
+    # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == 'echo "Done."'
-    # import ipdb; ipdb.set_trace()
-    assert container_args["entrypoint"] == "/root/scripts/aws-sso/aws-sso-entrypoint.sh -- "
+    assert mock_refresh.called_once
+
+
+@mock.patch("leverage.container.refresh_layer_credentials")
+def test_auth_method_sso_enabled(mock_refresh, terraform_container):
+    terraform_container.sso_enabled = True
+    terraform_container.auth_method()
+
+    assert mock_refresh.called_once
+
+
+def test_auth_method_mfa_enabled(terraform_container):
+    terraform_container.sso_enabled = False
+    terraform_container.mfa_enabled = True
+
+    assert terraform_container.auth_method() == "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
+
+
+def test_auth_method_else(terraform_container):
+    terraform_container.sso_enabled = False
+    terraform_container.mfa_enabled = False
+
+    assert terraform_container.auth_method() == ""

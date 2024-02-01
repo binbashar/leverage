@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 import pytest
 from click.exceptions import Exit
 
-from leverage.container import TerraformContainer
 from leverage.containers.kubectl import KubeCtlContainer
+from leverage.path import PathsHandler
 from tests.test_containers import container_fixture_factory
 
 AWS_EKS_UPDATE_KUBECONFIG = "aws eks update-kubeconfig --name test-cluster --profile test-profile --region us-east-1"
@@ -24,7 +24,7 @@ def kubectl_container(muted_click_context):
 def test_get_eks_kube_config(kubectl_container):
     tf_output = "\r\naws eks update-kubeconfig --name test-cluster --profile test-profile\r\n"
     with patch.object(kubectl_container, "_start_with_output", return_value=(0, tf_output)):
-        kubectl_container.cwd = Path("/project/account/us-east-1/cluster")
+        kubectl_container.paths.cwd = Path("/project/account/us-east-1/cluster")
         cmd = kubectl_container._get_eks_kube_config()
 
     assert cmd == AWS_EKS_UPDATE_KUBECONFIG
@@ -37,18 +37,6 @@ def test_get_eks_kube_config_tf_output_error(kubectl_container):
     with patch.object(kubectl_container, "_start_with_output", return_value=(1, "ERROR!")):
         with pytest.raises(Exit):
             kubectl_container._get_eks_kube_config()
-
-
-def test_check_for_cluster_layer(kubectl_container, propagate_logs, caplog):
-    """
-    Test that if we are not on a cluster layer, we raise an error.
-    """
-    with patch.object(TerraformContainer, "check_for_layer_location"):  # assume parent method is already tested
-        with pytest.raises(Exit):
-            kubectl_container.cwd = Path("/random")
-            kubectl_container.check_for_cluster_layer()
-
-    assert caplog.messages[0] == "This command can only run at the [bold]cluster layer[/bold]."
 
 
 #################
@@ -80,7 +68,7 @@ def test_start_shell(kubectl_container):
 
 
 # don't rely on the filesystem
-@patch.object(KubeCtlContainer, "check_for_cluster_layer", Mock())
+@patch.object(PathsHandler, "check_for_cluster_layer", Mock())
 # nor terraform
 @patch.object(KubeCtlContainer, "_get_eks_kube_config", Mock(return_value=AWS_EKS_UPDATE_KUBECONFIG))
 def test_configure(kubectl_container, fake_os_user):
@@ -115,18 +103,19 @@ def test_start_shell_mfa(kubectl_container):
     assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/.aws/test/credentials"
 
 
-def test_start_shell_sso(kubectl_container):
+@patch("leverage.container.refresh_layer_credentials")
+def test_start_shell_sso(mock_refresh, kubectl_container):
     """
-    Make sure the command is executed through the proper SSO script.
+    Make sure the SSO flag is set properly before the command.
     """
     kubectl_container.enable_sso()
     kubectl_container._check_sso_token = Mock(return_value=True)
     kubectl_container.start_shell()
     container_args = kubectl_container.client.api.create_container.call_args_list[0][1]
 
-    # we want a shell, so -> /bin/bash with no entrypoint
+    # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == "/bin/bash"
-    assert container_args["entrypoint"] == "/root/scripts/aws-sso/aws-sso-entrypoint.sh -- "
+    assert mock_refresh.called_once
 
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"

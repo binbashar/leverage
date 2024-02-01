@@ -9,6 +9,7 @@ from subprocess import run
 from subprocess import PIPE
 
 from click.exceptions import Exit
+from configupdater import ConfigUpdater
 from docker import DockerClient
 from docker.models.containers import Container
 
@@ -109,7 +110,7 @@ class AwsCredsEntryPoint(CustomEntryPoint):
                 }
             )
         # now return file ownership on the aws credentials files
-        self.container.change_file_ownership(self.container.guest_aws_credentials_dir)
+        self.container.change_file_ownership(self.container.paths.guest_aws_credentials_dir)
 
 
 class AwsCredsContainer:
@@ -136,7 +137,7 @@ class AwsCredsContainer:
 
     def __exit__(self, *args, **kwargs):
         # now return file ownership on the aws credentials files
-        self.tf_container.change_file_ownership(self.tf_container.guest_aws_credentials_dir)
+        self.tf_container.change_file_ownership(self.tf_container.paths.guest_aws_credentials_dir)
 
 
 class ExitError(Exit):
@@ -200,3 +201,35 @@ def tar_directory(host_dir_path: Path) -> bytes:
     bytes_array.seek(0)
     # return the whole tar file as a byte array
     return bytes_array.read()
+
+
+def key_finder(d: dict, target: str, avoid: str = None):
+    """
+    Iterate over a dict of dicts and/or lists of dicts, looking for a key with value "target".
+    Collect and return all the values that matches "target" as key.
+    """
+    values = []
+
+    for key, value in d.items():
+        if isinstance(value, dict):
+            # not the target but a dict? keep iterating recursively
+            values.extend(key_finder(value, target, avoid))
+        elif isinstance(value, list):
+            # not a dict but a list? it must be a list of dicts, keep iterating recursively
+            for dict_ in [d_ for d_ in value if isinstance(d_, dict)]:
+                values.extend(key_finder(dict_, target, avoid))
+        elif key == target:
+            if avoid and avoid in value:
+                # we found a key but the value contains <avoid> so skip it
+                continue
+            # found the target key, store the value
+            return [value]  # return it as an 1-item array to avoid .extend() to split the string
+
+    return values
+
+
+def get_or_create_section(updater: ConfigUpdater, section_name: str):
+    if not updater.has_section(section_name):
+        updater.add_section(section_name)
+    # add_section doesn't return the section object, so we need to retrieve it either case
+    return updater.get_section(section_name)

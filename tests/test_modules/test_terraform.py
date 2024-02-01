@@ -21,7 +21,7 @@ def terraform_container(muted_click_context):
     ctx.obj = state
 
     # assume we are on a valid location
-    with patch.object(TerraformContainer, "check_for_layer_location", Mock()):
+    with patch.object(tf_container.paths, "check_for_layer_location", Mock()):
         # assume we have valid credentials
         with patch.object(AwsCredsContainer, "__enter__", Mock()):
             yield tf_container
