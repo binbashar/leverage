@@ -312,7 +312,7 @@ def _load_configs_for_credentials():
 
     terraform_config = {}
     logger.info("Loading Terraform common configuration.")
-    terraform_config = AWSCLI.common_conf
+    terraform_config = AWSCLI.paths.common_conf
 
     config_values = {}
     config_values["short_name"] = (
