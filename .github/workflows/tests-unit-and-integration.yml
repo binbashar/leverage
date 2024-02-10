@@ -16,9 +16,12 @@ jobs:
 
       - name: run_unit_tests
         run: |
-          echo "[INFO] Running unit tests"
-          make test-unit-no-cov
+          echo "[INFO] Running unit tests and generate coverage report"
+          make test-unit
         shell: bash
+
+    - name: Report Coveralls
+      uses: coverallsapp/github-action@v2
 
   integration_tests:
     runs-on: ubuntu-latest
