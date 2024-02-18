@@ -8,16 +8,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: build_image
+      - name: install_requirements
         run: |
-          echo "[INFO] Building image"
-          make build-image
-        shell: bash
+          echo "[INFO] Installing requirements...
+          pip install -r dev-requirements.txt
 
       - name: run_unit_tests
         run: |
           echo "[INFO] Running unit tests and generate coverage report"
-          make test-unit
+          pytest --verbose
         shell: bash
 
       - name: Report Coveralls
