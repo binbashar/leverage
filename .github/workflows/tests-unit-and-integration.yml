@@ -10,7 +10,7 @@ jobs:
 
       - name: install_requirements
         run: |
-          echo "[INFO] Installing requirements...
+          echo "[INFO] Installing requirements..."
           pip install -r dev-requirements.txt
 
       - name: run_unit_tests
