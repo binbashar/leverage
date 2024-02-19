@@ -36,7 +36,7 @@ version-resolver:
       - 'patch'
   default: patch
 footer: |
-  REMINDER: please remember to add a Version Compatibility section before publishing a release draft.
+  *REMINDER:* please remember to add or update the Version Compatibility section before publishing a release draft.
 template: |
   ## Changes
 
