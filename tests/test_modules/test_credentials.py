@@ -1,10 +1,15 @@
+from pathlib import Path
 from unittest import mock
 from unittest.mock import Mock
 
 import pytest
 
 from leverage._utils import ExitError
-from leverage.modules.credentials import _load_configs_for_credentials, configure_accounts_profiles
+from leverage.modules.credentials import (
+    _load_configs_for_credentials,
+    configure_accounts_profiles,
+    _extract_credentials,
+)
 
 
 @mock.patch(
@@ -106,3 +111,17 @@ def test_configure_accounts_profiles_mfa_error(muted_click_context):
     """
     with pytest.raises(ExitError, match="No MFA device found for user."):
         configure_accounts_profiles("test-management", "us-test-1", {}, [], True)
+
+
+@mock.patch(
+    "builtins.open",
+    new_callable=mock.mock_open,
+    read_data="""Access key ID,Secret access key
+ACCESSKEYXXXXXXXXXXX,secretkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+""",
+)
+def test_extract_credentials(mocked_open):
+    assert _extract_credentials(Path("credentials.csv")) == (
+        "ACCESSKEYXXXXXXXXXXX",
+        "secretkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    )
