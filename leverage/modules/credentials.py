@@ -15,6 +15,7 @@ from ruamel.yaml import YAML
 
 from leverage import __toolbox_version__
 from leverage import logger
+from leverage._utils import ExitError
 from leverage.path import get_root_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
@@ -565,18 +566,17 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         profile(str): Name of the profile to configure.
         region (str): Region.
         organization_accounts (dict): Name and id of all accounts in the organization.
-        project_accounts (dict): Name and email of all accounts in project configuration file.
+        project_accounts (list): Name and email of all accounts in project configuration file.
         fetch_mfa_device (bool): Whether to fetch MFA device for profiles.
     """
-    short_name, type = profile.split("-")
+    short_name, _type = profile.split("-")
 
     mfa_serial = ""
     if fetch_mfa_device:
         logger.info("Fetching MFA device serial.")
         mfa_serial = _get_mfa_serial(profile)
         if not mfa_serial:
-            logger.error("No MFA device found for user.")
-            raise Exit(1)
+            raise ExitError(1, "No MFA device found for user.")
 
     account_profiles = {}
     for account in project_accounts:
@@ -593,13 +593,13 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         account_profile = {
             "output": "json",
             "region": region,
-            "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[type]['role']}",
+            "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[_type]['role']}",
             "source_profile": profile,
         }
         if mfa_serial:
             account_profile["mfa_serial"] = mfa_serial
         # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = account_profile
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}"] = account_profile
 
     logger.info("Backing up account profiles file.")
     _backup_file("config")
