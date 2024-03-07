@@ -9,7 +9,11 @@ from leverage.modules.credentials import (
     _load_configs_for_credentials,
     configure_accounts_profiles,
     _extract_credentials,
+    _get_mfa_serial,
+    _get_organization_accounts,
 )
+
+mocked_aws_cli = Mock()
 
 
 @mock.patch(
@@ -125,3 +129,30 @@ def test_extract_credentials(mocked_open):
         "ACCESSKEYXXXXXXXXXXX",
         "secretkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     )
+
+
+def test_get_organization_accounts():
+    mocked_aws_cli.exec = Mock(return_value=(0, '{"Accounts": [{"Name": "test-acc1", "Id": "12345"}]}'))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        assert _get_organization_accounts("foo", "bar") == {"test-acc1": "12345"}
+
+
+def test_get_organization_accounts_error():
+    mocked_aws_cli.exec = Mock(return_value=(1, "BAD"))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        assert _get_organization_accounts("foo", "bar") == {}
+
+
+def test_get_mfa_serial():
+    mocked_aws_cli.exec = Mock(
+        return_value=(0, '{"MFADevices": [{"SerialNumber": "arn:aws:iam::123456789012:mfa/testuser"}]}')
+    )
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        assert _get_mfa_serial("foo") == "arn:aws:iam::123456789012:mfa/testuser"
+
+
+def test_get_mfa_serial_error(muted_click_context):
+    mocked_aws_cli.exec = Mock(return_value=(1, "BAD"))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        with pytest.raises(ExitError, match="AWS CLI error: BAD"):
+            _get_mfa_serial("foo")

@@ -527,8 +527,7 @@ def _get_mfa_serial(profile):
     """
     exit_code, mfa_devices = AWSCLI.exec("--output json iam list-mfa-devices", profile)
     if exit_code:
-        logger.error(f"AWS CLI error: {mfa_devices}")
-        raise Exit(exit_code)
+        raise ExitError(exit_code, f"AWS CLI error: {mfa_devices}")
     mfa_devices = json.loads(mfa_devices)
 
     # Either zero or one MFA device should be configured for either `management` or `security` accounts users.
