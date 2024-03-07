@@ -447,8 +447,7 @@ def configure_credentials(profile, file=None, make_backup=False):
     for key, value in values.items():
         exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
         if exit_code:
-            logger.error(f"AWS CLI error: {output}")
-            raise Exit(exit_code)
+            raise ExitError(exit_code, f"AWS CLI error: {output}")
 
 
 def _credentials_are_valid(profile):

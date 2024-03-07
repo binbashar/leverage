@@ -13,6 +13,7 @@ from leverage.modules.credentials import (
     _get_organization_accounts,
     _profile_is_configured,
     _backup_file,
+    configure_credentials,
 )
 
 mocked_aws_cli = Mock()
@@ -173,3 +174,21 @@ def test_backup_file():
     assert (
         mocked_aws_cli.system_exec.call_args_list[0][0][0] == "sh -c 'cp $AWS_CONFIG_FILE \"${AWS_CONFIG_FILE}.bkp\"'"
     )
+
+
+def test_configure_credentials(with_click_context, propagate_logs, caplog):
+    mocked_aws_cli.exec = Mock(return_value=(0, ""))
+    with mock.patch("leverage.modules.credentials._backup_file"):
+        with mock.patch("leverage.modules.credentials._ask_for_credentials", new=Mock(return_value=("foo", "bar"))):
+            with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+                configure_credentials("foo", "manual", make_backup=True)
+
+    assert caplog.messages[0] == "Backing up credentials file."
+
+
+def test_configure_credentials_error(with_click_context):
+    mocked_aws_cli.exec = Mock(return_value=(1, "BROKEN"))
+    with mock.patch("leverage.modules.credentials._extract_credentials", new=Mock(return_value=("foo", "bar"))):
+        with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+            with pytest.raises(ExitError, match="AWS CLI error: BROKEN"):
+                configure_credentials("foo", "/.aws/creds")
