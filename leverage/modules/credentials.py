@@ -481,8 +481,7 @@ def _get_management_account_id(profile):
     """
     exit_code, caller_identity = AWSCLI.exec("--output json sts get-caller-identity", profile)
     if exit_code:
-        logger.error(f"AWS CLI error: {caller_identity}")
-        raise Exit(exit_code)
+        raise ExitError(exit_code, f"AWS CLI error: {caller_identity}")
 
     caller_identity = json.loads(caller_identity)
     return caller_identity["Account"]

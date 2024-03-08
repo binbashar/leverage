@@ -14,6 +14,8 @@ from leverage.modules.credentials import (
     _profile_is_configured,
     _backup_file,
     configure_credentials,
+    _credentials_are_valid,
+    _get_management_account_id,
 )
 
 mocked_aws_cli = Mock()
@@ -165,6 +167,25 @@ def test_profile_is_configured():
     mocked_aws_cli.exec = Mock(return_value=(0, "OK"))
     with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
         assert _profile_is_configured("foo")
+
+
+def test_credentials_are_valid():
+    mocked_aws_cli.exec = Mock(return_value=(0, "OK"))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        assert _credentials_are_valid("foo")
+
+
+def test_get_management_account_id():
+    mocked_aws_cli.exec = Mock(return_value=(0, '{"Account": "123456789012"}'))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        assert _get_management_account_id("foo") == "123456789012"
+
+
+def test_get_management_account_id_error(with_click_context):
+    mocked_aws_cli.exec = Mock(return_value=(1, "BAD"))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        with pytest.raises(ExitError, match="AWS CLI error: BAD"):
+            _get_management_account_id("foo")
 
 
 def test_backup_file():
