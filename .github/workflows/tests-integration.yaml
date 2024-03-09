@@ -1,27 +1,8 @@
-name: Tests | Unit and Integration
+name: Tests | Integration
 
 on: [pull_request, workflow_dispatch]
 
 jobs:
-  unit_tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: install_requirements
-        run: |
-          echo "[INFO] Installing requirements..."
-          pip install -r dev-requirements.txt
-
-      - name: run_unit_tests
-        run: |
-          echo "[INFO] Running unit tests and generate coverage report"
-          pytest --verbose
-        shell: bash
-
-      - name: Report Coveralls
-        uses: coverallsapp/github-action@v2
-
   integration_tests:
     runs-on: ubuntu-latest
     steps:

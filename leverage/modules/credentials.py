@@ -15,6 +15,7 @@ from ruamel.yaml import YAML
 
 from leverage import __toolbox_version__
 from leverage import logger
+from leverage._utils import ExitError
 from leverage.path import get_root_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
@@ -446,8 +447,7 @@ def configure_credentials(profile, file=None, make_backup=False):
     for key, value in values.items():
         exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
         if exit_code:
-            logger.error(f"AWS CLI error: {output}")
-            raise Exit(exit_code)
+            raise ExitError(exit_code, f"AWS CLI error: {output}")
 
 
 def _credentials_are_valid(profile):
@@ -481,8 +481,7 @@ def _get_management_account_id(profile):
     """
     exit_code, caller_identity = AWSCLI.exec("--output json sts get-caller-identity", profile)
     if exit_code:
-        logger.error(f"AWS CLI error: {caller_identity}")
-        raise Exit(exit_code)
+        raise ExitError(exit_code, f"AWS CLI error: {caller_identity}")
 
     caller_identity = json.loads(caller_identity)
     return caller_identity["Account"]
@@ -526,8 +525,7 @@ def _get_mfa_serial(profile):
     """
     exit_code, mfa_devices = AWSCLI.exec("--output json iam list-mfa-devices", profile)
     if exit_code:
-        logger.error(f"AWS CLI error: {mfa_devices}")
-        raise Exit(exit_code)
+        raise ExitError(exit_code, f"AWS CLI error: {mfa_devices}")
     mfa_devices = json.loads(mfa_devices)
 
     # Either zero or one MFA device should be configured for either `management` or `security` accounts users.
@@ -554,8 +552,7 @@ def configure_profile(profile, values):
     for key, value in values.items():
         exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
         if exit_code:
-            logger.error(f"AWS CLI error: {output}")
-            raise Exit(exit_code)
+            raise ExitError(exit_code, f"AWS CLI error: {output}")
 
 
 def configure_accounts_profiles(profile, region, organization_accounts, project_accounts, fetch_mfa_device):
@@ -565,18 +562,17 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         profile(str): Name of the profile to configure.
         region (str): Region.
         organization_accounts (dict): Name and id of all accounts in the organization.
-        project_accounts (dict): Name and email of all accounts in project configuration file.
+        project_accounts (list): Name and email of all accounts in project configuration file.
         fetch_mfa_device (bool): Whether to fetch MFA device for profiles.
     """
-    short_name, type = profile.split("-")
+    short_name, _type = profile.split("-")
 
     mfa_serial = ""
     if fetch_mfa_device:
         logger.info("Fetching MFA device serial.")
         mfa_serial = _get_mfa_serial(profile)
         if not mfa_serial:
-            logger.error("No MFA device found for user.")
-            raise Exit(1)
+            raise ExitError(1, "No MFA device found for user.")
 
     account_profiles = {}
     for account in project_accounts:
@@ -593,13 +589,13 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         account_profile = {
             "output": "json",
             "region": region,
-            "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[type]['role']}",
+            "role_arn": f"arn:aws:iam::{account_id}:role/{PROFILES[_type]['role']}",
             "source_profile": profile,
         }
         if mfa_serial:
             account_profile["mfa_serial"] = mfa_serial
         # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[type]['profile_role']}"] = account_profile
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}"] = account_profile
 
     logger.info("Backing up account profiles file.")
     _backup_file("config")

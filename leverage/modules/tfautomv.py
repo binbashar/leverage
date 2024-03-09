@@ -1,10 +1,6 @@
-import re
-
-import hcl2
 import click
 from click.exceptions import Exit
 
-from leverage import logger
 from leverage._internals import pass_state
 from leverage._internals import pass_container
 from leverage.container import get_docker_client
