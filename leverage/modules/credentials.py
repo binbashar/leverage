@@ -552,8 +552,7 @@ def configure_profile(profile, values):
     for key, value in values.items():
         exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
         if exit_code:
-            logger.error(f"AWS CLI error: {output}")
-            raise Exit(exit_code)
+            raise ExitError(exit_code, f"AWS CLI error: {output}")
 
 
 def configure_accounts_profiles(profile, region, organization_accounts, project_accounts, fetch_mfa_device):

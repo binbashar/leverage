@@ -16,6 +16,8 @@ from leverage.modules.credentials import (
     configure_credentials,
     _credentials_are_valid,
     _get_management_account_id,
+    configure_profile,
+    _update_account_ids,
 )
 
 mocked_aws_cli = Mock()
@@ -213,3 +215,54 @@ def test_configure_credentials_error(with_click_context):
         with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
             with pytest.raises(ExitError, match="AWS CLI error: BROKEN"):
                 configure_credentials("foo", "/.aws/creds")
+
+
+def test_configure_profile(with_click_context, propagate_logs, caplog):
+    mocked_aws_cli.exec = Mock(return_value=(0, ""))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        configure_profile("dummy", {"foo": "bar"})
+
+    assert caplog.messages[0] == "\tConfiguring profile [bold]dummy[/bold]"
+    assert mocked_aws_cli.exec.call_args_list[0][0] == ("configure set foo bar", "dummy")
+
+
+def test_configure_profile_error(with_click_context):
+    mocked_aws_cli.exec = Mock(return_value=(1, "BROKEN"))
+    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+        with pytest.raises(ExitError, match="AWS CLI error: BROKEN"):
+            configure_profile("dummy", {"foo": "bar"})
+
+
+def test_update_account_ids(with_click_context, propagate_logs):
+    mocked_aws_cli.system_exec = Mock()
+    with mock.patch("leverage.modules.credentials.PROJECT_COMMON_TFVARS"):
+        with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
+            _update_account_ids(
+                {
+                    "project_name": "test",
+                    "organization": {
+                        "accounts": [
+                            {
+                                "name": "acc1",
+                                "email": "acc@test.com",
+                                "id": "12345",
+                            }
+                        ]
+                    },
+                }
+            )
+
+    assert (
+        mocked_aws_cli.system_exec.call_args_list[0][0][0]
+        == 'hcledit -f /test/config/common.tfvars -u attribute set acc1_account_id "\\"12345\\""'
+    )
+
+    assert (
+        mocked_aws_cli.system_exec.call_args_list[1][0][0]
+        == """hcledit -f /test/config/common.tfvars -u attribute set accounts '{
+  acc1 = {
+    email = \"acc@test.com\",
+    id = \"12345\"
+  }
+}'"""
+    )
