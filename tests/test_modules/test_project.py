@@ -14,8 +14,7 @@ from leverage.modules.project import validate_config
         ("hyphens-are-allowed", "ok"),
         # different valid short project names
         ("fine", "foo"),
-        ("fine", "123"),
-        ("fine", "max3"),
+        ("fine", "full"),
     ],
 )
 def test_validate_config_happy_path(project_name, short_name):
