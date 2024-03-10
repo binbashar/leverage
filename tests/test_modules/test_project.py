@@ -39,10 +39,11 @@ def test_validate_config_project_name_errors(muted_click_context, invalid_name):
 @pytest.mark.parametrize(
     "invalid_name",
     [
-        "longerthan4",
+        "longerthan",
         "1",
         "@-!#",
         "",
+        "UPPR",
     ],
 )
 def test_validate_config_short_project_name_errors(muted_click_context, invalid_name):

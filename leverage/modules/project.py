@@ -290,10 +290,10 @@ def validate_config(config: dict):
             "Project name is not valid. Only lowercase alphanumeric characters and hyphens are allowed. It must be 25 characters long at most.",
         )
 
-    if not re.match(r"^[a-z0-9]{2,4}$", config["short_name"]):
+    if not re.match(r"^[a-z]{2,4}$", config["short_name"]):
         raise ExitError(
             1,
-            "Project short name is not valid. Only lowercase alphanumeric characters are allowed. It must be between 2 and 4 characters long.",
+            "Project short name is not valid. Only lowercase alphabetic characters are allowed. It must be between 2 and 4 characters long.",
         )
 
     return True
