@@ -50,27 +50,72 @@ So, if you have created a project with version <1.8.0 and want to use it with ve
 
 For the second item you can check the version [here](https://hub.docker.com/r/binbash/leverage-toolbox/tags).
 
+
 ## Setting up development environment
 
-First, you should create a virtual environment and install all the required dependencies by running: `pipenv install --dev`.
+### How to contribute to this repository
 
-NOTE: If you don't have `pipenv` in your system, you can check the following documentation: https://pipenv.pypa.io/en/latest/#install-pipenv-today
+- The `master` branch should always be in a deployable state.
+- [We are not following GitFlow](https://www.endoflineblog.com/gitflow-considered-harmful), there is no `dev` branch.
+- All work is done in short lived feature branches that are merged to `master` once they have been tested and approved.
+- Commit history is kept linear.
 
-Now, go to the directory that you will be using for running the local version of the CLI (it needs to be directory outside the CLI's source code) and install the CLI as an editable package inside this new virtual environment: `pipenv install -e /path/to/cli-source-code`.
+In order to keep our commit history linear and easy to navigate, we're following a few simple rules:
 
-After that shell into the virtual environment via `pipenv shell` to start using the CLI in dev mode. This way, the `leverage` command on your virtual environment will be executed from the project folder, using it as the source.
+- Only [fast-forward merges](http://ariya.ofilabs.com/2013/09/fast-forward-git-merge.html) are allowed. Github's repo
+  has already been set up for this so only `Rebase and Merge` button is available for all PRs. Alternatively you can
+  merge PRs from command line:
+  ```bash
+  git fetch origin                   # fetch latest changes from Github
+  git rebase -i origin/master        # rebase your branch on top of master and squash multiple commits 
+  git push -f origin <my_branch>     # update the remote branch on Github 
+  git push origin <my_branch>:master # push your branch as master. This will succeed only if your branch 
+                                     # is rebased on top of master and if the PR has been approved. 
+                                     # It also merges the PR and deletes the feature branch on Github.
+  ```
+
+- Before merge ensure commits are [squashed](http://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html):
+    1. Each commit should be well-tested product increment
+    2. PR should usually have only one commit
+    3. Multiple commits per PR are acceptable in rare cases when each commit is a complete work unit.
+
+- [Write meaningful commit messages](https://chris.beams.io/posts/git-commit/), prefix it with ticket number in square brackets
+
+### Python versions and virtual environment management
+
+Install Python 3.8.18 & setup virtual environment. We recommend to use [pyenv](https://github.com/pyenv/pyenv) and
+[pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv)
+
+```bash
+pyenv install 3.8.18
+pyenv local 3.8.18
+pyenv virtualenv 3.8.2 leverage_cli_venv
+pyenv local leverage_cli_venv
+```
+
+The new virtual environment will be automatically used when you change into the project's directory.
+
+### Install dependencies with pipenv
+
+Install [pipenv](https://pipenv.pypa.io/en/latest/#install-pipenv-today) if you don't have it already:
+
+```bash
+pip install pipenv
+```
+
+First, you should create a virtual environment and install all the required dependencies by running:
+```bash
+pipenv install --dev
+```
 
 Now all the changes to the project will be immediately reflected on the command.
 
-## Pre-commit hooks
+### Pre-commit hooks
 
-In order to run black automatically on every commit, you should install `pre-commit` first:
+In order to run black automatically on every commit, you should install [pre-commit](https://pre-commit.com/#installation) first:
 
-https://pre-commit.com/#installation
-
-And then the hooks:
-
-```
+And then install the hooks:
+```bash
 pre-commit install
 ```
 
@@ -90,9 +135,34 @@ Integration tests:
 bats -r tests/bats
 ```
 ### Using docker image
-A Docker image suitable for running all tests can be crafted by running `make build-image`. After crafting the image all tests can be executed.
 
-To run all tests, run `make tests`. Alternatively `make test-unit` or `make test-int` for unit or integration tests respectively.
+#### Build the base image for all tests
+
+A Docker image suitable for running all tests can be crafted by running:
+
+```bash
+make build-image
+``` 
+
+*Note*: this is a pre-requisite for running tests with `make`
+
+#### Run all tests
+
+```bash
+make tests
+```
+
+#### Run only unit tests
+
+```bash
+make test-unit
+```
+
+#### Run only integration tests
+
+```bash
+make test-int 
+```
 
 ## Release Process
 * On every PR, a Github Action workflow is triggered to create/update a release draft.
