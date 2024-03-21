@@ -13,6 +13,8 @@ from leverage.path import (
     get_global_config_path,
     get_build_script_path,
     get_account_path,
+    get_project_root_or_current_dir_path,
+    NotARepositoryError,
 )
 
 
@@ -118,3 +120,37 @@ def test_check_for_cluster_layer(muted_click_context, propagate_logs, caplog):
             paths.check_for_cluster_layer()
 
     assert caplog.messages[0] == "This command can only run at the [bold]cluster layer[/bold]."
+
+
+class TestGetProjectPathOrCurrentDir:
+    @patch("leverage.path.get_root_path")
+    @patch("pathlib.Path.cwd")
+    def test_in_valid_git_repository(self, mock_cwd, mock_get_root_path):
+        """Test returns project root in a valid Git repository."""
+        expected_path = Path("/path/to/project/root")
+        mock_get_root_path.return_value = str(expected_path)
+        assert get_project_root_or_current_dir_path() == expected_path
+        mock_get_root_path.assert_called_once()
+        mock_cwd.assert_not_called()
+
+    @patch("leverage.path.get_root_path")
+    @patch("pathlib.Path.cwd")
+    def test_not_in_git_repository(self, mock_cwd, mock_get_root_path):
+        """Test falls back to current directory if NotARepositoryError is raised."""
+        mock_get_root_path.side_effect = NotARepositoryError("Not running in a git repository.")
+        expected_cwd = Path("/current/working/directory")
+        mock_cwd.return_value = expected_cwd
+        assert get_project_root_or_current_dir_path() == expected_cwd
+        mock_get_root_path.assert_called_once()
+        mock_cwd.assert_called_once()
+
+    @patch("leverage.path.get_root_path")
+    @patch("pathlib.Path.cwd")
+    def test_get_root_path_returns_unexpected_type(self, mock_cwd, mock_get_root_path):
+        """Test falls back to current directory if TypeError is encountered."""
+        mock_get_root_path.side_effect = TypeError("Unexpected return type.")
+        expected_cwd = Path("/current/working/directory")
+        mock_cwd.return_value = expected_cwd
+        assert get_project_root_or_current_dir_path() == expected_cwd
+        mock_get_root_path.assert_called_once()
+        mock_cwd.assert_called_once()

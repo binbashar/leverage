@@ -15,7 +15,7 @@ from ruamel.yaml import YAML
 
 from leverage import __toolbox_version__
 from leverage import logger
-from leverage.path import get_root_path
+from leverage.path import get_root_path, get_project_root_or_current_dir_path
 from leverage.path import get_global_config_path
 from leverage.path import NotARepositoryError
 from leverage._internals import pass_state
@@ -37,9 +37,9 @@ ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 
 # TODO: Remove these and get them into the global app state
+PROJECT_ROOT = get_project_root_or_current_dir_path()
 try:
     PROJECT_COMMON_TFVARS = Path(get_global_config_path())
-    PROJECT_ROOT = Path(get_root_path())
 except NotARepositoryError:
     PROJECT_COMMON_TFVARS = PROJECT_ROOT = Path.cwd()
 
