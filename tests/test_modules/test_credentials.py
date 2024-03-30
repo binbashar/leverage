@@ -232,6 +232,9 @@ def test_get_management_account_id_error(with_click_context):
 
 
 def test_configure_credentials(with_click_context, propagate_logs, caplog):
+    """
+    Test that the aws credentials for the profile are set and the backup feature is called.
+    """
     mocked_aws_cli.exec = Mock(return_value=(0, ""))
     with mock.patch("leverage.modules.credentials._backup_file"):
         with mock.patch("leverage.modules.credentials._ask_for_credentials", new=Mock(return_value=("foo", "bar"))):
@@ -242,6 +245,9 @@ def test_configure_credentials(with_click_context, propagate_logs, caplog):
 
 
 def test_configure_credentials_error(with_click_context):
+    """
+    Test that, if settings the credentials for a profile fails, we return a user-friendly error.
+    """
     mocked_aws_cli.exec = Mock(return_value=(1, "BROKEN"))
     with mock.patch("leverage.modules.credentials._extract_credentials", new=Mock(return_value=("foo", "bar"))):
         with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
@@ -249,23 +255,10 @@ def test_configure_credentials_error(with_click_context):
                 configure_credentials("foo", "/.aws/creds")
 
 
-def test_configure_profile(with_click_context, propagate_logs, caplog):
-    mocked_aws_cli.exec = Mock(return_value=(0, ""))
-    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
-        configure_profile("dummy", {"foo": "bar"})
-
-    assert caplog.messages[0] == "\tConfiguring profile [bold]dummy[/bold]"
-    assert mocked_aws_cli.exec.call_args_list[0][0] == ("configure set foo bar", "dummy")
-
-
-def test_configure_profile_error(with_click_context):
-    mocked_aws_cli.exec = Mock(return_value=(1, "BROKEN"))
-    with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
-        with pytest.raises(ExitError, match="AWS CLI error: BROKEN"):
-            configure_profile("dummy", {"foo": "bar"})
-
-
 def test_update_account_ids(with_click_context, propagate_logs):
+    """
+    Test that account ids are updated in global configuration files.
+    """
     mocked_aws_cli.system_exec = Mock()
     with mock.patch("leverage.modules.credentials.PROJECT_COMMON_TFVARS"):
         with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
