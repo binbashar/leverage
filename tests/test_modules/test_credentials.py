@@ -213,18 +213,27 @@ def test_get_mfa_serial_error(muted_click_context):
 
 
 def test_credentials_are_valid():
+    """
+    Test that AWS credentials for the current profile are valid.
+    """
     mocked_aws_cli.exec = Mock(return_value=(0, "OK"))
     with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
         assert _credentials_are_valid("foo")
 
 
 def test_get_management_account_id():
+    """
+    Test that we can get the account id from the current profile.
+    """
     mocked_aws_cli.exec = Mock(return_value=(0, '{"Account": "123456789012"}'))
     with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
         assert _get_management_account_id("foo") == "123456789012"
 
 
 def test_get_management_account_id_error(with_click_context):
+    """
+    Test that we return a user-friendly error if getting the account id of a profile fails.
+    """
     mocked_aws_cli.exec = Mock(return_value=(1, "BAD"))
     with mock.patch("leverage.modules.credentials.AWSCLI", mocked_aws_cli):
         with pytest.raises(ExitError, match="AWS CLI error: BAD"):
