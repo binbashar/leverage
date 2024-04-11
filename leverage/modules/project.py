@@ -16,7 +16,7 @@ from jinja2 import FileSystemLoader
 from leverage import __toolbox_version__
 from leverage import logger
 from leverage.logger import console
-from leverage.path import get_root_path
+from leverage.path import get_root_path, get_project_root_or_current_dir_path
 from leverage.path import NotARepositoryError
 from leverage._utils import git, ExitError
 from leverage.container import get_docker_client
@@ -33,10 +33,7 @@ LEVERAGE_TEMPLATE_REPO = "https://github.com/binbashar/le-tf-infra-aws-template.
 IGNORE_PATTERNS = ignore_patterns(TEMPLATE_PATTERN, ".gitkeep")
 
 # Useful project related definitions
-try:
-    PROJECT_ROOT = Path(get_root_path())
-except NotARepositoryError:
-    PROJECT_ROOT = Path.cwd()
+PROJECT_ROOT = get_project_root_or_current_dir_path()
 PROJECT_CONFIG = PROJECT_ROOT / PROJECT_CONFIG_FILE
 
 CONFIG_DIRECTORY = "config"

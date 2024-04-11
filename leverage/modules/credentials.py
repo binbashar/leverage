@@ -1,28 +1,27 @@
 """
     Credentials managing module.
 """
-import re
 import csv
 import json
-from pathlib import Path
+import re
 from functools import wraps
+from pathlib import Path
 
 import click
-from click.exceptions import Exit
 import questionary
+from click.exceptions import Exit
 from questionary import Choice
 from ruamel.yaml import YAML
 
 from leverage import __toolbox_version__
 from leverage import logger
-from leverage._utils import ExitError
-from leverage.path import get_root_path
-from leverage.path import get_global_config_path
-from leverage.path import NotARepositoryError
 from leverage._internals import pass_state
-from leverage.container import get_docker_client
+from leverage._utils import ExitError
 from leverage.container import AWSCLIContainer
-
+from leverage.container import get_docker_client
+from leverage.path import NotARepositoryError
+from leverage.path import get_global_config_path
+from leverage.path import get_project_root_or_current_dir_path
 
 # Regexes for general validation
 PROJECT_SHORT = r"[a-z]{2,4}"
@@ -38,11 +37,11 @@ ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 
 # TODO: Remove these and get them into the global app state
+PROJECT_ROOT = get_project_root_or_current_dir_path()
 try:
     PROJECT_COMMON_TFVARS = Path(get_global_config_path())
-    PROJECT_ROOT = Path(get_root_path())
 except NotARepositoryError:
-    PROJECT_COMMON_TFVARS = PROJECT_ROOT = Path.cwd()
+    PROJECT_COMMON_TFVARS = Path.cwd()
 
 PROJECT_COMMON_TFVARS_FILE = "common.tfvars"
 PROJECT_COMMON_TFVARS = PROJECT_COMMON_TFVARS / PROJECT_COMMON_TFVARS_FILE
