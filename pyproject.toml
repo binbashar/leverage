@@ -1,9 +1,64 @@
+[tool.poetry]
+name = "leverage"
+version = "0.0.0"
+description = "Binbash Leverage Command-Line tool."
+authors = ["BinBash Inc <leverage@binbash.com.ar>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/binbashar/leverage"
+repository = "https://github.com/binbashar/leverage"
+documentation = "https://leverage.binbash.co/"
+keywords = ["leverage", "binbash"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11"
+]
+packages = [
+    { include = "leverage" },
+    { include = "leverage/modules" },
+    { include = "leverage/containers" }
+]
+
+[tool.poetry.dependencies]
+python = "~3.8 || ~3.9 || ~3.10 || ~3.11"
+click = "8.0.1"
+yaenv = "1.4.1"
+"ruamel.yaml" = "0.17.10"
+jinja2 = "3.0.1"
+docker = "6.1.0"
+dockerpty = "0.4.1"
+questionary = "1.10.0"
+python-hcl2 = "3.0.1"
+boto3 = "1.33.2"
+configupdater = "3.2"
+docutils = "0.17.1"
+rich = "10.4.0"
+
+[tool.poetry.group.dev.dependencies]
+pylint = "2.8.3"
+pytest = "6.2.4"
+pytest-cov = "2.12.1"
+twine = "3.4.1"
+black = "23.3.0"
+pre-commit = "3.5.0"
+
+
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+leverage = "leverage:leverage"
 
 [tool.black]
 line-length = 120
 extend-exclude = """
 simple_build_bad_syntax.py
 """
+

@@ -5,19 +5,40 @@ on: [push, pull_request]
 jobs:
   unit_tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ '3.8', '3.9', '3.10', '3.11' ]
     steps:
       - uses: actions/checkout@v3
 
-      - name: install_requirements
-        run: |
-          echo "[INFO] Installing requirements..."
-          pip install -r dev-requirements.txt
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-      - name: run_unit_tests
+      - name: Install Poetry
+        run: |
+          echo "[INFO] Installing Poetry..."
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          echo "[INFO] Configuring Poetry..."
+          poetry config virtualenvs.create false  # This prevents poetry from creating a virtual environment
+
+      - name: Install dependencies using Poetry
+        run: |
+          echo "[INFO] Installing dependencies..."
+          export ENV POETRY_VIRTUALENVS_CREATE=false
+          export PATH="${PATH}:${HOME}/.poetry/bin"
+          poetry install --with=dev
+
+      - name: Run unit tests
         run: |
           echo "[INFO] Running unit tests and generate coverage report"
-          pytest --verbose
+          export PATH="${PATH}:${HOME}/.poetry/bin"
+          poetry run pytest --verbose --cov=./ --cov-report=xml
         shell: bash
 
       - name: Report Coveralls
+        if: matrix.python-version == '3.8'  # Run this for the first python version only!
         uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

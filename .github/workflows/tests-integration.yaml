@@ -25,7 +25,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        python-version: [3.8.14,3.9.15,3.10.8]
+        python-version: ['3.8.14', '3.9.15', '3.10.8', '3.11.8']
         toolbox-image-tag: ['1.3.5-0.1.15', '1.5.0-0.1.15', '1.6.0-0.1.15']
     steps:
       - name: Checkout base branch
@@ -36,11 +36,24 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install Poetry
+        run: |
+          echo "[INFO] Installing Poetry..."
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          echo "[INFO] Configuring Poetry..."
+          poetry config virtualenvs.create false  # This prevents poetry from creating a virtual environment
+
+      - name: Install dependencies using Poetry
+        run: |
+          echo "[INFO] Installing dependencies..."
+          export ENV POETRY_VIRTUALENVS_CREATE=false
+          export PATH="${PATH}:${HOME}/.poetry/bin"
+          poetry install --with=dev
+
       - name: Build Leverage CLI
         run: |
-          printf "[INFO] Building Leverage CLI\n"
-          if ! (which pipenv 2>/dev/null); then printf "Installing pipenv..." && pip install pipenv && pipenv --python $(which python) ; else printf "pipenv is already installed"; fi
-          printf "Working with python version $(python --version)"
+          echo "[INFO] Building Leverage CLI"
+          echo "[INFO] Working with python version $(python --version)"
           make build
           pip install -e .
 

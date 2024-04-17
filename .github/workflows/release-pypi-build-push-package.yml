@@ -15,41 +15,40 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: '3.8'
-          
-      - name: install_dependencies
+
+      - name: Install Poetry
         run: |
-          pip3 install --user --upgrade pipenv && pipenv install --dev --python 3.8
-        shell: bash
+          echo "[INFO] Installing Poetry..."
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          echo "[INFO] Configuring Poetry..."
+          poetry config virtualenvs.create false  # This prevents poetry from creating a virtual environment
+
+      - name: Install dependencies using Poetry
+        run: |
+          echo "[INFO] Installing dependencies..."
+          export ENV POETRY_VIRTUALENVS_CREATE=false
+          export PATH="${PATH}:${HOME}/.poetry/bin"
+          poetry install --with=dev
 
       - name: bump_version
         run: |
-          echo "[INFO] Get latest tag"
-          git fetch --all --tags
-          RELEASE_VERSION=$(git tag --sort version:refname | tail -1)
-          RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/v//)
-          echo $RELEASE_VERSION
-
-          echo "[INFO] Write version"
-          sed -i s/$PLACEHOLDER/$RELEASE_VERSION/ $INIT_FILE
-        env:
-          INIT_FILE: leverage/__init__.py
-          PLACEHOLDER: 0.0.0
+          make bump-version-ci
 
       - name: clean
         run: |
-          rm -rf ./build/ &&	rm -rf ./dist/
+          make clean
 
       - name: build
         run: |
-          pipenv run python setup.py sdist bdist_wheel
+          make build
 
       - name: check
         run:
-          pipenv run twine check dist/*
+          make check
 
       - name: upload
         run: |
-          pipenv run twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
+          make push-ci
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
