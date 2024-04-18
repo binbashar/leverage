@@ -26,6 +26,7 @@ jobs:
       max-parallel: 1
       matrix:
         python-version: [3.8.14,3.9.15,3.10.8]
+        toolbox-image-tag: ['1.3.5-0.1.15', '1.5.0-0.1.15', '1.6.0-0.1.15']
     steps:
       - name: Checkout base branch
         uses: actions/checkout@v3
@@ -153,6 +154,12 @@ jobs:
           printf "[INFO] Cloning repo...\n"
           git clone https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
 
+      - name: Set Toolbox Image Tag for the cloned ref arch repo
+        run: |
+          echo "Updating Terraform Image Tag to ${{ matrix.toolbox-image-tag }}"
+          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=${{ matrix.toolbox-image-tag }}/' build.env
+        working-directory: ../theblairwitchproject
+
       - name: Configure Testing Reference Architecture
         run: |
           echo "[INFO] Configure Reference Architecture\n"
@@ -175,7 +182,6 @@ jobs:
           EOF
           echo "[INFO] Disable MFA\n"
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
-          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=1.2.7-0.0.5/' build.env;
         working-directory: ../theblairwitchproject
 
       - name: Test Testing Reference Architecture
