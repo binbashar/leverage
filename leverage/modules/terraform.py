@@ -1,17 +1,17 @@
 import os
 import re
 
+import click
 import dockerpty
 import hcl2
-import click
 from click.exceptions import Exit
 
 from leverage import logger
-from leverage._internals import pass_state
 from leverage._internals import pass_container
+from leverage._internals import pass_state
 from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer, ExitError
-from leverage.container import get_docker_client
 from leverage.container import TerraformContainer
+from leverage.container import get_docker_client
 from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
 
 REGION = (
@@ -351,18 +351,58 @@ def _plan(tf, args):
         raise Exit(exit_code)
 
 
+def handle_apply_arguments_parsing(args):
+    """Parse and process the arguments for the 'apply' command."""
+    # Initialize new_args to handle both '-key=value' and '-key value'
+    new_args = []
+    skip_next = False  # Flag to skip the next argument if it's part of '-key value'
+
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False  # Reset flag and skip this iteration
+            continue
+
+        if arg.startswith("-") and not arg.startswith("-var"):
+            if i + 1 < len(args) and not args[i + 1].startswith("-"):
+                # Detected '-key value' pair; append them without merging
+                new_args.append(arg)
+                new_args.append(args[i + 1])
+                skip_next = True  # Mark to skip the next item as it's already processed
+                logger.debug(f"Detected '-key value' pair: {arg}, {args[i + 1]}")
+            else:
+                # Either '-key=value' or a standalone '-key'; just append
+                new_args.append(arg)
+                logger.debug(f"Appending standard -key=value or standalone argument: {arg}")
+        else:
+            # Handles '-var' and non '-' starting arguments
+            new_args.append(arg)
+            logger.debug(f"Appending argument (non '-' or '-var'): {arg}")
+
+    return new_args
+
+
 @pass_container
 def _apply(tf, args):
     """Build or change the infrastructure in this layer."""
     # if there is a plan, remove all "-var" from the default args
+    # Preserve the original `-var` removal logic and modify tf_default_args if necessary
     tf_default_args = tf.tf_default_args
     for arg in args:
         if not arg.startswith("-"):
             tf_default_args = [arg for index, arg in enumerate(tf_default_args) if not arg.startswith("-var")]
             break
-    exit_code = tf.start_in_layer("apply", *tf_default_args, *args)
+
+    # Process arguments using the new parsing logic
+    processed_args = handle_apply_arguments_parsing(args)
+
+    logger.debug(f"Original tf_default_args: {tf_default_args}")
+    logger.debug(f"Processed argument list for execution: {processed_args}")
+
+    # Execute the command with the modified arguments list
+    exit_code = tf.start_in_layer("apply", *tf_default_args, *processed_args)
 
     if exit_code:
+        logger.error(f"Command execution failed with exit code: {exit_code}")
         raise Exit(exit_code)
 
 
