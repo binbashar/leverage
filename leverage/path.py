@@ -3,9 +3,9 @@
 """
 import os
 from pathlib import Path
-from subprocess import run
-from subprocess import PIPE
 from subprocess import CalledProcessError
+from subprocess import PIPE
+from subprocess import run
 
 import hcl2
 
@@ -13,7 +13,7 @@ from leverage._utils import ExitError
 
 
 class NotARepositoryError(RuntimeError):
-    pass
+    """When you are not running inside a git repository directory"""
 
 
 def get_working_path():
@@ -51,8 +51,10 @@ def get_root_path():
     except CalledProcessError as exc:
         if "fatal: not a git repository" in exc.stderr:
             raise NotARepositoryError("Not running in a git repository.")
-
-    return root.strip()
+    except FileNotFoundError as exc:
+        raise NotARepositoryError("Not running in a git repository.")
+    else:
+        return root.strip()
 
 
 def get_account_path():
@@ -274,3 +276,13 @@ class PathsHandler:
         # assuming the "cluster" layer will contain the expected EKS outputs
         if self.cwd.parts[-1] != "cluster":
             raise ExitError(1, "This command can only run at the [bold]cluster layer[/bold].")
+
+
+def get_project_root_or_current_dir_path() -> Path:
+    """Returns the project root if detected, otherwise the current path"""
+    try:
+        root = Path(get_root_path())
+    except (NotARepositoryError, TypeError):
+        root = Path.cwd()
+
+    return root
