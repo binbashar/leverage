@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from typing import Dict, Any, Union, List
@@ -46,13 +47,14 @@ class VersionExtractor:
     def extract_module_versions(tf_config: Dict[str, Any], versions: Dict[str, Dict[str, str]]):
         module_version_pattern = re.compile(r"\?ref=v([\d\.]+)$")
         for module in tf_config.get("module", []):
-            if isinstance(module, dict) and "source" in module:
-                source = module["source"]
-                match = module_version_pattern.search(source)
-                if match:
-                    versions[f"Module: {module['source']}"] = {"type": "module", "version": match.group(1)}
-                elif "version" in module:
-                    versions[f"Module: {module['source']}"] = {"type": "module", "version": module["version"]}
+            if isinstance(module, dict) and len(module) == 1:
+                for name, data in module.items():
+                    source = data["source"]
+                    match = module_version_pattern.search(source)
+                    if match:
+                        versions[name] = {"type": "module", "version": match.group(1), "repo": source.split("?")[0]}
+                    elif "version" in module:
+                        versions[name] = {"type": "module", "version": data["version"]}
 
 
 class TerraformFileParser:
