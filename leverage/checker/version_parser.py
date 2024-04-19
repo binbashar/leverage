@@ -1,13 +1,12 @@
-import json
 import os
 import re
-from typing import Dict, Any, Union, List
+from typing import Dict, Any
 
 import hcl2
 
 
 class VersionExtractor:
-    """Extracts versions from parsed Terraform configurations using best practices with type tagging."""
+    """Extracts versions from parsed Terraform configurations, focusing on accurate source handling based on Terraform documentation."""
 
     @staticmethod
     def extract_versions(tf_config: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
@@ -26,14 +25,12 @@ class VersionExtractor:
                     VersionExtractor.process_providers(terraform_block["required_providers"], versions)
 
     @staticmethod
-    def process_providers(providers: Union[Dict[str, Any], List[Dict[str, Any]]], versions: Dict[str, Dict[str, str]]):
+    def process_providers(providers: Any, versions: Dict[str, Dict[str, str]]):
         if isinstance(providers, dict):
             VersionExtractor.extract_provider_versions(providers, versions)
         elif isinstance(providers, list):
             for provider_dict in providers:
                 VersionExtractor.extract_provider_versions(provider_dict, versions)
-        else:
-            print(f"Error: Providers data structure not recognized: {providers}")
 
     @staticmethod
     def extract_provider_versions(providers: Dict[str, Any], versions: Dict[str, Dict[str, str]]):
@@ -45,16 +42,66 @@ class VersionExtractor:
 
     @staticmethod
     def extract_module_versions(tf_config: Dict[str, Any], versions: Dict[str, Dict[str, str]]):
-        module_version_pattern = re.compile(r"\?ref=v([\d\.]+)$")
         for module in tf_config.get("module", []):
-            if isinstance(module, dict) and len(module) == 1:
+            if isinstance(module, dict):
                 for name, data in module.items():
-                    source = data["source"]
-                    match = module_version_pattern.search(source)
-                    if match:
-                        versions[name] = {"type": "module", "version": match.group(1), "repo": source.split("?")[0]}
-                    elif "version" in module:
-                        versions[name] = {"type": "module", "version": data["version"]}
+                    source = data.get("source", "")
+                    explicit_version = data.get("version", None)
+                    version_info = VersionExtractor.parse_source(source, explicit_version)
+                    versions[name] = version_info
+
+    @staticmethod
+    def parse_source(source: str, explicit_version: str = None) -> Dict[str, str]:
+        # Local path detection
+        if source.startswith("./") or source.startswith("../"):
+            return {"type": "local", "source": source, "version": explicit_version or "N/A"}
+        # GitHub URL detection (SSH or HTTPS)
+        elif "github.com" in source:
+            return VersionExtractor.parse_github_source(source, explicit_version)
+        # Registry source detection
+        elif any(x in source for x in ["terraform-registry", "registry.terraform.io"]):
+            return VersionExtractor.parse_registry_source(source, explicit_version)
+        else:
+            return {"type": "other", "source": source, "version": explicit_version or "unknown"}
+
+    @staticmethod
+    def parse_github_source(source: str, explicit_version: str) -> Dict[str, str]:
+        ref_match = re.search(r"ref=([vV]?[\w\d\.\-_]+)", source)
+        version = ref_match.group(1) if ref_match else explicit_version
+        if version and version.lower().startswith("v"):
+            version = version[1:]  # Strip the 'v' prefix if present
+        return {"type": "github", "repository": source.split("?")[0], "version": version or "HEAD"}
+
+    @staticmethod
+    def parse_registry_source(source: str, explicit_version: str) -> Dict[str, str]:
+        """
+        Parses Terraform Registry sources with or without a hostname.
+        Formats:
+        - <NAMESPACE>/<NAME>/<PROVIDER>
+        - <HOSTNAME>/<NAMESPACE>/<NAME>/<PROVIDER>
+        """
+        regex = re.compile(r"^(?:(?P<hostname>[\w\.:-]+)/)?(?P<namespace>\w+)/(?P<name>\w+)/(?P<provider>\w+)$")
+        match = regex.match(source)
+        if match:
+            details = match.groupdict()
+            hostname = details.get("hostname")
+            namespace = details["namespace"]
+            name = details["name"]
+            provider = details["provider"]
+            module_identifier = f"{namespace}/{name}/{provider}"
+            if hostname:
+                module_identifier = f"{hostname}/{module_identifier}"
+            version_match = re.search(r"ref=([vV]?[\w\d\.]+)", source)
+            version = version_match.group(1) if version_match else explicit_version
+            if version and version.lower().startswith("v"):
+                version = version[1:]  # Strip the 'v' prefix if present
+            return {
+                "type": "registry",
+                "module": module_identifier,
+                "version": version or "latest",
+                "hostname": hostname or "public",
+            }
+        return {"type": "registry", "source": source, "version": explicit_version or "unknown"}
 
 
 class TerraformFileParser:
