@@ -1,0 +1,8 @@
+terraform:
+  core: ">=1.0.0"
+  providers:
+    aws: ">=3.40.0"
+    google: ">=3.50.0"
+  modules:
+    networking: ">=2.1.0"
+    security: ">=1.5.0"

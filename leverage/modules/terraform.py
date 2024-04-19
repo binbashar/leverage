@@ -1,3 +1,4 @@
+import json
 import os
 import re
 
@@ -10,6 +11,8 @@ from leverage import logger
 from leverage._internals import pass_container
 from leverage._internals import pass_state
 from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer, ExitError
+from leverage.checker.utils import TimeIt
+from leverage.checker.version_parser import VersionManager
 from leverage.container import TerraformContainer
 from leverage.container import get_docker_client
 from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
@@ -549,3 +552,18 @@ def _validate_layout(tf: TerraformContainer):
             valid_layout = False
 
     return valid_layout
+
+
+@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("args", nargs=-1)
+@pass_container
+@click.pass_context
+def checks(context, tf, args):
+    """Run pre-flight checks for terraform"""
+    with TimeIt("Check layer location"):
+        tf.paths.check_for_layer_location()  # We want this to be run at layer level!
+    with TimeIt("Parse current path tf files"):
+        version_manager = VersionManager(tf.paths.cwd)
+        found_versions = version_manager.find_versions()
+    logger.info(f"Current path: {tf.paths.cwd}")
+    logger.info(f"Versions found: {json.dumps(found_versions, indent=4, sort_keys=True)}")
