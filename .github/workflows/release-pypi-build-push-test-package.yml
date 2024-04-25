@@ -36,7 +36,14 @@ jobs:
 
       - name: bump_test_version
         run: |
-          make bump-test-version RELEASE_VERSION=${{ github.event.inputs.version }}
+          if [ -z "${{ github.event.inputs.version }}" ]; then
+            echo "No version input provided, running without RELEASE_VERSION."
+            make bump-test-version
+          else
+            echo "Version input provided: ${{ github.event.inputs.version }}"
+            make bump-test-version RELEASE_VERSION=${{ github.event.inputs.version }}
+          fi
+        shell: bash
 
       - name: clean
         run: |
