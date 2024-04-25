@@ -16,7 +16,7 @@ _create_directory_structure(){
 
 _create_leverage_directory_structure(){
     : " Create a temporary directory structure, initialize
-        a git repository in the root of such structrue and
+        a git repository in the root of such structure and
         print its path
     "
     ROOT_DIR="$(_create_directory_structure)"

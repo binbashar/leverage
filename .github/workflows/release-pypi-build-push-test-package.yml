@@ -20,46 +20,39 @@ jobs:
         with:
           python-version: '3.8'
 
-      - name: install_dependencies
+      - name: Install Poetry
         run: |
-          pip3 install --user --upgrade pipenv && pipenv install --dev --python 3.8
-        shell: bash
+          echo "[INFO] Installing Poetry..."
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          echo "[INFO] Configuring Poetry..."
+          poetry config virtualenvs.create false  # This prevents poetry from creating a virtual environment
 
-      - name: bump_version
+      - name: Install dependencies using Poetry
         run: |
-          echo "[INFO] Get current version"
-          CURRENT_VERSION=$(cat $INIT_FILE | grep "__version__" | grep -oP "([0-9]*\.[0-9]*\.[0-9]*)")
-          echo "[INFO] Current version: $CURRENT_VERSION"
+          echo "[INFO] Installing dependencies..."
+          export ENV POETRY_VIRTUALENVS_CREATE=false
+          export PATH="${PATH}:${HOME}/.poetry/bin"
+          poetry install --with=dev
 
-          [ -z "$RELEASE_VERSION" ] && \
-            echo "[INFO] Get latest version from TestPypi." && \
-            LATEST_VERSION=$(curl -sL "https://test.pypi.org/pypi/leverage/json" | jq -r ".releases | keys | sort | .[-1]") && \
-            echo "[INFO] Latest version: $LATEST_VERSION" && \
-            RELEASE_VERSION="$(echo $LATEST_VERSION | awk 'BEGIN{FS="."; OFS="."} {print $1,$2,$3+1}')rc.1"
-
-          echo "[INFO] Checking Release Version (template 9.9.9-rc9)..."
-          ([ $(echo $RELEASE_VERSION | grep -oP "([0-9]*\.[0-9]*\.[0-9]*\-(rc|alpha|beta)[0-9]+)") ] && echo "[INFO] Version ok" ) || (echo "[ERROR] Version is wrong" && exit 1)
-          echo "[INFO] Bump version to $RELEASE_VERSION"
-          sed -i 's/'$CURRENT_VERSION'/'$RELEASE_VERSION'/' $INIT_FILE
-        env:
-          INIT_FILE: leverage/__init__.py
-          RELEASE_VERSION: ${{ github.event.inputs.version }}
+      - name: bump_test_version
+        run: |
+          make bump-test-version RELEASE_VERSION=${{ github.event.inputs.version }}
 
       - name: clean
         run: |
-          rm -rf ./build/ &&	rm -rf ./dist/
+          make clean
 
       - name: build
         run: |
-          pipenv run python setup.py sdist bdist_wheel
+          make build
 
       - name: check
         run:
-          pipenv run twine check dist/*
+          make check
 
       - name: upload
         run: |
-          pipenv run twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
+          make push-ci
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
