@@ -325,13 +325,13 @@ def _init(tf, args):
 
     with LiveContainer(tf) as container:
         # create the .ssh directory
-        container.exec_run("mkdir -p /root/.ssh")
+        container.exec_run("mkdir -p /opt/home/.ssh")
         # copy the entire ~/.ssh/ folder
         tar_bytes = tar_directory(tf.paths.home / ".ssh")
-        # into /root/.ssh
-        container.put_archive("/root/.ssh/", tar_bytes)
+        # into /opt/home/.ssh
+        container.put_archive("/opt/home/.ssh/", tar_bytes)
         # correct the owner of the files to match with the docker internal user
-        container.exec_run("chown root:root -R /root/.ssh/")
+        container.exec_run("chown root:root -R /opt/home/.ssh/")
 
         with AwsCredsContainer(container, tf):
             dockerpty.exec_command(

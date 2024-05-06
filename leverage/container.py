@@ -323,8 +323,8 @@ class AWSCLIContainer(SSOContainer):
     AWS_CLI_BINARY = "/usr/local/bin/aws"
 
     # SSO scripts
-    AWS_SSO_LOGIN_SCRIPT = "/root/scripts/aws-sso/aws-sso-login.sh"
-    AWS_SSO_LOGOUT_SCRIPT = "/root/scripts/aws-sso/aws-sso-logout.sh"
+    AWS_SSO_LOGIN_SCRIPT = "/opt/home/scripts/aws-sso/aws-sso-login.sh"
+    AWS_SSO_LOGOUT_SCRIPT = "/opt/home/scripts/aws-sso/aws-sso-logout.sh"
 
     # SSO constants
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
@@ -434,8 +434,8 @@ class TerraformContainer(SSOContainer):
 
     TF_BINARY = "/bin/terraform"
 
-    TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
-    TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
+    TF_MFA_ENTRYPOINT = "/opt/home/scripts/aws-mfa/aws-mfa-entrypoint.sh"
+    TF_SSO_ENTRYPOINT = "/opt/home/scripts/aws-sso/aws-sso-entrypoint.sh"
 
     def __init__(self, client, mounts=None, env_vars=None):
         super().__init__(client, mounts=mounts, env_vars=env_vars)

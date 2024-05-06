@@ -51,7 +51,7 @@ def test_auth_method_mfa_enabled(terraform_container):
     terraform_container.sso_enabled = False
     terraform_container.mfa_enabled = True
 
-    assert terraform_container.auth_method() == "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
+    assert terraform_container.auth_method() == "/opt/home/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
 
 
 def test_auth_method_else(terraform_container):

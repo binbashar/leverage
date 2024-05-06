@@ -36,8 +36,8 @@ def test_init(terraform_container):
         with patch("dockerpty.exec_command") as mocked_pty:
             _init([])
 
-    assert live_container.exec_run.call_args_list[0].args[0] == "mkdir -p /root/.ssh"
-    assert live_container.exec_run.call_args_list[1].args[0] == "chown root:root -R /root/.ssh/"
+    assert live_container.exec_run.call_args_list[0].args[0] == "mkdir -p /opt/home/.ssh"
+    assert live_container.exec_run.call_args_list[1].args[0] == "chown root:root -R /opt/home/.ssh/"
     assert (
         mocked_pty.call_args_list[0].kwargs["command"]
         == f"terraform init -backend-config=/project/./config/backend.tfvars"

@@ -186,7 +186,7 @@ class PathsHandler:
 
     @property
     def guest_aws_credentials_dir(self):
-        return f"/root/tmp/{self.project}"
+        return f"/opt/home/tmp/{self.project}"
 
     @property
     def host_aws_profiles_file(self):
