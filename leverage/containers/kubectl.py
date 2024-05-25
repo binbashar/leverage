@@ -12,7 +12,7 @@ class KubeCtlContainer(TerraformContainer):
     """Container specifically tailored to run kubectl commands."""
 
     KUBECTL_CLI_BINARY = "/usr/local/bin/kubectl"
-    KUBECTL_CONFIG_PATH = Path("/root/.kube")
+    KUBECTL_CONFIG_PATH = Path("/home/leverage/.kube")
     KUBECTL_CONFIG_FILE = KUBECTL_CONFIG_PATH / Path("config")
 
     def __init__(self, client):

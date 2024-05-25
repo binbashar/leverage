@@ -186,7 +186,7 @@ class PathsHandler:
 
     @property
     def guest_aws_credentials_dir(self):
-        return str(get_home_path() / Path(self.project))
+        return str("/home/leverage/tmp" / Path(self.project))
 
     @property
     def host_aws_profiles_file(self):
