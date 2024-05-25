@@ -1,7 +1,9 @@
 import json
 import os
 import re
+import timeit
 import webbrowser
+from io import BytesIO
 from pathlib import Path
 from datetime import datetime
 from time import sleep
@@ -94,7 +96,7 @@ class LeverageContainer:
         mounts = [Mount(source=source, target=target, type="bind") for source, target in mounts] if mounts else []
         self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=mounts)
         self.container_config = {
-            "image": f"{self.image}:{self.image_tag}",
+            "image": f"{self.image}:local",
             "command": "",
             "stdin_open": True,
             "environment": env_vars or {},
@@ -138,43 +140,52 @@ class LeverageContainer:
 
         raise ExitError(1, f"No valid region could be found at: {self.paths.cwd.as_posix()}")
 
-    def ensure_image(self):
-        """Make sure the required Docker image is available in the system. If not, pull it from registry."""
-        found_image = self.client.api.images(f"{self.image}:{self.image_tag}")
-        if found_image:
-            return
-
-        logger.info("Required Docker image not found.")
-
-        try:
-            stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
-        except NotFound as e:
-            logger.error(
-                f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. "
-                "If you come from a project created with an older version of Leverage CLI or have modified the 'build.env' file manually, "
-                f"please consider either deleting the file, or configuring a valid toolbox version to use. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')"
+    @property
+    def local_image(self):
+        return BytesIO(
+            f"""
+            ARG IMAGE_TAG
+            FROM binbash/leverage-toolbox:$IMAGE_TAG
+            
+            # Needed as is mounted later on
+            #RUN mkdir /root/.ssh
+            # Needed for git to run propertly
+            #RUN touch /root/.gitconfig
+            
+            ARG UNAME
+            ARG UID
+            ARG GID
+            RUN groupadd -g $GID -o $UNAME
+            RUN useradd -m -u $UID -g $GID -o -s /bin/bash $UNAME
+            USER $UNAME
+            """.encode(
+                "utf-8"
             )
-            raise Exit(1)
-        except APIError as pull:
-            pull.__traceback__ = None
-            pull.__context__.__traceback__ = None
-            logger.exception("Error pulling image:", exc_info=pull)
-            raise Exit(1)
-        except Exception as e:
-            logger.error(f"Not handled error while pulling the image: {e}")
-            raise Exit(1)
+        )
 
-        logger.info(next(stream)["status"])
+    def ensure_image(self):
+        logger.info(f"Checking for local docker image, tag: {self.image_tag}...")
+        """Make sure the required local Docker image is available in the system. If not, pull it from registry."""
+        build_args = {
+            "IMAGE_TAG": self.image_tag,
+            "UNAME": "leverage",  # TODO: what is this exactly?
+            "GID": str(os.getgid()),
+            "UID": str(os.getuid()),
+        }
 
-        imageinfo = []
-        with console.status("Pulling image..."):
-            for status in stream:
-                status = status["status"]
-                if status.startswith("Digest") or status.startswith("Status"):
-                    imageinfo.append(status)
+        stream = self.client.api.build(
+            fileobj=self.local_image,
+            tag=f"binbash/leverage-toolbox:local",
+            pull=True,
+            buildargs=build_args,
+            decode=True,
+        )
 
-        for info in imageinfo:
-            logger.info(info)
+        for line in stream:
+            if "stream" in line and line["stream"].startswith("Successfully built"):
+                logger.info("[green]✔ OK[/green]\n")
+            elif "errorDetail" in line:
+                raise ExitError(1, f"Failed building local image: {line['errorDetail']}")
 
     def _create_container(self, tty, command="", *args):
         """Create the container that will run the command.
@@ -285,24 +296,26 @@ class LeverageContainer:
     def docker_logs(self, container):
         return self.client.api.logs(container).decode("utf-8")
 
-    def change_ownership_cmd(self, path: Union[Path, str], recursive=True) -> str:
-        recursive = "-R " if recursive else ""
-        user_id = os.getuid()
-        group_id = os.getgid()
-
-        return f"chown {user_id}:{group_id} {recursive}{path}"
-
-    def change_file_ownership(self, path: Union[Path, str], recursive=True):
-        """
-        Change the file/folder ownership from the internal docker user (usually root)
-        to the user executing the CLI.
-        """
-        cmd = self.change_ownership_cmd(path, recursive=recursive)
-        with CustomEntryPoint(self, entrypoint=""):
-            self._exec(cmd)
-
 
 class SSOContainer(LeverageContainer):
+    # SSO scripts
+    AWS_SSO_LOGIN_SCRIPT = "/opt/scripts/aws-sso/aws-sso-login.sh"
+    AWS_SSO_LOGOUT_SCRIPT = "/opt/scripts/aws-sso/aws-sso-logout.sh"
+
+    # SSO constants
+    AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
+    AWS_SSO_CODE_WAIT_SECONDS = 2
+    AWS_SSO_CODE_ATTEMPTS = 10
+    FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
+
+    def __init__(self, client, mounts=None, env_vars=None):
+        super().__init__(client, mounts=mounts, env_vars=env_vars)
+        self.mounts.extend(
+            [
+                Mount(source=(Path(__file__).parent / "scripts").as_posix(), target="/opt/scripts", type="bind"),
+            ]
+        )
+
     def get_sso_access_token(self):
         with open(self.paths.sso_token_file) as token_file:
             return json.loads(token_file.read())["accessToken"]
@@ -315,71 +328,6 @@ class SSOContainer(LeverageContainer):
         conf = ConfigUpdater()
         conf.read(self.paths.host_aws_profiles_file)
         return conf.get(f"profile {self.project}-sso", "sso_region").value
-
-
-class AWSCLIContainer(SSOContainer):
-    """Leverage Container specially tailored to run AWS CLI commands."""
-
-    AWS_CLI_BINARY = "/usr/local/bin/aws"
-
-    # SSO scripts
-    AWS_SSO_LOGIN_SCRIPT = "/root/scripts/aws-sso/aws-sso-login.sh"
-    AWS_SSO_LOGOUT_SCRIPT = "/root/scripts/aws-sso/aws-sso-logout.sh"
-
-    # SSO constants
-    AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
-    AWS_SSO_CODE_WAIT_SECONDS = 2
-    AWS_SSO_CODE_ATTEMPTS = 10
-    FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
-
-    def __init__(self, client):
-        super().__init__(client)
-
-        self.environment = {
-            "COMMON_CONFIG_FILE": self.paths.common_tfvars,
-            "ACCOUNT_CONFIG_FILE": self.paths.account_tfvars,
-            "BACKEND_CONFIG_FILE": self.paths.backend_tfvars,
-            "AWS_SHARED_CREDENTIALS_FILE": f"{self.paths.guest_aws_credentials_dir}/credentials",
-            "AWS_CONFIG_FILE": f"{self.paths.guest_aws_credentials_dir}/config",
-            "SSO_CACHE_DIR": f"{self.paths.guest_aws_credentials_dir}/sso/cache",
-            "SCRIPT_LOG_LEVEL": get_script_log_level(),
-        }
-        self.entrypoint = self.AWS_CLI_BINARY
-        self.mounts = [
-            Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
-            Mount(
-                source=self.paths.host_aws_credentials_dir.as_posix(),
-                target=self.paths.guest_aws_credentials_dir,
-                type="bind",
-            ),
-        ]
-
-        logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
-
-    def start(self, command, profile=""):
-        args = [] if not profile else ["--profile", profile]
-        return self._start(command, *args)
-
-    # FIXME: we have a context manager for this now, remove this method later!
-    def system_start(self, command):
-        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
-        self.entrypoint = ""
-        exit_code = self._start(command)
-        self.entrypoint = self.AWS_CLI_BINARY
-        return exit_code
-
-    def exec(self, command, profile=""):
-        args = [] if not profile else ["--profile", profile]
-        return self._exec(command, *args)
-
-    # FIXME: we have a context manager for this now, remove this method later!
-    def system_exec(self, command):
-        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
-        self.entrypoint = ""
-        exit_code, output = self._exec(command)
-
-        self.entrypoint = self.AWS_CLI_BINARY
-        return exit_code, output
 
     def get_sso_code(self, container) -> str:
         """
@@ -422,10 +370,65 @@ class AWSCLIContainer(SSOContainer):
             # once submitted to the browser, the authentication finish and the lock is released
             exit_code = self.client.api.wait(container)["StatusCode"]
             raw_logger.info(self.docker_logs(container))
-            # now return ownership of the token file back to the user
-            self.change_file_ownership(self.paths.guest_aws_credentials_dir)
 
         return exit_code
+
+
+class AWSCLIContainer(SSOContainer):
+    """Leverage Container specially tailored to run AWS CLI commands."""
+
+    AWS_CLI_BINARY = "/usr/local/bin/aws"
+
+    def __init__(self, client):
+        super().__init__(client)
+
+        self.environment = {
+            "COMMON_CONFIG_FILE": self.paths.common_tfvars,
+            "ACCOUNT_CONFIG_FILE": self.paths.account_tfvars,
+            "BACKEND_CONFIG_FILE": self.paths.backend_tfvars,
+            "AWS_SHARED_CREDENTIALS_FILE": f"{self.paths.guest_aws_credentials_dir}/credentials",
+            "AWS_CONFIG_FILE": f"{self.paths.guest_aws_credentials_dir}/config",
+            "SSO_CACHE_DIR": f"{self.paths.guest_aws_credentials_dir}/sso/cache",
+            "SCRIPT_LOG_LEVEL": get_script_log_level(),
+        }
+        self.entrypoint = self.AWS_CLI_BINARY
+        self.mounts.extend(
+            [
+                Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
+                Mount(
+                    source=self.paths.host_aws_credentials_dir.as_posix(),
+                    target=self.paths.guest_aws_credentials_dir,
+                    type="bind",
+                ),
+            ]
+        )
+
+        logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
+
+    def start(self, command, profile=""):
+        args = [] if not profile else ["--profile", profile]
+        return self._start(command, *args)
+
+    # FIXME: we have a context manager for this now, remove this method later!
+    def system_start(self, command):
+        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
+        self.entrypoint = ""
+        exit_code = self._start(command)
+        self.entrypoint = self.AWS_CLI_BINARY
+        return exit_code
+
+    def exec(self, command, profile=""):
+        args = [] if not profile else ["--profile", profile]
+        return self._exec(command, *args)
+
+    # FIXME: we have a context manager for this now, remove this method later!
+    def system_exec(self, command):
+        """Momentarily override the container's default entrypoint. To run arbitrary commands and not only AWS CLI ones."""
+        self.entrypoint = ""
+        exit_code, output = self._exec(command)
+
+        self.entrypoint = self.AWS_CLI_BINARY
+        return exit_code, output
 
 
 class TerraformContainer(SSOContainer):
@@ -434,8 +437,7 @@ class TerraformContainer(SSOContainer):
 
     TF_BINARY = "/bin/terraform"
 
-    TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
-    TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
+    TF_MFA_ENTRYPOINT = "/opt/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 
     def __init__(self, client, mounts=None, env_vars=None):
         super().__init__(client, mounts=mounts, env_vars=env_vars)

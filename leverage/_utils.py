@@ -1,10 +1,6 @@
 """
     General use utilities.
 """
-import io
-import os
-import tarfile
-from pathlib import Path
 from subprocess import run
 from subprocess import PIPE
 
@@ -14,7 +10,6 @@ from docker import DockerClient
 from docker.models.containers import Container
 
 from leverage import logger
-from leverage.logger import raw_logger
 
 
 def clean_exception_traceback(exception):
@@ -65,10 +60,6 @@ def git(command):
     run(command, stdout=PIPE, stderr=PIPE, check=True)
 
 
-def chain_commands(commands: list, chain: str = " && ") -> str:
-    return f'bash -c "{chain.join(commands)}"'
-
-
 class CustomEntryPoint:
     """
     Set a custom entrypoint on the container while entering the context.
@@ -109,35 +100,6 @@ class AwsCredsEntryPoint(CustomEntryPoint):
                     "AWS_CONFIG_FILE": self.container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
                 }
             )
-        # now return file ownership on the aws credentials files
-        self.container.change_file_ownership(self.container.paths.guest_aws_credentials_dir)
-
-
-class AwsCredsContainer:
-    """
-    Fetching AWS credentials by setting the SSO/MFA entrypoints on a living container.
-    This flow runs a command on a living container before any other command, leaving your AWS credentials ready
-    for authentication.
-
-    In the case of MFA, the env var tweaks (that happens at .auth_method()) must stay until the end of the block
-    given the container is reused for more commands.
-    """
-
-    def __init__(self, container: Container, tf_container):
-        self.container = container
-        self.tf_container = tf_container
-
-    def __enter__(self):
-        auth_method = self.tf_container.auth_method()
-        if not auth_method:
-            return
-
-        exit_code, output = self.container.exec_run(auth_method, environment=self.tf_container.environment)
-        raw_logger.info(output.decode("utf-8"))
-
-    def __exit__(self, *args, **kwargs):
-        # now return file ownership on the aws credentials files
-        self.tf_container.change_file_ownership(self.tf_container.paths.guest_aws_credentials_dir)
 
 
 class ExitError(Exit):
@@ -167,40 +129,6 @@ class ContainerSession:
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.docker_client.api.stop(self.container_data)
         self.docker_client.api.remove_container(self.container_data)
-
-
-class LiveContainer(ContainerSession):
-    """
-    A container that run a command that "do nothing" indefinitely. The idea is to keep the container alive.
-    """
-
-    COMMAND = "tail -f /dev/null"
-
-    def __init__(self, leverage_container, tty=True):
-        with CustomEntryPoint(leverage_container, self.COMMAND):
-            container_data = leverage_container._create_container(tty)
-        super().__init__(leverage_container.client, container_data)
-
-
-def tar_directory(host_dir_path: Path) -> bytes:
-    """
-    Compress a local directory on memory as a tar file and return it as bytes.
-    """
-    bytes_array = io.BytesIO()
-    with tarfile.open(fileobj=bytes_array, mode="w") as tar_handler:
-        # walk through the directory tree
-        for root, dirs, files in os.walk(host_dir_path):
-            for f in files:
-                # and add each file to the tar file
-                file_path = Path(os.path.join(root, f))
-                tar_handler.add(
-                    os.path.join(root, f),
-                    arcname=file_path.relative_to(host_dir_path),
-                )
-
-    bytes_array.seek(0)
-    # return the whole tar file as a byte array
-    return bytes_array.read()
 
 
 def key_finder(d: dict, target: str, avoid: str = None):
