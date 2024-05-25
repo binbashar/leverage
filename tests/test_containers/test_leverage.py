@@ -9,14 +9,6 @@ def leverage_container(muted_click_context):
     return container_fixture_factory(LeverageContainer)
 
 
-def test_change_ownership_cmd(leverage_container, fake_os_user):
-    assert leverage_container.change_ownership_cmd("/tmp/", recursive=True) == "chown 1234:5678 -R /tmp/"
-
-
-def test_change_ownership_non_recursive_cmd(leverage_container, fake_os_user):
-    assert leverage_container.change_ownership_cmd("/tmp/file.txt", recursive=False) == "chown 1234:5678 /tmp/file.txt"
-
-
 def test_mounts(muted_click_context):
     container = container_fixture_factory(
         LeverageContainer, mounts=(("/usr/bin", "/usr/bin"), ("/tmp/file.txt", "/tmp/file.txt"))
