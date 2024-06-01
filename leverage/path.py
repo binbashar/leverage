@@ -134,7 +134,8 @@ class PathsHandler:
     ACCOUNT_TF_VARS = "account.tfvars"
     BACKEND_TF_VARS = "backend.tfvars"
 
-    def __init__(self, env_conf):
+    def __init__(self, env_conf: dict, container_user: str):
+        self.container_user = container_user
         self.home = Path.home()
         self.cwd = Path.cwd()
         try:
@@ -186,7 +187,7 @@ class PathsHandler:
 
     @property
     def guest_aws_credentials_dir(self):
-        return str("/home/leverage/tmp" / Path(self.project))
+        return str(f"/home/{self.container_user}/tmp" / Path(self.project))
 
     @property
     def host_aws_profiles_file(self):

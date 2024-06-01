@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import timeit
 import webbrowser
 from io import BytesIO
 from pathlib import Path
@@ -13,15 +12,14 @@ from click.exceptions import Exit
 import dockerpty
 from configupdater import ConfigUpdater
 from docker import DockerClient
-from docker.errors import APIError, NotFound
+from docker.errors import APIError
 from docker.types import Mount
-from typing import Tuple, Union
+from typing import Tuple
 
-from leverage import __toolbox_version__
 from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, CustomEntryPoint, ExitError, ContainerSession
 from leverage.modules.auth import refresh_layer_credentials
-from leverage.logger import console, raw_logger
+from leverage.logger import raw_logger
 from leverage.logger import get_script_log_level
 from leverage.path import PathsHandler
 from leverage.conf import load as load_env
@@ -69,6 +67,7 @@ class LeverageContainer:
 
     LEVERAGE_IMAGE = "binbash/leverage-toolbox"
     SHELL = "/bin/bash"
+    CONTAINER_USER = "leverage"
 
     def __init__(self, client, mounts: tuple = None, env_vars: dict = None):
         """Project related paths are determined and stored. Project configuration is loaded.
@@ -80,7 +79,7 @@ class LeverageContainer:
         # Load configs
         self.env_conf = load_env()
 
-        self.paths = PathsHandler(self.env_conf)
+        self.paths = PathsHandler(self.env_conf, self.CONTAINER_USER)
         self.project = self.paths.project
 
         # Set image to use
@@ -141,17 +140,13 @@ class LeverageContainer:
         raise ExitError(1, f"No valid region could be found at: {self.paths.cwd.as_posix()}")
 
     @property
-    def local_image(self):
+    def local_image(self) -> BytesIO:
+        """Return the local image that will be built, as a file-like object."""
         return BytesIO(
-            f"""
+            """
             ARG IMAGE_TAG
             FROM binbash/leverage-toolbox:$IMAGE_TAG
-            
-            # Needed as is mounted later on
-            #RUN mkdir /root/.ssh
-            # Needed for git to run propertly
-            #RUN touch /root/.gitconfig
-            
+
             ARG UNAME
             ARG UID
             ARG GID
@@ -164,11 +159,14 @@ class LeverageContainer:
         )
 
     def ensure_image(self):
+        """
+        Make sure the required local Docker image is available in the system. If not, build it.
+        If the image already exists, re-build it so changes in the arguments can take effect.
+        """
         logger.info(f"Checking for local docker image, tag: {self.image_tag}...")
-        """Make sure the required local Docker image is available in the system. If not, pull it from registry."""
         build_args = {
             "IMAGE_TAG": self.image_tag,
-            "UNAME": "leverage",  # TODO: what is this exactly?
+            "UNAME": self.CONTAINER_USER,
             "GID": str(os.getgid()),
             "UID": str(os.getuid()),
         }
