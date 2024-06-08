@@ -95,7 +95,7 @@ class LeverageContainer:
         mounts = [Mount(source=source, target=target, type="bind") for source, target in mounts] if mounts else []
         self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=mounts)
         self.container_config = {
-            "image": f"{self.image}:local",
+            "image": f"{self.image}:{self.local_image_tag}",
             "command": "",
             "stdin_open": True,
             "environment": env_vars or {},
@@ -140,6 +140,10 @@ class LeverageContainer:
         raise ExitError(1, f"No valid region could be found at: {self.paths.cwd.as_posix()}")
 
     @property
+    def local_image_tag(self):
+        return f"{self.image_tag}-{os.getgid()}-{os.getuid()}"
+
+    @property
     def local_image(self) -> BytesIO:
         """Return the local image that will be built, as a file-like object."""
         return BytesIO(
@@ -163,7 +167,16 @@ class LeverageContainer:
         Make sure the required local Docker image is available in the system. If not, build it.
         If the image already exists, re-build it so changes in the arguments can take effect.
         """
-        logger.info(f"Checking for local docker image, tag: {self.image_tag}...")
+        logger.info(f"Checking for local docker image, tag: {self.local_image_tag}...")
+        image_name = f"{self.image}:{self.local_image_tag}"
+
+        # check first is our image is already available locally
+        found_image = self.client.api.images(f"{self.image}:{self.local_image_tag}")
+        if found_image:
+            logger.info("[green]✔ OK[/green]\n")
+            return
+
+        logger.info(f"Image not found, building it...")
         build_args = {
             "IMAGE_TAG": self.image_tag,
             "UNAME": self.CONTAINER_USER,
@@ -173,7 +186,7 @@ class LeverageContainer:
 
         stream = self.client.api.build(
             fileobj=self.local_image,
-            tag=f"binbash/leverage-toolbox:local",
+            tag=image_name,
             pull=True,
             buildargs=build_args,
             decode=True,
