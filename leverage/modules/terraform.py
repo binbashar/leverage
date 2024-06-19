@@ -1,5 +1,6 @@
 import os
 import re
+from typing import List
 
 import click
 import dockerpty
@@ -351,55 +352,89 @@ def _plan(tf, args):
         raise Exit(exit_code)
 
 
-def handle_apply_arguments_parsing(args):
-    """Parse and process the arguments for the 'apply' command."""
-    # Initialize new_args to handle both '-key=value' and '-key value'
-    new_args = []
-    skip_next = False  # Flag to skip the next argument if it's part of '-key value'
+def handle_apply_arguments_parsing(default_args: List[str], args: List[str]) -> List[str]:
+    """Parse and process arguments for the 'apply' command."""
+    parsed_args = []
+    plan_filename = None
+    skip_next = False
 
-    for i, arg in enumerate(args):
+    valid_single_flags = {"-auto-approve", "-json", "-compact-warnings", "-no-color"}
+
+    i = 0
+    while i < len(args):
+        arg = args[i]
+
         if skip_next:
-            skip_next = False  # Reset flag and skip this iteration
+            skip_next = False
+            i += 1
             continue
 
-        if arg.startswith("-") and not arg.startswith("-var"):
-            if i + 1 < len(args) and not args[i + 1].startswith("-"):
-                # Detected '-key value' pair; append them without merging
-                new_args.append(arg)
-                new_args.append(args[i + 1])
-                skip_next = True  # Mark to skip the next item as it's already processed
+        if arg.startswith("-") and arg not in {"-var", "-var-file"}:
+            if arg == "-json" and i + 1 < len(args) and not args[i + 1].startswith("-"):
+                # Handle -json <planname>
+                parsed_args.append(arg)
+                parsed_args.append(args[i + 1])
+                logger.debug(f"Detected -json argument with plan: {arg} {args[i + 1]}")
+                plan_filename = args[i + 1]
+                skip_next = True
+            elif arg in valid_single_flags:
+                # Handle valid single flags
+                parsed_args.append(arg)
+                logger.debug(f"Appending valid single flag: {arg}")
+            elif i + 1 < len(args) and not args[i + 1].startswith("-"):
+                # Handle '-key value' pair
+                parsed_args.append(arg)
+                parsed_args.append(args[i + 1])
                 logger.debug(f"Detected '-key value' pair: {arg}, {args[i + 1]}")
+                skip_next = True
             else:
-                # Either '-key=value' or a standalone '-key'; just append
-                new_args.append(arg)
-                logger.debug(f"Appending standard -key=value or standalone argument: {arg}")
+                # Standalone flag or unknown format (treat as standalone flag)
+                parsed_args.append(arg)
+                logger.debug(f"Appending standalone flag: {arg}")
+        elif arg.startswith("-var=") or arg.startswith("-var-file="):
+            logger.debug(f"Detected var or varfile '-var=name=value' pair: {arg}, {args[i + 1]}")
+            parsed_args.append(arg)
+        elif arg == "-var" or arg == "-var-file":
+            logger.debug(f"Detected var or varfile '-var name=value' pair: {arg}, {args[i + 1]}")
+            if i + 1 < len(args):
+                parsed_args.append(args[i])
+                parsed_args.append(f"{args[i + 1]}")
+                skip_next = True
+        elif not arg.startswith("-"):
+            # Assume it's a plan filename if it's not a flag
+            plan_filename = arg
+            parsed_args.append(arg)
+            logger.debug(f"Detected plan filename: {arg}")
         else:
-            # Handles '-var' and non '-' starting arguments
-            new_args.append(arg)
-            logger.debug(f"Appending argument (non '-' or '-var'): {arg}")
+            # Handle unexpected format (should not occur with valid Terraform apply command usage)
+            logger.warning(f"Ignoring unexpected argument format: {arg}")
 
-    return new_args
+        i += 1
+
+    # If a plan filename is detected, retain only valid single flags and the plan filename
+    if plan_filename:
+        parsed_args = [arg for arg in parsed_args if arg in valid_single_flags or arg == plan_filename]
+
+    # If no plan filename detected, prepend default_args
+    if not plan_filename:
+        parsed_args = default_args + parsed_args
+
+    logger.debug(f"Final parsed_args: {parsed_args}")
+    return parsed_args
 
 
 @pass_container
-def _apply(tf, args):
+def _apply(tf, args: List[str]) -> None:
     """Build or change the infrastructure in this layer."""
-    # if there is a plan, remove all "-var" from the default args
-    # Preserve the original `-var` removal logic and modify tf_default_args if necessary
-    tf_default_args = tf.tf_default_args
-    for arg in args:
-        if not arg.startswith("-"):
-            tf_default_args = [arg for index, arg in enumerate(tf_default_args) if not arg.startswith("-var")]
-            break
+    default_args = tf.tf_default_args
+    logger.debug(f"Original tf_default_args: {default_args}")
 
-    # Process arguments using the new parsing logic
-    processed_args = handle_apply_arguments_parsing(args)
+    # Parse arguments for apply command
+    parsed_args = handle_apply_arguments_parsing(default_args, args)
+    logger.debug(f"Processed argument list for execution: {parsed_args}")
 
-    logger.debug(f"Original tf_default_args: {tf_default_args}")
-    logger.debug(f"Processed argument list for execution: {processed_args}")
-
-    # Execute the command with the modified arguments list
-    exit_code = tf.start_in_layer("apply", *tf_default_args, *processed_args)
+    # Execute the command with the parsed arguments list
+    exit_code = tf.start_in_layer("apply", *parsed_args)
 
     if exit_code:
         logger.error(f"Command execution failed with exit code: {exit_code}")
