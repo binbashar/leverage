@@ -47,10 +47,11 @@ def get_docker_client():
         docker_client = DockerClient.from_env()
         docker_client.ping()
 
-    except:
-        logger.error(
+    except Exception as exc:
+        logger.exception(
             "Docker daemon doesn't seem to be responding. "
-            "Please check it is up and running correctly before re-running the command."
+            "Please check it is up and running correctly before re-running the command.",
+            exc_info=exc,
         )
         raise Exit(1)
 
