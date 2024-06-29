@@ -39,6 +39,7 @@ boto3 = "1.33.2"
 configupdater = "3.2"
 docutils = "0.17.1"
 rich = "10.4.0"
+requests = "2.31"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "2.8.3"
