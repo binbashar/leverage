@@ -113,7 +113,7 @@ def test_check_for_cluster_layer(muted_click_context, propagate_logs, caplog):
     """
     Test that if we are not on a cluster layer, we raise an error.
     """
-    paths = PathsHandler({"PROJECT": "test"})
+    paths = PathsHandler({"PROJECT": "test"}, "leverage")
     with patch.object(paths, "check_for_layer_location"):  # assume parent method is already tested
         with pytest.raises(ExitError):
             paths.cwd = Path("/random")
