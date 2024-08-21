@@ -7,6 +7,7 @@ from leverage._internals import State
 from leverage._utils import AwsCredsContainer
 from leverage.container import TerraformContainer
 from leverage.modules.terraform import _init
+from leverage.modules.terraform import there_is_a_plan_file
 from tests.test_containers import container_fixture_factory
 
 
@@ -55,3 +56,32 @@ def test_init_with_args(terraform_container):
         mocked_pty.call_args_list[0].kwargs["command"]
         == f"terraform init -migrate-state -backend-config=/project/./config/backend.tfvars"
     )
+
+
+@pytest.mark.parametrize(
+    "args, expected_output",
+    [
+        # No arguments, there's no plan file
+        ([], False),
+        # One argument that doesn't begin with '-', it is a plan file
+        (["plan_file"], True),
+        # A single flag/mode, no plan file
+        (["-no-color"], False),
+        # A single argument that has -key=value form, no plan file
+        (["-val='NAME=value'"], False),
+        # One key value argument, no plan file
+        (["-target", "aws_iam_role.example_role"], False),
+        # One flag before a plan file
+        (["-compact-warnings", "plan_file"], True),
+        # One -key=value argument before a plan file
+        (["-lock=false", "plan_file"], True),
+        # One key value argument before a plan file
+        (["-lock-timeout", "5s", "plan_file"], True),
+        # Some other options
+        (["-no-color", "-auto-approve"], False),
+        (["-destroy", "-target", "aws_iam_role.example.role"], False),
+        (["-target=aws_iam_role.example_role", "-destroy"], False),
+    ],
+)
+def test_apply_arguments_have_plan_file(args, expected_output):
+    assert there_is_a_plan_file(tuple(args)) == expected_output
