@@ -1,6 +1,6 @@
 import os
 import re
-from typing import List
+from typing import Sequence
 
 import click
 import dockerpty
@@ -283,7 +283,7 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         # change to original dir and set it in the container
         tf.paths.cwd = original_location
 
-        # change to original workgindir
+        # change to original working dir
         tf.container_config["working_dir"] = original_working_dir
 
     return layers
@@ -352,89 +352,60 @@ def _plan(tf, args):
         raise Exit(exit_code)
 
 
-def handle_apply_arguments_parsing(default_args: List[str], args: List[str]) -> List[str]:
-    """Parse and process arguments for the 'apply' command."""
-    parsed_args = []
-    plan_filename = None
-    skip_next = False
+def there_is_a_plan_file(args: Sequence[str]) -> bool:
+    """Determine whether the list of arguments has a plan file at the end.
 
-    valid_single_flags = {"-auto-approve", "-json", "-compact-warnings", "-no-color"}
+    Terraform apply arguments have the form "-target ADDRESS" or "-target=ADDRESS"
+    in one case "-var 'NAME=value'" or "-var='NAME=value'". There are also flags
+    with the form "-flag".
+    We just need to know if there is or not a plan file as a last argument to
+    decide if we prepend our default terraform arguments or not.
 
-    i = 0
-    while i < len(args):
-        arg = args[i]
+    Cases to consider:
+     Args                                | Plan file present
+    -------------------------------------|-------------------
+     ()                                  | False
+     ("-flag")                           | False
+     ("-var=value")                      | False
+     ("plan_file")                       | True
+     (..., "-var", "value")              | False
+     (..., "-flag", "plan_file")         | True
+     (..., "-var=value", "plan_file")    | True
+     (..., "-var", "value", "plan_file") | True
 
-        if skip_next:
-            skip_next = False
-            i += 1
-            continue
+    """
 
-        if arg.startswith("-") and arg not in {"-var", "-var-file"}:
-            if arg == "-json" and i + 1 < len(args) and not args[i + 1].startswith("-"):
-                # Handle -json <planname>
-                parsed_args.append(arg)
-                parsed_args.append(args[i + 1])
-                logger.debug(f"Detected -json argument with plan: {arg} {args[i + 1]}")
-                plan_filename = args[i + 1]
-                skip_next = True
-            elif arg in valid_single_flags:
-                # Handle valid single flags
-                parsed_args.append(arg)
-                logger.debug(f"Appending valid single flag: {arg}")
-            elif i + 1 < len(args) and not args[i + 1].startswith("-"):
-                # Handle '-key value' pair
-                parsed_args.append(arg)
-                parsed_args.append(args[i + 1])
-                logger.debug(f"Detected '-key value' pair: {arg}, {args[i + 1]}")
-                skip_next = True
-            else:
-                # Standalone flag or unknown format (treat as standalone flag)
-                parsed_args.append(arg)
-                logger.debug(f"Appending standalone flag: {arg}")
-        elif arg.startswith("-var=") or arg.startswith("-var-file="):
-            logger.debug(f"Detected var or varfile '-var=name=value' pair: {arg}, {args[i + 1]}")
-            parsed_args.append(arg)
-        elif arg == "-var" or arg == "-var-file":
-            logger.debug(f"Detected var or varfile '-var name=value' pair: {arg}, {args[i + 1]}")
-            if i + 1 < len(args):
-                parsed_args.append(args[i])
-                parsed_args.append(f"{args[i + 1]}")
-                skip_next = True
-        elif not arg.startswith("-"):
-            # Assume it's a plan filename if it's not a flag
-            plan_filename = arg
-            parsed_args.append(arg)
-            logger.debug(f"Detected plan filename: {arg}")
-        else:
-            # Handle unexpected format (should not occur with valid Terraform apply command usage)
-            logger.warning(f"Ignoring unexpected argument format: {arg}")
+    # Valid 'terraform apply' flags:
+    # https://developer.hashicorp.com/terraform/cli/commands/apply
+    tf_flags = [
+        "-destroy",
+        "-refresh-only",
+        "-detailed-exitcode",
+        "-auto-approve",
+        "-compact-warnings",
+        "-json",
+        "-no-color",
+    ]
 
-        i += 1
+    if not args or args[-1].startswith("-"):
+        return False
 
-    # If a plan filename is detected, retain only valid single flags and the plan filename
-    if plan_filename:
-        parsed_args = [arg for arg in parsed_args if arg in valid_single_flags or arg == plan_filename]
+    if len(args) > 1:
+        second_last = args[-2]
+        if second_last.startswith("-"):
+            if not "=" in second_last and second_last not in tf_flags:
+                return False
 
-    # If no plan filename detected, prepend default_args
-    if not plan_filename:
-        parsed_args = default_args + parsed_args
-
-    logger.debug(f"Final parsed_args: {parsed_args}")
-    return parsed_args
+    return True
 
 
 @pass_container
-def _apply(tf, args: List[str]) -> None:
+def _apply(tf, args: Sequence[str]) -> None:
     """Build or change the infrastructure in this layer."""
-    default_args = tf.tf_default_args
-    logger.debug(f"Original tf_default_args: {default_args}")
+    default_args = [] if there_is_a_plan_file(args) else tf.tf_default_args
+    logger.debug(f"Default args passed to apply command: {default_args}")
 
-    # Parse arguments for apply command
-    parsed_args = handle_apply_arguments_parsing(default_args, args)
-    logger.debug(f"Processed argument list for execution: {parsed_args}")
-
-    # Execute the command with the parsed arguments list
-    exit_code = tf.start_in_layer("apply", *parsed_args)
+    exit_code = tf.start_in_layer("apply", *default_args, *args)
 
     if exit_code:
         logger.error(f"Command execution failed with exit code: {exit_code}")
