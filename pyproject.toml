@@ -27,7 +27,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.8 || ~3.9 || ~3.10 || ~3.11"
+python = "~3.8 || ~3.9 || ~3.10 || ~3.11 || ~3.12"
 click = "8.0.1"
 yaenv = "1.4.1"
 "ruamel.yaml" = "0.17.10"
