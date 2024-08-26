@@ -7,7 +7,7 @@ from leverage._internals import State
 from leverage._utils import AwsCredsContainer
 from leverage.container import TerraformContainer
 from leverage.modules.terraform import _init
-from leverage.modules.terraform import there_is_a_plan_file
+from leverage.modules.terraform import has_a_plan_file
 from tests.test_containers import container_fixture_factory
 
 
@@ -84,4 +84,4 @@ def test_init_with_args(terraform_container):
     ],
 )
 def test_apply_arguments_have_plan_file(args, expected_output):
-    assert there_is_a_plan_file(tuple(args)) == expected_output
+    assert has_a_plan_file(tuple(args)) == expected_output

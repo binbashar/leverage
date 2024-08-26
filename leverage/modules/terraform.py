@@ -352,7 +352,7 @@ def _plan(tf, args):
         raise Exit(exit_code)
 
 
-def there_is_a_plan_file(args: Sequence[str]) -> bool:
+def has_a_plan_file(args: Sequence[str]) -> bool:
     """Determine whether the list of arguments has a plan file at the end.
 
     Terraform apply arguments have the form "-target ADDRESS" or "-target=ADDRESS"
@@ -402,7 +402,7 @@ def there_is_a_plan_file(args: Sequence[str]) -> bool:
 @pass_container
 def _apply(tf, args: Sequence[str]) -> None:
     """Build or change the infrastructure in this layer."""
-    default_args = [] if there_is_a_plan_file(args) else tf.tf_default_args
+    default_args = [] if has_a_plan_file(args) else tf.tf_default_args
     logger.debug(f"Default args passed to apply command: {default_args}")
 
     exit_code = tf.start_in_layer("apply", *default_args, *args)
