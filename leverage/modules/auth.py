@@ -65,7 +65,7 @@ def get_profiles(cli):
     # these are files from the layer we are currently on
     for name in ("config.tf", "locals.tf"):
         try:
-            with open(name) as tf_file:
+            with open(cli.paths.cwd / name) as tf_file:
                 tf_config = hcl2.load(tf_file)
         except FileNotFoundError:
             continue

@@ -41,6 +41,7 @@ docutils = "0.17.1"
 rich = "10.4.0"
 
 requests = "2.31"
+simple-term-menu = "1.6.4"
 [tool.poetry.group.dev.dependencies]
 pylint = "2.8.3"
 pytest = "6.2.4"
