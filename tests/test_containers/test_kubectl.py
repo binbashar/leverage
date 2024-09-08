@@ -97,7 +97,7 @@ def test_start_shell_mfa(kubectl_container):
 
     # we want a shell, so -> /bin/bash with no entrypoint
     assert container_args["command"] == "/bin/bash"
-    assert container_args["entrypoint"] == "/opt/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
+    assert container_args["entrypoint"] == "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
 
     # make sure we are pointing to the right AWS credentials: /.aws/ folder for MFA
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/home/leverage/.aws/test/config"

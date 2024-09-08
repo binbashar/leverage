@@ -55,7 +55,7 @@ def test_sso_login(mocked_new_tab, aws_container, fake_os_user, propagate_logs, 
 
     container_args = aws_container.client.api.create_container.call_args_list[0][1]
     # make sure we: point to the correct script
-    assert container_args["command"] == "/opt/scripts/aws-sso/aws-sso-login.sh"
+    assert container_args["command"] == "/home/leverage/scripts/aws-sso/aws-sso-login.sh"
     # the browser tab points to the correct code and the correct region
     assert mocked_new_tab.call_args[0][0] == "https://device.sso.us-east-1.amazonaws.com/?user_code=TEST-CODE"
     # and the fallback method is printed

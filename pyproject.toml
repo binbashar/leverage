@@ -22,8 +22,7 @@ classifiers = [
 packages = [
     { include = "leverage" },
     { include = "leverage/modules" },
-    { include = "leverage/containers" },
-    { include = "leverage/scripts" }
+    { include = "leverage/containers" }
 ]
 
 [tool.poetry.dependencies]
