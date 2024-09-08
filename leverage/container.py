@@ -3,7 +3,6 @@ import os
 import re
 import webbrowser
 from io import BytesIO
-from pathlib import Path
 from datetime import datetime
 from time import sleep
 
@@ -156,6 +155,7 @@ class LeverageContainer:
             ARG GID
             RUN groupadd -g $GID -o $UNAME
             RUN useradd -m -u $UID -g $GID -o -s /bin/bash $UNAME
+            RUN chown -R $UID:$GID /home/leverage
             USER $UNAME
             """.encode(
                 "utf-8"
@@ -310,22 +310,14 @@ class LeverageContainer:
 
 class SSOContainer(LeverageContainer):
     # SSO scripts
-    AWS_SSO_LOGIN_SCRIPT = "/opt/scripts/aws-sso/aws-sso-login.sh"
-    AWS_SSO_LOGOUT_SCRIPT = "/opt/scripts/aws-sso/aws-sso-logout.sh"
+    AWS_SSO_LOGIN_SCRIPT = "/home/leverage/scripts/aws-sso/aws-sso-login.sh"
+    AWS_SSO_LOGOUT_SCRIPT = "/home/leverage/scripts/aws-sso/aws-sso-logout.sh"
 
     # SSO constants
     AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
     AWS_SSO_CODE_WAIT_SECONDS = 2
     AWS_SSO_CODE_ATTEMPTS = 10
     FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
-
-    def __init__(self, client, mounts=None, env_vars=None):
-        super().__init__(client, mounts=mounts, env_vars=env_vars)
-        self.mounts.extend(
-            [
-                Mount(source=(Path(__file__).parent / "scripts").as_posix(), target="/opt/scripts", type="bind"),
-            ]
-        )
 
     def get_sso_access_token(self):
         with open(self.paths.sso_token_file) as token_file:
@@ -403,16 +395,14 @@ class AWSCLIContainer(SSOContainer):
             "SCRIPT_LOG_LEVEL": get_script_log_level(),
         }
         self.entrypoint = self.AWS_CLI_BINARY
-        self.mounts.extend(
-            [
-                Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
-                Mount(
-                    source=self.paths.host_aws_credentials_dir.as_posix(),
-                    target=self.paths.guest_aws_credentials_dir,
-                    type="bind",
-                ),
-            ]
-        )
+        self.mounts = [
+            Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
+            Mount(
+                source=self.paths.host_aws_credentials_dir.as_posix(),
+                target=self.paths.guest_aws_credentials_dir,
+                type="bind",
+            ),
+        ]
 
         logger.debug(f"[bold cyan]Container configuration:[/bold cyan]\n{json.dumps(self.container_config, indent=2)}")
 
@@ -448,7 +438,7 @@ class TerraformContainer(SSOContainer):
 
     TF_BINARY = "/bin/terraform"
 
-    TF_MFA_ENTRYPOINT = "/opt/scripts/aws-mfa/aws-mfa-entrypoint.sh"
+    TF_MFA_ENTRYPOINT = "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 
     def __init__(self, client, mounts=None, env_vars=None):
         super().__init__(client, mounts=mounts, env_vars=env_vars)
