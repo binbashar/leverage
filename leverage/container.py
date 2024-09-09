@@ -598,9 +598,6 @@ class TerraformContainer(SSOContainer):
             return self._start(command, *arguments)
 
     def start_in_layer(self, command, *arguments):
-        import ipdb
-
-        ipdb.set_trace()
         """Run a command that can only be performed in layer level."""
         self.paths.check_for_layer_location()
 
