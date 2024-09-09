@@ -1,4 +1,5 @@
 import re
+from typing import Sequence
 
 import click
 import hcl2
@@ -272,7 +273,7 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         # change to original dir and set it in the container
         tf.paths.cwd = original_location
 
-        # change to original workgindir
+        # change to original working dir
         tf.container_config["working_dir"] = original_working_dir
 
     return layers
@@ -327,55 +328,60 @@ def _plan(tf, args):
         raise Exit(exit_code)
 
 
-def handle_apply_arguments_parsing(args):
-    """Parse and process the arguments for the 'apply' command."""
-    # Initialize new_args to handle both '-key=value' and '-key value'
-    new_args = []
-    skip_next = False  # Flag to skip the next argument if it's part of '-key value'
+def has_a_plan_file(args: Sequence[str]) -> bool:
+    """Determine whether the list of arguments has a plan file at the end.
 
-    for i, arg in enumerate(args):
-        if skip_next:
-            skip_next = False  # Reset flag and skip this iteration
-            continue
+    Terraform apply arguments have the form "-target ADDRESS" or "-target=ADDRESS"
+    in one case "-var 'NAME=value'" or "-var='NAME=value'". There are also flags
+    with the form "-flag".
+    We just need to know if there is or not a plan file as a last argument to
+    decide if we prepend our default terraform arguments or not.
 
-        if arg.startswith("-") and not arg.startswith("-var"):
-            if i + 1 < len(args) and not args[i + 1].startswith("-"):
-                # Detected '-key value' pair; append them without merging
-                new_args.append(arg)
-                new_args.append(args[i + 1])
-                skip_next = True  # Mark to skip the next item as it's already processed
-                logger.debug(f"Detected '-key value' pair: {arg}, {args[i + 1]}")
-            else:
-                # Either '-key=value' or a standalone '-key'; just append
-                new_args.append(arg)
-                logger.debug(f"Appending standard -key=value or standalone argument: {arg}")
-        else:
-            # Handles '-var' and non '-' starting arguments
-            new_args.append(arg)
-            logger.debug(f"Appending argument (non '-' or '-var'): {arg}")
+    Cases to consider:
+     Args                                | Plan file present
+    -------------------------------------|-------------------
+     ()                                  | False
+     ("-flag")                           | False
+     ("-var=value")                      | False
+     ("plan_file")                       | True
+     (..., "-var", "value")              | False
+     (..., "-flag", "plan_file")         | True
+     (..., "-var=value", "plan_file")    | True
+     (..., "-var", "value", "plan_file") | True
 
-    return new_args
+    """
+
+    # Valid 'terraform apply' flags:
+    # https://developer.hashicorp.com/terraform/cli/commands/apply
+    tf_flags = [
+        "-destroy",
+        "-refresh-only",
+        "-detailed-exitcode",
+        "-auto-approve",
+        "-compact-warnings",
+        "-json",
+        "-no-color",
+    ]
+
+    if not args or args[-1].startswith("-"):
+        return False
+
+    if len(args) > 1:
+        second_last = args[-2]
+        if second_last.startswith("-"):
+            if not "=" in second_last and second_last not in tf_flags:
+                return False
+
+    return True
 
 
 @pass_container
-def _apply(tf, args):
+def _apply(tf, args: Sequence[str]) -> None:
     """Build or change the infrastructure in this layer."""
-    # if there is a plan, remove all "-var" from the default args
-    # Preserve the original `-var` removal logic and modify tf_default_args if necessary
-    tf_default_args = tf.tf_default_args
-    for arg in args:
-        if not arg.startswith("-"):
-            tf_default_args = [arg for index, arg in enumerate(tf_default_args) if not arg.startswith("-var")]
-            break
+    default_args = [] if has_a_plan_file(args) else tf.tf_default_args
+    logger.debug(f"Default args passed to apply command: {default_args}")
 
-    # Process arguments using the new parsing logic
-    processed_args = handle_apply_arguments_parsing(args)
-
-    logger.debug(f"Original tf_default_args: {tf_default_args}")
-    logger.debug(f"Processed argument list for execution: {processed_args}")
-
-    # Execute the command with the modified arguments list
-    exit_code = tf.start_in_layer("apply", *tf_default_args, *processed_args)
+    exit_code = tf.start_in_layer("apply", *default_args, *args)
 
     if exit_code:
         logger.error(f"Command execution failed with exit code: {exit_code}")
