@@ -97,7 +97,7 @@ def test_configure_accounts_profiles(mocked_backup, muted_click_context):
         )
 
     # make sure we did a backup with the old credentials
-    assert mocked_backup.called_once
+    assert mocked_backup.assert_called_once
 
     # only 1 call since "out-of-project-acc" should be avoided
     assert mocked_config.call_count == 1
@@ -130,7 +130,7 @@ def test_configure_accounts_profiles_mfa(mocked_backup, mfa_device, muted_click_
         )
 
     # make sure we did a backup with the old credentials
-    assert mocked_backup.called_once
+    assert mocked_backup.assert_called_once
 
     # only 1 call since "out-of-project-acc" should be avoided
     assert mocked_config.call_count == 1
