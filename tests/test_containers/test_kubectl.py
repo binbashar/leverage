@@ -115,7 +115,7 @@ def test_start_shell_sso(mock_refresh, kubectl_container):
 
     # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == "/bin/bash"
-    assert mock_refresh.called_once
+    assert mock_refresh.assert_called_once
 
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"
