@@ -92,7 +92,7 @@ class LeverageContainer:
             raise Exit(1)
 
         mounts = [Mount(source=source, target=target, type="bind") for source, target in mounts] if mounts else []
-        self.host_config = self.client.api.create_host_config(security_opt=["label:disable"], mounts=mounts)
+        self.host_config = self.client.api.create_host_config(security_opt=["label=disable"], mounts=mounts)
         self.container_config = {
             "image": f"{self.image}:{self.image_tag}",
             "command": "",
@@ -405,7 +405,7 @@ class AWSCLIContainer(SSOContainer):
     def sso_login(self) -> int:
         region = self.get_sso_region()
 
-        with CustomEntryPoint(self, ""):
+        with CustomEntryPoint(self, "sh -c"):
             container = self._create_container(False, command=self.AWS_SSO_LOGIN_SCRIPT)
 
         with ContainerSession(self.client, container):
