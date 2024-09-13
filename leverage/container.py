@@ -405,7 +405,7 @@ class AWSCLIContainer(SSOContainer):
     def sso_login(self) -> int:
         region = self.get_sso_region()
 
-        with CustomEntryPoint(self, ""):
+        with CustomEntryPoint(self, "sh -c"):
             container = self._create_container(False, command=self.AWS_SSO_LOGIN_SCRIPT)
 
         with ContainerSession(self.client, container):
