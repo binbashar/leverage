@@ -72,7 +72,7 @@ def test_get_root_path_not_in_a_git_repository(pytester):
 def test_get_account_path(monkeypatch, tmp_path):
     # Make a deep directory structure
     root_dir = leaf_dir = tmp_path
-    leaf_dir = leaf_dir / "subdir" / "subdir" / "subdir" / "subdir"
+    leaf_dir = leaf_dir / "subdir" / "subdir" / "subdir" / "subdir" / "subdir" / "subdir" / "subdir"
     leaf_dir.mkdir(parents=True)
 
     monkeypatch.setattr(lepath, "get_root_path", lambda: root_dir)
