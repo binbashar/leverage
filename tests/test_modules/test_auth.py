@@ -1,4 +1,5 @@
 from collections import namedtuple
+from pathlib import PosixPath
 from unittest import mock
 from unittest.mock import Mock, MagicMock, PropertyMock
 
@@ -189,19 +190,24 @@ aws_session_token = session-token
 """
 
 data_dict = {
-    "config.tf": FILE_CONFIG_TF,
-    "locals.tf": FILE_LOCALS_TF,
     "~/config/backend.tfvars": FILE_BACKEND_TFVARS,
     "~/.aws/test/config": FILE_AWS_CONFIG,
     "~/.aws/test/credentials": FILE_AWS_CREDENTIALS,
 }
 
 
-def open_side_effect(name, *args, **kwargs):
+def open_side_effect(name: PosixPath, *args, **kwargs):
     """
     Everytime we call open(), this side effect will try to get the value from data_dict rather than reading a disk file.
     """
-    return mock.mock_open(read_data=data_dict[name])()
+    if str(name).endswith("config.tf"):
+        read_data = FILE_CONFIG_TF
+    elif str(name).endswith("locals.tf"):
+        read_data = FILE_LOCALS_TF
+    else:
+        read_data = data_dict[name]
+
+    return mock.mock_open(read_data=read_data)()
 
 
 b3_client = Mock()
