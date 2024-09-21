@@ -2,6 +2,7 @@
     Utilities to obtain relevant files' and directories' locations
 """
 import os
+import pathlib
 from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import PIPE
@@ -168,6 +169,18 @@ class PathsHandler:
             self.host_aws_credentials_dir.mkdir(parents=True)
         self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
 
+    def account_conf_from_layer(self, layer_path: Path):
+        return self._conf_from_layer(layer_path, self.ACCOUNT_TF_VARS)
+
+    def _conf_from_layer(self, layer_path: Path, file_name) -> dict:
+        acc_folder = layer_path.relative_to(self.root_dir).parts[0]
+        account_config_path = self.root_dir / acc_folder / "config" / file_name
+        return hcl2.loads(account_config_path.read_text())
+
+    def _account_config_dir(self, layer_path) -> dict:
+        acc_folder = layer_path.relative_to(self.root_dir).parts[0]
+        return self.root_dir / acc_folder / "config"
+
     @property
     def guest_account_base_path(self):
         return f"{self.guest_base_path}/{self.account_dir.relative_to(self.root_dir).as_posix()}"
@@ -256,25 +269,27 @@ class PathsHandler:
     def tf_cache_dir(self):
         return os.getenv("TF_PLUGIN_CACHE_DIR")
 
-    def check_for_layer_location(self):
-        """Make sure the command is being ran at layer level. If not, bail."""
-        if self.cwd in (self.common_config_dir, self.account_config_dir):
+    def check_for_layer_location(self, path: Path = None):
+        """Make sure the command is being run at layer level. If not, bail."""
+        path = path or self.cwd
+        if path in (self.common_config_dir, self.account_config_dir):
             raise ExitError(1, "Currently in a configuration directory, no Terraform command can be run here.")
 
-        if self.cwd in (self.root_dir, self.account_dir):
+        if path in (self.root_dir, self.account_dir):
             raise ExitError(
                 1,
                 "Terraform commands cannot run neither in the root of the project or in"
                 " the root directory of an account.",
             )
 
-        if not list(self.cwd.glob("*.tf")):
+        if not list(path.glob("*.tf")):
             raise ExitError(1, "This command can only run at [bold]layer[/bold] level.")
 
-    def check_for_cluster_layer(self):
-        self.check_for_layer_location()
+    def check_for_cluster_layer(self, path: Path = None):
+        path = path or self.cwd
+        self.check_for_layer_location(path)
         # assuming the "cluster" layer will contain the expected EKS outputs
-        if self.cwd.parts[-1] != "cluster":
+        if path.parts[-1] != "cluster":
             raise ExitError(1, "This command can only run at the [bold]cluster layer[/bold].")
 
 

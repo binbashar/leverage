@@ -1,10 +1,12 @@
+import os
 from pathlib import Path
 
 from click.exceptions import Exit
 from docker.types import Mount
+from simple_term_menu import TerminalMenu
 
 from leverage import logger
-from leverage._utils import chain_commands, AwsCredsEntryPoint, ExitError
+from leverage._utils import chain_commands, AwsCredsEntryPoint, ExitError, CustomEntryPoint
 from leverage.container import TerraformContainer
 
 
@@ -39,12 +41,9 @@ class KubeCtlContainer(TerraformContainer):
             self._start(self.SHELL)
 
     def configure(self):
-        # make sure we are on the cluster layer
-        self.paths.check_for_cluster_layer()
-
         logger.info("Retrieving k8s cluster information...")
         # generate the command that will configure the new cluster
-        with AwsCredsEntryPoint(self, override_entrypoint=""):
+        with CustomEntryPoint(self, entrypoint=""):  # can't recall why this change
             add_eks_cluster_cmd = self._get_eks_kube_config()
         # and the command that will set the proper ownership on the config file (otherwise the owner will be "root")
         change_owner_cmd = self.change_ownership_cmd(self.KUBECTL_CONFIG_FILE, recursive=False)
@@ -65,3 +64,42 @@ class KubeCtlContainer(TerraformContainer):
 
         aws_eks_cmd = next(op for op in output.split("\r\n") if op.startswith("aws eks update-kubeconfig"))
         return aws_eks_cmd + f" --region {self.region}"
+
+    def _scan_clusters(self):
+        """
+        Scan all the subdirectories in search of "cluster" layers.
+        """
+        for root, dirs, files in os.walk(self.paths.cwd):
+            # exclude hidden directories
+            dirs[:] = [d for d in dirs if not d[0] == "."]
+
+            if "cluster" in dirs:
+                cluster_path = Path(root) / "cluster"
+                try:
+                    self.paths.check_for_cluster_layer(cluster_path)
+                except ExitError as exc:
+                    logger.error(exc)
+                else:
+                    yield cluster_path
+
+    def discover(self):
+        clusters = [str(c) for c in self._scan_clusters()]
+        if not clusters:
+            raise ExitError(1, "No clusters found.")
+        terminal_menu = TerminalMenu(clusters, title="Clusters found:")
+        menu_entry_index = terminal_menu.show()
+        if menu_entry_index is None:
+            # selection cancelled
+            return
+
+        cluster_path = Path(clusters[menu_entry_index])
+        # cluster is the host path, so in order to be able to run commands in that layer
+        # we need to convert it into a relative inside the container
+        self.container_config["working_dir"] = (
+            self.paths.guest_base_path / cluster_path.relative_to(self.paths.cwd)
+        ).as_posix()
+        # TODO: rather than overriding property by propery, maybe a custom .paths object pointing to cluster_path?
+        self.paths.cwd = cluster_path
+        self.paths.account_config_dir = self.paths._account_config_dir(cluster_path)
+        self.paths.account_conf = self.paths.account_conf_from_layer(cluster_path)
+        self.configure()
