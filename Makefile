@@ -1,7 +1,7 @@
 .PHONY: help build
 LEVERAGE_TESTING_IMAGE := binbash/leverage-cli-testing
 LEVERAGE_TESTING_TAG   := 2.5.0
-LEVERAGE_IMAGE_TAG     := 1.2.7-0.1.14
+LEVERAGE_IMAGE_TAG     := 1.3.5-0.2.0
 PYPROJECT_FILE := pyproject.toml
 INIT_FILE := leverage/__init__.py
 PLACEHOLDER := 0.0.0
