@@ -4,7 +4,6 @@ import pytest
 from click import get_current_context
 
 from leverage._internals import State
-from leverage._utils import AwsCredsContainer
 from leverage.container import TerraformContainer
 from leverage.modules.terraform import _init
 from leverage.modules.terraform import has_a_plan_file
@@ -23,39 +22,37 @@ def terraform_container(muted_click_context):
 
     # assume we are on a valid location
     with patch.object(tf_container.paths, "check_for_layer_location", Mock()):
-        # assume we have valid credentials
-        with patch.object(AwsCredsContainer, "__enter__", Mock()):
-            yield tf_container
+        yield tf_container
 
 
-def test_init(terraform_container):
+@pytest.mark.parametrize(
+    "args, expected_value",
+    [
+        ([], ["-backend-config=/project/./config/backend.tfvars"]),
+        (["-migrate-state"], ["-migrate-state", "-backend-config=/project/./config/backend.tfvars"]),
+        (["-r1", "-r2"], ["-r1", "-r2", "-backend-config=/project/./config/backend.tfvars"]),
+    ],
+)
+def test_init_arguments(terraform_container, args, expected_value):
     """
-    Test happy path.
+    Test that the arguments for the init command are prepared correctly.
     """
-    live_container = Mock()
-    with patch("leverage._utils.LiveContainer.__enter__", return_value=live_container):
-        with patch("dockerpty.exec_command") as mocked_pty:
-            _init([])
+    with patch.object(terraform_container, "start_in_layer", return_value=0) as mocked:
+        _init(args)
 
-    assert live_container.exec_run.call_args_list[0].args[0] == "mkdir -p /root/.ssh"
-    assert live_container.exec_run.call_args_list[1].args[0] == "chown root:root -R /root/.ssh/"
-    assert (
-        mocked_pty.call_args_list[0].kwargs["command"]
-        == f"terraform init -backend-config=/project/./config/backend.tfvars"
-    )
+    assert mocked.call_args_list[0][0][0] == "init"
+    assert " ".join(mocked.call_args_list[0][0][1:]) == " ".join(expected_value)
 
 
 def test_init_with_args(terraform_container):
     """
     Test tf init with arguments.
     """
-    with patch("dockerpty.exec_command") as mocked_pty:
+    # with patch("dockerpty.exec_command") as mocked_pty:
+    with patch.object(terraform_container, "start_in_layer", return_value=0) as mocked:
         _init(["-migrate-state"])
 
-    assert (
-        mocked_pty.call_args_list[0].kwargs["command"]
-        == f"terraform init -migrate-state -backend-config=/project/./config/backend.tfvars"
-    )
+    assert mocked.call_args_list[0][0] == ("init", "-migrate-state", "-backend-config=/project/./config/backend.tfvars")
 
 
 @pytest.mark.parametrize(

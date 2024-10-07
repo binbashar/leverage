@@ -34,7 +34,7 @@ jobs:
         run: |
           echo "[INFO] Running unit tests and generate coverage report"
           export PATH="${PATH}:${HOME}/.poetry/bin"
-          poetry run pytest --verbose --cov=./ --cov-report=xml
+          poetry run pytest --verbose --cov=./leverage/ --cov-report=xml
         shell: bash
 
       - name: Report Coveralls

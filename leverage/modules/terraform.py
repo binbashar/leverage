@@ -1,16 +1,13 @@
-import os
 import re
 from typing import Sequence
 
 import click
-import dockerpty
 import hcl2
 from click.exceptions import Exit
 
 from leverage import logger
-from leverage._internals import pass_container
-from leverage._internals import pass_state
-from leverage._utils import tar_directory, AwsCredsContainer, LiveContainer, ExitError
+from leverage._internals import pass_container, pass_state
+from leverage._utils import ExitError
 from leverage.container import TerraformContainer
 from leverage.container import get_docker_client
 from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
@@ -85,14 +82,7 @@ def init(context, tf: TerraformContainer, skip_validation, layers, args):
     """
     Initialize this layer.
     """
-    layers = invoke_for_all_commands(layers, _init, args, skip_validation)
-
-    # now change ownership on all the downloaded modules and providers
-    for layer in layers:
-        tf.change_file_ownership(tf.paths.guest_base_path / layer.relative_to(tf.paths.root_dir) / ".terraform")
-    # and then providers in the cache folder
-    if tf.paths.tf_cache_dir:
-        tf.change_file_ownership(tf.paths.tf_cache_dir)
+    invoke_for_all_commands(layers, _init, args, skip_validation)
 
 
 @terraform.command(context_settings=CONTEXT_SETTINGS)
@@ -324,23 +314,9 @@ def _init(tf, args):
 
     tf.paths.check_for_layer_location()
 
-    with LiveContainer(tf) as container:
-        # create the .ssh directory
-        container.exec_run("mkdir -p /root/.ssh")
-        # copy the entire ~/.ssh/ folder
-        tar_bytes = tar_directory(tf.paths.home / ".ssh")
-        # into /root/.ssh
-        container.put_archive("/root/.ssh/", tar_bytes)
-        # correct the owner of the files to match with the docker internal user
-        container.exec_run("chown root:root -R /root/.ssh/")
-
-        with AwsCredsContainer(container, tf):
-            dockerpty.exec_command(
-                client=tf.client.api,
-                container=container.id,
-                command="terraform init " + " ".join(args),
-                interactive=bool(int(os.environ.get("LEVERAGE_INTERACTIVE", 1))),
-            )
+    exit_code = tf.start_in_layer("init", *args)
+    if exit_code:
+        raise Exit(exit_code)
 
 
 @pass_container

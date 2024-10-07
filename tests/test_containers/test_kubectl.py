@@ -57,14 +57,15 @@ def test_start_shell(kubectl_container):
     assert container_args["entrypoint"] == ""
 
     # make sure we are pointing to the AWS credentials
-    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"
-    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/tmp/test/credentials"
+    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/home/leverage/tmp/test/config"
+    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/home/leverage/tmp/test/credentials"
 
     # make sure we mounted the .kube config folder
-    assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/root/.kube")
+    print(container_args["host_config"])
+    assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/home/leverage/.kube")
 
     # and the aws config folder
-    assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/root/tmp/test")
+    assert next(m for m in container_args["host_config"]["Mounts"] if m["Target"] == "/home/leverage/tmp/test")
 
 
 # don't rely on the filesystem
@@ -75,7 +76,7 @@ def test_configure(kubectl_container, fake_os_user):
     with patch.object(kubectl_container, "_start", return_value=0) as mock_start:
         kubectl_container.configure()
 
-    assert mock_start.call_args[0][0] == f'bash -c "{AWS_EKS_UPDATE_KUBECONFIG} && chown 1234:5678 /root/.kube/config"'
+    assert mock_start.call_args[0][0] == AWS_EKS_UPDATE_KUBECONFIG
 
 
 #####################
@@ -96,11 +97,11 @@ def test_start_shell_mfa(kubectl_container):
 
     # we want a shell, so -> /bin/bash with no entrypoint
     assert container_args["command"] == "/bin/bash"
-    assert container_args["entrypoint"] == "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
+    assert container_args["entrypoint"] == "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
 
     # make sure we are pointing to the right AWS credentials: /.aws/ folder for MFA
-    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/.aws/test/config"
-    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/.aws/test/credentials"
+    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/home/leverage/.aws/test/config"
+    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/home/leverage/.aws/test/credentials"
 
 
 @patch("leverage.container.refresh_layer_credentials")
@@ -118,5 +119,5 @@ def test_start_shell_sso(mock_refresh, kubectl_container):
     assert mock_refresh.assert_called_once
 
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
-    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/root/tmp/test/config"
-    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/root/tmp/test/credentials"
+    assert container_args["environment"]["AWS_CONFIG_FILE"] == "/home/leverage/tmp/test/config"
+    assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/home/leverage/tmp/test/credentials"

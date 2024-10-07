@@ -2,7 +2,7 @@ import json
 import os
 import re
 import webbrowser
-from pathlib import Path
+from io import BytesIO
 from datetime import datetime
 from time import sleep
 
@@ -11,15 +11,14 @@ from click.exceptions import Exit
 import dockerpty
 from configupdater import ConfigUpdater
 from docker import DockerClient
-from docker.errors import APIError, NotFound
+from docker.errors import APIError
 from docker.types import Mount
-from typing import Tuple, Union
+from typing import Tuple
 
-from leverage import __toolbox_version__
 from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, CustomEntryPoint, ExitError, ContainerSession
 from leverage.modules.auth import refresh_layer_credentials
-from leverage.logger import console, raw_logger
+from leverage.logger import raw_logger
 from leverage.logger import get_script_log_level
 from leverage.path import PathsHandler
 from leverage.conf import load as load_env
@@ -67,6 +66,7 @@ class LeverageContainer:
 
     LEVERAGE_IMAGE = "binbash/leverage-toolbox"
     SHELL = "/bin/bash"
+    CONTAINER_USER = "leverage"
 
     def __init__(self, client, mounts: tuple = None, env_vars: dict = None):
         """Project related paths are determined and stored. Project configuration is loaded.
@@ -78,7 +78,7 @@ class LeverageContainer:
         # Load configs
         self.env_conf = load_env()
 
-        self.paths = PathsHandler(self.env_conf)
+        self.paths = PathsHandler(self.env_conf, self.CONTAINER_USER)
         self.project = self.paths.project
 
         # Set image to use
@@ -94,7 +94,7 @@ class LeverageContainer:
         mounts = [Mount(source=source, target=target, type="bind") for source, target in mounts] if mounts else []
         self.host_config = self.client.api.create_host_config(security_opt=["label=disable"], mounts=mounts)
         self.container_config = {
-            "image": f"{self.image}:{self.image_tag}",
+            "image": f"{self.image}:{self.local_image_tag}",
             "command": "",
             "stdin_open": True,
             "environment": env_vars or {},
@@ -138,43 +138,65 @@ class LeverageContainer:
 
         raise ExitError(1, f"No valid region could be found at: {self.paths.cwd.as_posix()}")
 
+    @property
+    def local_image_tag(self):
+        return f"{self.image_tag}-{os.getgid()}-{os.getuid()}"
+
+    @property
+    def local_image(self) -> BytesIO:
+        """Return the local image that will be built, as a file-like object."""
+        return BytesIO(
+            """
+            ARG IMAGE_TAG
+            FROM binbash/leverage-toolbox:$IMAGE_TAG
+
+            ARG UNAME
+            ARG UID
+            ARG GID
+            RUN groupadd -g $GID -o $UNAME
+            RUN useradd -m -u $UID -g $GID -o -s /bin/bash $UNAME
+            RUN chown -R $UID:$GID /home/leverage
+            USER $UNAME
+            """.encode(
+                "utf-8"
+            )
+        )
+
     def ensure_image(self):
-        """Make sure the required Docker image is available in the system. If not, pull it from registry."""
-        found_image = self.client.api.images(f"{self.image}:{self.image_tag}")
+        """
+        Make sure the required local Docker image is available in the system. If not, build it.
+        If the image already exists, re-build it so changes in the arguments can take effect.
+        """
+        logger.info(f"Checking for local docker image, tag: {self.local_image_tag}...")
+        image_name = f"{self.image}:{self.local_image_tag}"
+
+        # check first is our image is already available locally
+        found_image = self.client.api.images(f"{self.image}:{self.local_image_tag}")
         if found_image:
+            logger.info("[green]✔ OK[/green]\n")
             return
 
-        logger.info("Required Docker image not found.")
+        logger.info(f"Image not found, building it...")
+        build_args = {
+            "IMAGE_TAG": self.image_tag,
+            "UNAME": self.CONTAINER_USER,
+            "GID": str(os.getgid()),
+            "UID": str(os.getuid()),
+        }
 
-        try:
-            stream = self.client.api.pull(repository=self.image, tag=self.image_tag, stream=True, decode=True)
-        except NotFound as e:
-            logger.error(
-                f"The specified toolbox version, '{self.image_tag}' (toolbox image '{self.image}:{self.image_tag}') can not be found. "
-                "If you come from a project created with an older version of Leverage CLI or have modified the 'build.env' file manually, "
-                f"please consider either deleting the file, or configuring a valid toolbox version to use. (i.e. 'TERRAFORM_IMAGE_TAG={__toolbox_version__}')"
-            )
-            raise Exit(1)
-        except APIError as pull:
-            pull.__traceback__ = None
-            pull.__context__.__traceback__ = None
-            logger.exception("Error pulling image:", exc_info=pull)
-            raise Exit(1)
-        except Exception as e:
-            logger.error(f"Not handled error while pulling the image: {e}")
-            raise Exit(1)
+        stream = self.client.api.build(
+            fileobj=self.local_image,
+            tag=image_name,
+            pull=True,
+            buildargs=build_args,
+            decode=True,
+        )
 
-        logger.info(next(stream)["status"])
-
-        imageinfo = []
-        with console.status("Pulling image..."):
-            for status in stream:
-                status = status["status"]
-                if status.startswith("Digest") or status.startswith("Status"):
-                    imageinfo.append(status)
-
-        for info in imageinfo:
-            logger.info(info)
+        for line in stream:
+            if "stream" in line and line["stream"].startswith("Successfully built"):
+                logger.info("[green]✔ OK[/green]\n")
+            elif "errorDetail" in line:
+                raise ExitError(1, f"Failed building local image: {line['errorDetail']}")
 
     def _create_container(self, tty, command="", *args):
         """Create the container that will run the command.
@@ -285,24 +307,18 @@ class LeverageContainer:
     def docker_logs(self, container):
         return self.client.api.logs(container).decode("utf-8")
 
-    def change_ownership_cmd(self, path: Union[Path, str], recursive=True) -> str:
-        recursive = "-R " if recursive else ""
-        user_id = os.getuid()
-        group_id = os.getgid()
-
-        return f"chown {user_id}:{group_id} {recursive}{path}"
-
-    def change_file_ownership(self, path: Union[Path, str], recursive=True):
-        """
-        Change the file/folder ownership from the internal docker user (usually root)
-        to the user executing the CLI.
-        """
-        cmd = self.change_ownership_cmd(path, recursive=recursive)
-        with CustomEntryPoint(self, entrypoint=""):
-            self._exec(cmd)
-
 
 class SSOContainer(LeverageContainer):
+    # SSO scripts
+    AWS_SSO_LOGIN_SCRIPT = "/home/leverage/scripts/aws-sso/aws-sso-login.sh"
+    AWS_SSO_LOGOUT_SCRIPT = "/home/leverage/scripts/aws-sso/aws-sso-logout.sh"
+
+    # SSO constants
+    AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
+    AWS_SSO_CODE_WAIT_SECONDS = 2
+    AWS_SSO_CODE_ATTEMPTS = 10
+    FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
+
     def get_sso_access_token(self):
         with open(self.paths.sso_token_file) as token_file:
             return json.loads(token_file.read())["accessToken"]
@@ -316,21 +332,56 @@ class SSOContainer(LeverageContainer):
         conf.read(self.paths.host_aws_profiles_file)
         return conf.get(f"profile {self.project}-sso", "sso_region").value
 
+    def get_sso_code(self, container) -> str:
+        """
+        Find and return the SSO user code by periodically checking the logs.
+        Up until N attempts.
+        """
+        logger.info("Fetching SSO code...")
+        for _ in range(self.AWS_SSO_CODE_ATTEMPTS):
+            # pull logs periodically until we find our SSO code
+            logs = self.docker_logs(container)
+            if "Then enter the code:" in logs:
+                return logs.split("Then enter the code:")[1].split("\n")[2]
+            else:
+                logger.debug(logs)
+            sleep(self.AWS_SSO_CODE_WAIT_SECONDS)
+
+        raise ExitError(1, "Get SSO code timed-out")
+
+    def get_sso_region(self):
+        # TODO: what about using the .region property we have now? that takes the value from the path of the layer
+        _, region = self.exec(f"configure get sso_region --profile {self.project}-sso")
+        return region
+
+    def sso_login(self) -> int:
+        region = self.get_sso_region()
+
+        with CustomEntryPoint(self, "sh -c"):
+            container = self._create_container(False, command=self.AWS_SSO_LOGIN_SCRIPT)
+
+        with ContainerSession(self.client, container):
+            # once inside this block, the SSO_LOGIN_SCRIPT is being executed in the "background"
+            # now let's grab the user code from the logs
+            user_code = self.get_sso_code(container)
+            # with the user code, we can now autocomplete the url
+            link = self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code)
+            webbrowser.open_new_tab(link)
+            # The SSO code is only valid once: if the browser was able to open it, the fallback link will be invalid
+            logger.info(self.FALLBACK_LINK_MSG.format(link=link))
+            # now let's wait until the command locking the container resolve itself:
+            # aws sso login will wait for the user code
+            # once submitted to the browser, the authentication finish and the lock is released
+            exit_code = self.client.api.wait(container)["StatusCode"]
+            raw_logger.info(self.docker_logs(container))
+
+        return exit_code
+
 
 class AWSCLIContainer(SSOContainer):
     """Leverage Container specially tailored to run AWS CLI commands."""
 
     AWS_CLI_BINARY = "/usr/local/bin/aws"
-
-    # SSO scripts
-    AWS_SSO_LOGIN_SCRIPT = "/root/scripts/aws-sso/aws-sso-login.sh"
-    AWS_SSO_LOGOUT_SCRIPT = "/root/scripts/aws-sso/aws-sso-logout.sh"
-
-    # SSO constants
-    AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
-    AWS_SSO_CODE_WAIT_SECONDS = 2
-    AWS_SSO_CODE_ATTEMPTS = 10
-    FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
 
     def __init__(self, client):
         super().__init__(client)
@@ -381,52 +432,6 @@ class AWSCLIContainer(SSOContainer):
         self.entrypoint = self.AWS_CLI_BINARY
         return exit_code, output
 
-    def get_sso_code(self, container) -> str:
-        """
-        Find and return the SSO user code by periodically checking the logs.
-        Up until N attempts.
-        """
-        logger.info("Fetching SSO code...")
-        for _ in range(self.AWS_SSO_CODE_ATTEMPTS):
-            # pull logs periodically until we find our SSO code
-            logs = self.docker_logs(container)
-            if "Then enter the code:" in logs:
-                return logs.split("Then enter the code:")[1].split("\n")[2]
-
-            sleep(self.AWS_SSO_CODE_WAIT_SECONDS)
-
-        raise ExitError(1, "Get SSO code timed-out")
-
-    def get_sso_region(self):
-        # TODO: what about using the .region property we have now? that takes the value from the path of the layer
-        _, region = self.exec(f"configure get sso_region --profile {self.project}-sso")
-        return region
-
-    def sso_login(self) -> int:
-        region = self.get_sso_region()
-
-        with CustomEntryPoint(self, "sh -c"):
-            container = self._create_container(False, command=self.AWS_SSO_LOGIN_SCRIPT)
-
-        with ContainerSession(self.client, container):
-            # once inside this block, the SSO_LOGIN_SCRIPT is being executed in the "background"
-            # now let's grab the user code from the logs
-            user_code = self.get_sso_code(container)
-            # with the user code, we can now autocomplete the url
-            link = self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code)
-            webbrowser.open_new_tab(link)
-            # The SSO code is only valid once: if the browser was able to open it, the fallback link will be invalid
-            logger.info(self.FALLBACK_LINK_MSG.format(link=link))
-            # now let's wait until the command locking the container resolve itself:
-            # aws sso login will wait for the user code
-            # once submitted to the browser, the authentication finish and the lock is released
-            exit_code = self.client.api.wait(container)["StatusCode"]
-            raw_logger.info(self.docker_logs(container))
-            # now return ownership of the token file back to the user
-            self.change_file_ownership(self.paths.guest_aws_credentials_dir)
-
-        return exit_code
-
 
 class TerraformContainer(SSOContainer):
     """Leverage container specifically tailored to run Terraform commands.
@@ -434,8 +439,7 @@ class TerraformContainer(SSOContainer):
 
     TF_BINARY = "/bin/terraform"
 
-    TF_MFA_ENTRYPOINT = "/root/scripts/aws-mfa/aws-mfa-entrypoint.sh"
-    TF_SSO_ENTRYPOINT = "/root/scripts/aws-sso/aws-sso-entrypoint.sh"
+    TF_MFA_ENTRYPOINT = "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 
     def __init__(self, client, mounts=None, env_vars=None):
         super().__init__(client, mounts=mounts, env_vars=env_vars)
