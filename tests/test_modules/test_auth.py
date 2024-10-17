@@ -251,6 +251,7 @@ def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_contain
 @mock.patch("leverage.modules.auth.update_config_section")
 @mock.patch("builtins.open", side_effect=open_side_effect)
 @mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("pathlib.Path.touch", new=Mock())
 def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_container, propagate_logs):
     refresh_layer_credentials(sso_container)
