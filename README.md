@@ -50,7 +50,7 @@ PROJECT=bb
 MFA_ENABLED=false
 
 # Terraform
-TERRAFORM_IMAGE_TAG=1.2.7-0.1.0
+TERRAFORM_IMAGE_TAG=1.5.0-0.2.0
 ```
 
 So, if you have created a project with version <1.8.0 and want to use it with version >=1.8.0 you should:
@@ -66,7 +66,6 @@ For the second item you can check the version [here](https://hub.docker.com/r/bi
 
 Leverage CLI explicitly supports the following Python versions:
 
-- Python 3.8.x
 - Python 3.9.x
 - Python 3.10.x
 - Python 3.11.x
@@ -81,7 +80,7 @@ reinforces our commitment to maintaining a reliable and stable toolset.
 
 ### Installing multiple python versions with pyenv
 
-If you need to install one of the supported Python versions (3.8, 3.9, 3.10 or 3.11) and would like to manage multiple
+If you need to install one of the supported Python versions and would like to manage multiple
 Python environments, `pyenv` is a highly recommended tool. Here’s how you can use `pyenv` to install and manage Python
 versions:
 
@@ -107,7 +106,6 @@ exec "$SHELL"
 Once pyenv is installed, you can install any supported Python version by following these steps:
 
 ```bash
-pyenv install 3.8.10
 pyenv install 3.9.7
 pyenv install 3.10.1
 pyenv install 3.11.8
@@ -135,8 +133,7 @@ ensuring that all Python operations within this directory use this isolated envi
 
 ## Setting up development environment
 
-Before you begin, ensure you are running Python 3.8, 3.9, or 3.10 as these are the only versions Leverage CLI supports
-and tests against.
+Before you begin, ensure you are running one of the supported Python versions.
 
 We now use Poetry for dependency management. Setup your development environment as follows:
 
@@ -230,7 +227,7 @@ respectively.
 * There is an Action called "Test Build Package and Push".
 * This Action can be called manually on any branch specifying the version to release to test.
     * The version is a Release Candidate following the Semver: e.g. if the next release is 1.2.3, the test version
-      should be 1.2.3-rc.1
+      should be 1.2.3rc.1
 * The package will be published to [PyPi](https://pypi.org/project/leverage/).
 
 ## Contributors/Contributing
