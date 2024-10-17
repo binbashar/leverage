@@ -1812,14 +1812,14 @@ files = [
 
 [[package]]
 name = "yaenv"
-version = "1.4.1"
+version = "1.5.3"
 description = "Yet another dotenv parser for Python."
 category = "main"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = ">=3.9,<4.0"
 files = [
-    {file = "yaenv-1.4.1-py3-none-any.whl", hash = "sha256:b088504bbba57419985d538545efa515bba9b3b4f647bd84e8664ce059e481de"},
-    {file = "yaenv-1.4.1.tar.gz", hash = "sha256:8cd57e495c8b89111f15442d618d3802880596e91f3a88f0271a0d6b9f05d97e"},
+    {file = "yaenv-1.5.3-py3-none-any.whl", hash = "sha256:d40d4e07e7d54f3b56c9c5a04d99fdb9b3c5d65935fe11d6438ba279ec7e4752"},
+    {file = "yaenv-1.5.3.tar.gz", hash = "sha256:97731cc3daa4670cc0657b1f98212242ba7a08559f96b7726f5d1496fcde8fb2"},
 ]
 
 [[package]]
@@ -1845,4 +1845,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.9 || ~3.10 || ~3.11"
-content-hash = "101a32d5b81119f7797806b26feca1b2d21b76e23e62d9e201248c022a3ac700"
+content-hash = "92ab307ccb02a6de297d1316f6bccb88fa09961676d4eae68d78b7e532ee2757"

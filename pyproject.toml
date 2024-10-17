@@ -27,7 +27,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "~3.9 || ~3.10 || ~3.11"
 click = "8.0.1"
-yaenv = "1.4.1"
+yaenv = "1.5.3"
 "ruamel.yaml" = "0.17.10"
 jinja2 = "3.0.1"
 docker = "6.1.0"
