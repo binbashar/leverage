@@ -3,6 +3,7 @@ from unittest import mock
 from unittest.mock import Mock, MagicMock, PropertyMock
 
 import pytest
+from botocore.exceptions import ClientError
 from configupdater import ConfigUpdater
 
 from leverage._utils import ExitError
@@ -265,3 +266,19 @@ def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_c
         "aws_secret_access_key": "secret-key",
         "aws_session_token": "session-token",
     }
+
+
+b3_client_error = Mock()
+b3_client_error.get_role_credentials.side_effect = ClientError(
+    {"Error": {"Code": "ForbiddenException", "Message": "No access"}}, "GetRoleCredentials"
+)
+
+
+@mock.patch("leverage.modules.auth.update_config_section")
+@mock.patch("builtins.open", side_effect=open_side_effect)
+@mock.patch("boto3.client", return_value=b3_client_error)
+@mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("pathlib.Path.touch", new=Mock())
+def test_refresh_layer_credentials_no_access(mock_boto, mock_open, mock_update_conf, sso_container, propagate_logs):
+    with pytest.raises(ExitError):
+        refresh_layer_credentials(sso_container)
