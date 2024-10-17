@@ -125,7 +125,7 @@ def refresh_layer_credentials(cli):
                 accessToken=cli.get_sso_access_token(),
             )["roleCredentials"]
         except ClientError as error:
-            if error.response["Error"]["Code"] == "ForbiddenException":
+            if error.response["Error"]["Code"] in ("AccessDeniedException", "ForbiddenException"):
                 raise ExitError(
                     40,
                     f"User does not have permission to assume role [bold]{sso_role}[/bold]"
