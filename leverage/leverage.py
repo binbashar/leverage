@@ -4,8 +4,6 @@
 import click
 
 from leverage import __version__
-from leverage.tasks import load_tasks
-from leverage.tasks import list_tasks as _list_tasks
 from leverage._internals import pass_state
 
 from leverage.modules.aws import aws
@@ -14,34 +12,17 @@ from leverage.modules import run, project, terraform, tfautomv, kubectl, shell
 
 
 @click.group(invoke_without_command=True)
-@click.option(
-    "--filename",
-    "-f",
-    default="build.py",
-    show_default=True,
-    help="Name of the build file containing the tasks definitions.",
-)
-@click.option("--list-tasks", "-l", is_flag=True, help="List available tasks to run.")
 @click.option("-v", "--verbose", is_flag=True, help="Increase output verbosity.")
 @click.version_option(version=__version__)
 @pass_state
 @click.pass_context
-def leverage(context, state, filename, list_tasks, verbose):
+def leverage(context, state, verbose):
     """Leverage Reference Architecture projects command-line tool."""
     # --verbose | -v
     state.verbosity = verbose
-
-    # Load build file as a module
-    state.module = load_tasks(build_script_filename=filename)
-
     if context.invoked_subcommand is None:
-        # --list-tasks|-l
-        if list_tasks:
-            _list_tasks(state.module)
-
-        else:
-            # leverage called with no subcommand
-            click.echo(context.get_help())
+        # leverage called with no subcommand
+        click.echo(context.get_help())
 
 
 # Add modules to leverage
