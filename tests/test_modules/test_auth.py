@@ -277,7 +277,7 @@ def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_c
     [
         ClientError({"Error": {"Code": "AccessDeniedException", "Message": "No access"}}, "GetRoleCredentials"),
         ClientError({"Error": {"Code": "ForbiddenException", "Message": "No access"}}, "GetRoleCredentials"),
-    ]
+    ],
 )
 def test_refresh_layer_credentials_no_access(mock_update_conf, mock_open, sso_container, error):
     with mock.patch("boto3.client") as mocked_client:
