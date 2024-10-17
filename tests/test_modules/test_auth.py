@@ -279,7 +279,7 @@ def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_c
         ClientError({"Error": {"Code": "ForbiddenException", "Message": "No access"}}, "GetRoleCredentials"),
     ]
 )
-def test_refresh_layer_credentials_no_access(mock_open, mock_update_conf, sso_container, error):
+def test_refresh_layer_credentials_no_access(mock_update_conf, mock_open, sso_container, error):
     with mock.patch("boto3.client") as mocked_client:
         mocked_client_obj = MagicMock()
         mocked_client_obj.get_role_credentials.side_effect = error
