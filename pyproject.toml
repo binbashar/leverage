@@ -16,8 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12"
+    "Programming Language :: Python :: 3.11"
 ]
 packages = [
     { include = "leverage" },
@@ -26,9 +25,9 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.9 || ~3.10 || ~3.11 || ~3.12"
+python = "~3.9 || ~3.10 || ~3.11"
 click = "8.0.1"
-yaenv = "1.5.3post1"
+yaenv = "1.5.3"
 "ruamel.yaml" = "0.17.10"
 jinja2 = "3.0.1"
 docker = "6.1.0"
@@ -39,8 +38,8 @@ boto3 = "1.33.2"
 configupdater = "3.2"
 docutils = "0.17.1"
 rich = "10.4.0"
-requests = "2.31"
 
+requests = "2.31"
 [tool.poetry.group.dev.dependencies]
 pylint = "2.8.3"
 pytest = "6.2.4"
