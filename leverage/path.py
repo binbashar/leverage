@@ -68,9 +68,9 @@ def get_account_path():
     cur_path = Path(get_working_path())
     prev_path = cur_path
 
-    # NOTE: currently we only support up to 5 subdir levels. Normally we use
+    # NOTE: currently we only support up to 8 subdir levels. Normally we use
     #       only 2 subdirectories so this should be enough for most cases.
-    for _ in range(5):
+    for _ in range(8):
         if cur_path.resolve() == root_path:
             break
 
@@ -135,7 +135,8 @@ class PathsHandler:
     ACCOUNT_TF_VARS = "account.tfvars"
     BACKEND_TF_VARS = "backend.tfvars"
 
-    def __init__(self, env_conf):
+    def __init__(self, env_conf: dict, container_user: str):
+        self.container_user = container_user
         self.home = Path.home()
         self.cwd = Path.cwd()
         try:
@@ -199,7 +200,7 @@ class PathsHandler:
 
     @property
     def guest_aws_credentials_dir(self):
-        return f"/root/tmp/{self.project}"
+        return str(f"/home/{self.container_user}/tmp" / Path(self.project))
 
     @property
     def host_aws_profiles_file(self):

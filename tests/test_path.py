@@ -72,7 +72,7 @@ def test_get_root_path_not_in_a_git_repository(pytester):
 def test_get_account_path(monkeypatch, tmp_path):
     # Make a deep directory structure
     root_dir = leaf_dir = tmp_path
-    leaf_dir = leaf_dir / "subdir" / "subdir" / "subdir" / "subdir"
+    leaf_dir = leaf_dir / "subdir" / "subdir" / "subdir" / "subdir" / "subdir" / "subdir" / "subdir"
     leaf_dir.mkdir(parents=True)
 
     monkeypatch.setattr(lepath, "get_root_path", lambda: root_dir)
@@ -113,7 +113,7 @@ def test_check_for_cluster_layer(muted_click_context, propagate_logs, caplog):
     """
     Test that if we are not on a cluster layer, we raise an error.
     """
-    paths = PathsHandler({"PROJECT": "test"})
+    paths = PathsHandler({"PROJECT": "test"}, "leverage")
     with patch.object(paths, "check_for_layer_location"):  # assume parent method is already tested
         with pytest.raises(ExitError):
             paths.cwd = Path("/random")

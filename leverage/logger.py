@@ -64,9 +64,15 @@ def _configure_logger(logger, show_level=True):
         logger (logging.Logger): Logger to be configured
         show_level (bool): Whether to display the logging level in the record. Defaults to True
     """
-    state = get_current_context().obj
+    click_context = get_current_context(silent=True)
 
-    level = state.verbosity
+    if click_context:
+        state = click_context.obj
+    else:
+        state = None
+
+    # Defaults to DEBUG if there is no click context (unit tests normally)
+    level = state.verbosity if state else "DEBUG"
     logger.setLevel(level)
 
     logger.propagate = False

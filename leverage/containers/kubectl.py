@@ -6,7 +6,7 @@ from docker.types import Mount
 from simple_term_menu import TerminalMenu
 
 from leverage import logger
-from leverage._utils import chain_commands, AwsCredsEntryPoint, ExitError, CustomEntryPoint
+from leverage._utils import AwsCredsEntryPoint, ExitError, CustomEntryPoint
 from leverage.container import TerraformContainer
 
 
@@ -14,7 +14,7 @@ class KubeCtlContainer(TerraformContainer):
     """Container specifically tailored to run kubectl commands."""
 
     KUBECTL_CLI_BINARY = "/usr/local/bin/kubectl"
-    KUBECTL_CONFIG_PATH = Path("/root/.kube")
+    KUBECTL_CONFIG_PATH = Path(f"/home/{TerraformContainer.CONTAINER_USER}/.kube")
     KUBECTL_CONFIG_FILE = KUBECTL_CONFIG_PATH / Path("config")
 
     def __init__(self, client):
@@ -45,13 +45,10 @@ class KubeCtlContainer(TerraformContainer):
         # generate the command that will configure the new cluster
         with CustomEntryPoint(self, entrypoint=""):  # can't recall why this change
             add_eks_cluster_cmd = self._get_eks_kube_config()
-        # and the command that will set the proper ownership on the config file (otherwise the owner will be "root")
-        change_owner_cmd = self.change_ownership_cmd(self.KUBECTL_CONFIG_FILE, recursive=False)
-        full_cmd = chain_commands([add_eks_cluster_cmd, change_owner_cmd])
 
         logger.info("Configuring context...")
         with AwsCredsEntryPoint(self, override_entrypoint=""):
-            exit_code = self._start(full_cmd)
+            exit_code = self._start(add_eks_cluster_cmd)
         if exit_code:
             raise Exit(exit_code)
 
