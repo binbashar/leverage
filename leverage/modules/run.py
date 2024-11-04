@@ -7,7 +7,8 @@ import click
 from click.exceptions import Exit
 
 from leverage import logger
-from leverage.tasks import list_tasks
+from leverage.tasks import load_tasks
+from leverage.tasks import list_tasks as _list_tasks
 from leverage.logger import get_tasks_logger
 from leverage._parsing import parse_task_args
 from leverage._parsing import InvalidArgumentOrderError
@@ -30,15 +31,31 @@ class TaskNotFoundError(RuntimeError):
 
 
 @click.command()
+@click.option(
+    "--filename",
+    "-f",
+    default="build.py",
+    show_default=True,
+    help="Name of the build file containing the tasks definitions.",
+)
+@click.option("--list-tasks", "-l", is_flag=True, help="List available tasks to run.")
 @click.argument("tasks", nargs=-1)
 @pass_state
-def run(state, tasks):
+def run(state, filename, list_tasks, tasks):
     """Perform specified task(s) and all of its dependencies.
 
     When no task is given, the default (__DEFAULT__) task is run, if no default task has been defined, all available tasks are listed.
     """
     global _logger
     _logger = get_tasks_logger()
+
+    # Load build file as a module
+    state.module = load_tasks(build_script_filename=filename)
+
+    if list_tasks:
+        # --list-tasks|-l
+        _list_tasks(state.module)
+        return
 
     if tasks:
         # Run the given tasks
