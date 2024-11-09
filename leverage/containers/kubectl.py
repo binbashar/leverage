@@ -1,13 +1,22 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from click.exceptions import Exit
 from docker.types import Mount
+from ruamel.yaml import YAML
 from simple_term_menu import TerminalMenu
 
 from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, ExitError, CustomEntryPoint
 from leverage.container import TerraformContainer
+
+
+@dataclass
+class ClusterInfo:
+    cluster_name: str
+    profile: str
+    region: str
 
 
 class KubeCtlContainer(TerraformContainer):
@@ -40,15 +49,23 @@ class KubeCtlContainer(TerraformContainer):
         with AwsCredsEntryPoint(self, override_entrypoint=""):
             self._start(self.SHELL)
 
-    def configure(self):
-        logger.info("Retrieving k8s cluster information...")
-        # generate the command that will configure the new cluster
-        with CustomEntryPoint(self, entrypoint=""):  # can't recall why this change
-            add_eks_cluster_cmd = self._get_eks_kube_config()
+    def configure(self, ci: ClusterInfo = None):
+        """
+        Add the given EKS cluster configuration to the .kube/ files.
+        """
+        if ci:
+            # if you have the details, generate the command right away
+            cmd = f"aws eks update-kubeconfig --region {ci.region} --name {ci.cluster_name} --profile {ci.profile}"
+        else:
+            # otherwise go get them from the layer
+            logger.info("Retrieving k8s cluster information...")
+            with CustomEntryPoint(self, entrypoint=""):
+                cmd = self._get_eks_kube_config()
 
         logger.info("Configuring context...")
         with AwsCredsEntryPoint(self, override_entrypoint=""):
-            exit_code = self._start(add_eks_cluster_cmd)
+            exit_code = self._start(cmd)
+
         if exit_code:
             raise Exit(exit_code)
 
@@ -70,33 +87,49 @@ class KubeCtlContainer(TerraformContainer):
             # exclude hidden directories
             dirs[:] = [d for d in dirs if not d[0] == "."]
 
-            if "cluster" in dirs:
-                cluster_path = Path(root) / "cluster"
+            if "metadata.yaml" in files:
+                cluster_file = Path(root) / "metadata.yaml"
                 try:
-                    self.paths.check_for_cluster_layer(cluster_path)
-                except ExitError as exc:
-                    logger.error(exc)
+                    data = YAML().load(cluster_file)
+                    assert data["type"] == "k8s-eks-cluster"
+                except AssertionError:
+                    continue
+                except Exception as exc:
+                    logger.warning(exc)
+                    continue
                 else:
-                    yield cluster_path
+                    yield Path(root), data
 
     def discover(self):
-        clusters = [str(c) for c in self._scan_clusters()]
-        if not clusters:
+        cluster_files = [(path, data) for path, data in self._scan_clusters()]
+        if not cluster_files:
             raise ExitError(1, "No clusters found.")
-        terminal_menu = TerminalMenu(clusters, title="Clusters found:")
+
+        terminal_menu = TerminalMenu(
+            [f"{c[1]['data']['cluster_name']}: {str(c[0])}" for c in cluster_files], title="Clusters found:"
+        )
         menu_entry_index = terminal_menu.show()
         if menu_entry_index is None:
             # selection cancelled
             return
 
-        cluster_path = Path(clusters[menu_entry_index])
+        layer_path = cluster_files[menu_entry_index][0]
+        cluster_data = cluster_files[menu_entry_index][1]
+        cluster_info = ClusterInfo(
+            cluster_name=cluster_data["data"]["cluster_name"],
+            profile=cluster_data["data"]["profile"],
+            region=cluster_data["data"]["region"],
+        )
+
         # cluster is the host path, so in order to be able to run commands in that layer
         # we need to convert it into a relative inside the container
         self.container_config["working_dir"] = (
-            self.paths.guest_base_path / cluster_path.relative_to(self.paths.cwd)
+            self.paths.guest_base_path / layer_path.relative_to(self.paths.cwd)
         ).as_posix()
+
         # TODO: rather than overriding property by propery, maybe a custom .paths object pointing to cluster_path?
-        self.paths.cwd = cluster_path
-        self.paths.account_config_dir = self.paths._account_config_dir(cluster_path)
-        self.paths.account_conf = self.paths.account_conf_from_layer(cluster_path)
-        self.configure()
+        self.paths.cwd = layer_path
+        self.paths.account_config_dir = self.paths._account_config_dir(layer_path)
+        self.paths.account_conf = self.paths.account_conf_from_layer(layer_path)
+
+        self.configure(cluster_info)
