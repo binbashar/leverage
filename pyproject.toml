@@ -14,10 +14,10 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11"
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12"
 ]
 packages = [
     { include = "leverage" },
@@ -26,26 +26,26 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.8 || ~3.9 || ~3.10 || ~3.11 || ~3.12"
+python = "~3.9 || ~3.10 || ~3.11 || ~3.12"
 click = "8.0.1"
-yaenv = "1.4.1"
+yaenv = "1.5.3post1"
 "ruamel.yaml" = "0.17.10"
 jinja2 = "3.0.1"
 docker = "6.1.0"
 dockerpty = "0.4.1"
 questionary = "1.10.0"
-python-hcl2 = "3.0.1"
+python-hcl2 = "5.1.1"
 boto3 = "1.33.2"
 configupdater = "3.2"
 docutils = "0.17.1"
 rich = "10.4.0"
-
 requests = "2.31"
 simple-term-menu = "1.6.4"
+
 [tool.poetry.group.dev.dependencies]
 pylint = "2.8.3"
-pytest = "6.2.4"
-pytest-cov = "2.12.1"
+pytest = "8.3.3"
+pytest-cov = "6.0.0"
 twine = "3.4.1"
 black = "23.3.0"
 pre-commit = "3.5.0"
