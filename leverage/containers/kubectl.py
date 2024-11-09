@@ -4,7 +4,7 @@ from pathlib import Path
 
 from click.exceptions import Exit
 from docker.types import Mount
-from ruamel.yaml import YAML
+import ruamel.yaml
 from simple_term_menu import TerminalMenu
 
 from leverage import logger
@@ -25,6 +25,7 @@ class KubeCtlContainer(TerraformContainer):
     KUBECTL_CLI_BINARY = "/usr/local/bin/kubectl"
     KUBECTL_CONFIG_PATH = Path(f"/home/{TerraformContainer.CONTAINER_USER}/.kube")
     KUBECTL_CONFIG_FILE = KUBECTL_CONFIG_PATH / Path("config")
+    METADATA_FILENAME = "metadata.yaml"
 
     def __init__(self, client):
         super().__init__(client)
@@ -81,16 +82,19 @@ class KubeCtlContainer(TerraformContainer):
 
     def _scan_clusters(self):
         """
-        Scan all the subdirectories in search of "cluster" layers.
+        Scan all the subdirectories in search of "cluster" metadata files.
         """
         for root, dirs, files in os.walk(self.paths.cwd):
             # exclude hidden directories
             dirs[:] = [d for d in dirs if not d[0] == "."]
 
-            if "metadata.yaml" in files:
-                cluster_file = Path(root) / "metadata.yaml"
+            for file in files:
+                if file != self.METADATA_FILENAME:
+                    continue
+
+                cluster_file = Path(root) / file
                 try:
-                    data = YAML().load(cluster_file)
+                    data = ruamel.yaml.load(cluster_file)
                     assert data["type"] == "k8s-eks-cluster"
                 except AssertionError:
                     continue
@@ -101,6 +105,9 @@ class KubeCtlContainer(TerraformContainer):
                     yield Path(root), data
 
     def discover(self):
+        """
+        TODO: documentation
+        """
         cluster_files = [(path, data) for path, data in self._scan_clusters()]
         if not cluster_files:
             raise ExitError(1, "No clusters found.")

@@ -1,4 +1,5 @@
-from pathlib import Path
+from pathlib import Path, PosixPath
+from unittest import mock
 from unittest.mock import Mock, patch
 
 import pytest
@@ -121,3 +122,20 @@ def test_start_shell_sso(mock_refresh, kubectl_container):
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/home/leverage/tmp/test/config"
     assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/home/leverage/tmp/test/credentials"
+
+
+def test_scan_clusters(kubectl_container: KubeCtlContainer):
+    # mock and call
+    with mock.patch("os.walk") as mock_walk:
+        with mock.patch("ruamel.yaml.load") as mock_yaml:
+            mock_walk.return_value = [
+                ("/foo", ["bar"], ("baz",)),
+                ("/foo/bar", [], ("spam", "metadata.yaml")),
+            ]
+            mock_yaml.return_value = {"type": "k8s-eks-cluster"}
+
+            first_found = next(kubectl_container._scan_clusters())
+
+    # compare
+    assert first_found[0] == PosixPath("/foo/bar/")
+    assert first_found[1]["type"] == "k8s-eks-cluster"
