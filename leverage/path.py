@@ -170,17 +170,13 @@ class PathsHandler:
             self.host_aws_credentials_dir.mkdir(parents=True)
         self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
 
-    def account_conf_from_layer(self, layer_path: Path):
-        return self._conf_from_layer(layer_path, self.ACCOUNT_TF_VARS)
+    def update_cwd(self, new_cwd):
+        self.cwd = new_cwd
+        acc_folder = new_cwd.relative_to(self.root_dir).parts[0]
 
-    def _conf_from_layer(self, layer_path: Path, file_name) -> dict:
-        acc_folder = layer_path.relative_to(self.root_dir).parts[0]
-        account_config_path = self.root_dir / acc_folder / "config" / file_name
-        return hcl2.loads(account_config_path.read_text())
-
-    def _account_config_dir(self, layer_path) -> dict:
-        acc_folder = layer_path.relative_to(self.root_dir).parts[0]
-        return self.root_dir / acc_folder / "config"
+        self.account_config_dir = self.root_dir / acc_folder / "config"
+        account_config_path = self.account_config_dir / self.ACCOUNT_TF_VARS
+        self.account_conf = hcl2.loads(account_config_path.read_text())
 
     @property
     def guest_account_base_path(self):

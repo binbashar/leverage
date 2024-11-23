@@ -5,7 +5,7 @@ from pathlib import Path
 from click.exceptions import Exit
 from docker.types import Mount
 import ruamel.yaml
-from simple_term_menu import TerminalMenu
+import simple_term_menu
 
 from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, ExitError, CustomEntryPoint
@@ -94,7 +94,8 @@ class KubeCtlContainer(TerraformContainer):
 
                 cluster_file = Path(root) / file
                 try:
-                    data = ruamel.yaml.load(cluster_file)
+                    with open(cluster_file) as cluster_yaml_file:
+                        data = ruamel.yaml.safe_load(cluster_yaml_file)
                     assert data["type"] == "k8s-eks-cluster"
                 except AssertionError:
                     continue
@@ -106,13 +107,14 @@ class KubeCtlContainer(TerraformContainer):
 
     def discover(self):
         """
-        TODO: documentation
+        Do a scan down the tree of subdirectories looking for k8s clusters metadata files.
+        Open up a menu with all the found items, where you can pick up and configure it on your .kubeconfig file.
         """
         cluster_files = [(path, data) for path, data in self._scan_clusters()]
         if not cluster_files:
             raise ExitError(1, "No clusters found.")
 
-        terminal_menu = TerminalMenu(
+        terminal_menu = simple_term_menu.TerminalMenu(
             [f"{c[1]['data']['cluster_name']}: {str(c[0])}" for c in cluster_files], title="Clusters found:"
         )
         menu_entry_index = terminal_menu.show()
@@ -133,10 +135,6 @@ class KubeCtlContainer(TerraformContainer):
         self.container_config["working_dir"] = (
             self.paths.guest_base_path / layer_path.relative_to(self.paths.cwd)
         ).as_posix()
-
-        # TODO: rather than overriding property by propery, maybe a custom .paths object pointing to cluster_path?
-        self.paths.cwd = layer_path
-        self.paths.account_config_dir = self.paths._account_config_dir(layer_path)
-        self.paths.account_conf = self.paths.account_conf_from_layer(layer_path)
-
+        # now simulate we are standing on the chosen layer folder
+        self.paths.update_cwd(layer_path)
         self.configure(cluster_info)
