@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 from click.exceptions import Exit
@@ -17,6 +18,10 @@ class ClusterInfo:
     cluster_name: str
     profile: str
     region: str
+
+
+class MetadataTypes(Enum):
+    K8S_CLUSTER = "k8s-eks-cluster"
 
 
 class KubeCtlContainer(TerraformContainer):
@@ -86,7 +91,7 @@ class KubeCtlContainer(TerraformContainer):
         """
         for root, dirs, files in os.walk(self.paths.cwd):
             # exclude hidden directories
-            dirs[:] = [d for d in dirs if not d[0] == "."]
+            dirs[:] = [d for d in dirs if d[0] != "."]
 
             for file in files:
                 if file != self.METADATA_FILENAME:
@@ -96,10 +101,8 @@ class KubeCtlContainer(TerraformContainer):
                 try:
                     with open(cluster_file) as cluster_yaml_file:
                         data = ruamel.yaml.safe_load(cluster_yaml_file)
-                    if data["type"] != "k8s-eks-cluster":
+                    if data.get("type") != MetadataTypes.K8S_CLUSTER:
                         continue
-                except KeyError:
-                    continue
                 except Exception as exc:
                     logger.warning(exc)
                     continue
