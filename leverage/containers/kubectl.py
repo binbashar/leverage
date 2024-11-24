@@ -96,8 +96,9 @@ class KubeCtlContainer(TerraformContainer):
                 try:
                     with open(cluster_file) as cluster_yaml_file:
                         data = ruamel.yaml.safe_load(cluster_yaml_file)
-                    assert data["type"] == "k8s-eks-cluster"
-                except AssertionError:
+                    if data["type"] != "k8s-eks-cluster":
+                        continue
+                except KeyError:
                     continue
                 except Exception as exc:
                     logger.warning(exc)
