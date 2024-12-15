@@ -101,7 +101,7 @@ class KubeCtlContainer(TerraformContainer):
                 try:
                     with open(cluster_file) as cluster_yaml_file:
                         data = ruamel.yaml.safe_load(cluster_yaml_file)
-                    if data.get("type") != MetadataTypes.K8S_CLUSTER:
+                    if data.get("type") != MetadataTypes.K8S_CLUSTER.value:
                         continue
                 except Exception as exc:
                     logger.warning(exc)
