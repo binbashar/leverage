@@ -3,6 +3,7 @@ from unittest import mock
 from unittest.mock import Mock, MagicMock, PropertyMock
 
 import pytest
+from botocore.exceptions import ClientError
 from configupdater import ConfigUpdater
 
 from leverage._utils import ExitError
@@ -249,8 +250,8 @@ def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_contain
 
 @mock.patch("leverage.modules.auth.update_config_section")
 @mock.patch("builtins.open", side_effect=open_side_effect)
-@mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("pathlib.Path.touch", new=Mock())
 def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_container, propagate_logs):
     refresh_layer_credentials(sso_container)
@@ -265,3 +266,24 @@ def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_c
         "aws_secret_access_key": "secret-key",
         "aws_session_token": "session-token",
     }
+
+
+@mock.patch("leverage.modules.auth.update_config_section")
+@mock.patch("builtins.open", side_effect=open_side_effect)
+@mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("pathlib.Path.touch", new=Mock())
+@pytest.mark.parametrize(
+    "error",
+    [
+        ClientError({"Error": {"Code": "AccessDeniedException", "Message": "No access"}}, "GetRoleCredentials"),
+        ClientError({"Error": {"Code": "ForbiddenException", "Message": "No access"}}, "GetRoleCredentials"),
+    ],
+)
+def test_refresh_layer_credentials_no_access(mock_update_conf, mock_open, sso_container, error):
+    with mock.patch("boto3.client") as mocked_client:
+        mocked_client_obj = MagicMock()
+        mocked_client_obj.get_role_credentials.side_effect = error
+        mocked_client.return_value = mocked_client_obj
+
+        with pytest.raises(ExitError):
+            refresh_layer_credentials(sso_container)
