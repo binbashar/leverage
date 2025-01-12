@@ -455,6 +455,9 @@ class TerraformContainer(SSOContainer):
         # SSH AGENT
         SSH_AUTH_SOCK = os.getenv("SSH_AUTH_SOCK")
 
+        # make sure .gitconfig exists before mounting it
+        self.paths.host_git_config_file.touch(exist_ok=True)
+
         self.environment.update(
             {
                 "COMMON_CONFIG_FILE": self.paths.common_tfvars,
@@ -479,7 +482,7 @@ class TerraformContainer(SSOContainer):
                 target=self.paths.guest_aws_credentials_dir,
                 type="bind",
             ),
-            Mount(source=(self.paths.home / ".gitconfig").as_posix(), target="/etc/gitconfig", type="bind"),
+            Mount(source=self.paths.host_git_config_file.as_posix(), target="/etc/gitconfig", type="bind"),
         ]
         self.mounts.extend(extra_mounts)
         # if you have set the tf plugin cache locally
