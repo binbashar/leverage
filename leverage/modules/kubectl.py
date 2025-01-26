@@ -17,7 +17,7 @@ CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 def kubectl(context, state, args):
     """Run Kubectl commands in a custom containerized environment."""
     state.container = KubeCtlContainer(get_docker_client())
-    if not args or (args and args[0] != 'discover'):
+    if not args or (args and args[0] != "discover"):
         state.container.paths.check_for_layer_location()
     state.container.ensure_image()
     _handle_subcommand(context=context, cli_container=state.container, args=args)
