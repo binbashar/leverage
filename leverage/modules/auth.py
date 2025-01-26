@@ -1,10 +1,11 @@
 import time
-from configparser import NoSectionError, NoOptionError
 from pathlib import Path
+from configparser import NoSectionError, NoOptionError
 
-import boto3
 import hcl2
+import boto3
 from configupdater import ConfigUpdater
+from botocore.exceptions import ClientError
 
 from leverage import logger
 from leverage._utils import key_finder, ExitError, get_or_create_section
@@ -40,7 +41,7 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
     except NoSectionError:
         raise ExitError(40, f"Missing {sso_profile} permission for account {account_name}.")
 
-    # if we are processing a profile from a different layer, we need to built it
+    # if we are processing a profile from a different layer, we need to build it
     layer_profile = layer_profile or f"{project}-{account_name}-{sso_role.lower()}"
 
     return account_id, account_name, sso_role, layer_profile
@@ -104,7 +105,7 @@ def refresh_layer_credentials(cli):
             expiration = int(config_updater.get(f"profile {layer_profile}", "expiration").value) / 1000
         except (NoSectionError, NoOptionError):
             # first time using this profile, skip into the credential's retrieval step
-            logger.debug(f"No cached credentials found.")
+            logger.debug("No cached credentials found.")
         else:
             # we reduce the validity 30 minutes, to avoid expiration over long-standing tasks
             renewal = time.time() + (30 * 60)
@@ -117,11 +118,20 @@ def refresh_layer_credentials(cli):
 
         # retrieve credentials
         logger.debug(f"Retrieving role credentials for {sso_role}...")
-        credentials = client.get_role_credentials(
-            roleName=sso_role,
-            accountId=account_id,
-            accessToken=cli.get_sso_access_token(),
-        )["roleCredentials"]
+        try:
+            credentials = client.get_role_credentials(
+                roleName=sso_role,
+                accountId=account_id,
+                accessToken=cli.get_sso_access_token(),
+            )["roleCredentials"]
+        except ClientError as error:
+            if error.response["Error"]["Code"] in ("AccessDeniedException", "ForbiddenException"):
+                raise ExitError(
+                    40,
+                    f"User does not have permission to assume role [bold]{sso_role}[/bold]"
+                    " in this account.\nPlease check with your administrator or try"
+                    " running [bold]leverage aws configure sso[/bold].",
+                )
 
         # update expiration on aws/<project>/config
         logger.info(f"Writing {layer_profile} profile")
