@@ -35,7 +35,7 @@ teardown(){
     cp "$BUILD_SCRIPTS/simple_build.py" "$ACC_DIR/build.py"
     cd "$ACC_DIR"
 
-    run leverage -l
+    run leverage run -l
 
     assert_line --index 0 "Tasks in build file \`build.py\`:"
     assert_line --index 1 --regexp "^  hello\s+Say hello.$"
@@ -49,7 +49,7 @@ teardown(){
     cp "$BUILD_SCRIPTS/simple_build.py" "$ROOT_DIR/build.py"
     cd "$ROOT_DIR/account"
 
-    run leverage -l
+    run leverage run -l
 
     assert_line --index 0 "Tasks in build file \`build.py\`:"
     assert_line --index 1 --regexp "^  hello\s+Say hello.$"

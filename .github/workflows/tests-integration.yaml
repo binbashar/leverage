@@ -61,7 +61,7 @@ jobs:
         run: |
           mkdir -p ../theadamproject
           # These are later mounted in the container
-          mkdir ~/.ssh && touch ~/.gitconfig
+          mkdir ~/.ssh
 
       - name: Project Init
         run: |

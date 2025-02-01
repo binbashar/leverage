@@ -198,6 +198,10 @@ class PathsHandler:
         return self.host_aws_credentials_dir / "credentials"
 
     @property
+    def host_git_config_file(self):
+        return self.home / ".gitconfig"
+
+    @property
     def local_backend_tfvars(self):
         return self.account_config_dir / self.BACKEND_TF_VARS
 

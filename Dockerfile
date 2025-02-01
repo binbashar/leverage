@@ -16,8 +16,6 @@ RUN git clone https://github.com/bats-core/bats-assert.git
 
 # Needed as is mounted later on
 RUN mkdir /root/.ssh
-# Needed for git to run propertly
-RUN touch /root/.gitconfig
 
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/usr/local POETRY_VERSION=1.8.2 python3 -
 
