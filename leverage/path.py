@@ -1,6 +1,7 @@
 """
     Utilities to obtain relevant files' and directories' locations
 """
+
 import os
 from pathlib import Path
 from subprocess import CalledProcessError

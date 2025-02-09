@@ -1,6 +1,7 @@
 """
     Binbash Leverage Command-line tool.
 """
+
 # pylint: disable=wrong-import-position
 
 __version__ = "0.0.0"

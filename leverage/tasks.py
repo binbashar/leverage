@@ -1,6 +1,7 @@
 """
     Task loading, Task object definition and task creation decorator.
 """
+
 import sys
 import importlib
 from pathlib import Path

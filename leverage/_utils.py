@@ -1,6 +1,7 @@
 """
     General use utilities.
 """
+
 from pathlib import Path
 from subprocess import run
 from subprocess import PIPE
@@ -127,6 +128,7 @@ def parse_tf_file(file: Path):
             raise ExitError(1, f"There is a parsing error with the {f.name} file. Please review it.")
         else:
             return parsed
+
 
 class ContainerSession:
     """

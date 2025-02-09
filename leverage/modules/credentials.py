@@ -1,6 +1,7 @@
 """
     Credentials managing module.
 """
+
 import csv
 import json
 import re
