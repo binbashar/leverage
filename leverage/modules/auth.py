@@ -3,7 +3,6 @@ from pathlib import Path
 from configparser import NoSectionError, NoOptionError
 
 import boto3
-import hcl2
 from botocore.exceptions import ClientError
 from configupdater import ConfigUpdater
 
