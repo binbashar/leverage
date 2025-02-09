@@ -2,13 +2,13 @@ import time
 from pathlib import Path
 from configparser import NoSectionError, NoOptionError
 
-import hcl2
 import boto3
-from configupdater import ConfigUpdater
+import hcl2
 from botocore.exceptions import ClientError
+from configupdater import ConfigUpdater
 
 from leverage import logger
-from leverage._utils import key_finder, ExitError, get_or_create_section
+from leverage._utils import key_finder, ExitError, get_or_create_section, parse_tf_file
 
 
 class SkipProfile(Exception):
@@ -66,8 +66,7 @@ def get_profiles(cli):
     # these are files from the layer we are currently on
     for name in ("config.tf", "locals.tf"):
         try:
-            with open(name) as tf_file:
-                tf_config = hcl2.load(tf_file)
+            tf_config = parse_tf_file(Path(name))
         except FileNotFoundError:
             continue
 
@@ -76,8 +75,7 @@ def get_profiles(cli):
         raw_profiles.update(set(key_finder(tf_config, "profile", "lookup")))
 
     # the profile value from <layer>/config/backend.tfvars
-    with open(cli.paths.local_backend_tfvars) as backend_config_file:
-        backend_config = hcl2.load(backend_config_file)
+    backend_config = parse_tf_file(cli.paths.local_backend_tfvars)
     tf_profile = backend_config["profile"]
 
     return tf_profile, raw_profiles
