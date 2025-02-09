@@ -115,12 +115,6 @@ class ExitError(Exit):
         super(ExitError, self).__init__(exit_code)
 
 
-class ParsingError(ExitError):
-    """
-    Raise an Exit exception when a file filed to be parsed.
-    """
-
-
 def parse_tf_file(file: Path):
     """
     Open and parse an HCL file.
