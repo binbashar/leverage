@@ -1,13 +1,13 @@
 import re
+from pathlib import Path
 from typing import Sequence
 
 import click
-import hcl2
 from click.exceptions import Exit
 
 from leverage import logger
 from leverage._internals import pass_container, pass_state
-from leverage._utils import ExitError
+from leverage._utils import ExitError, parse_tf_file
 from leverage.container import TerraformContainer
 from leverage.container import get_docker_client
 from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
@@ -512,8 +512,8 @@ def _validate_layout(tf: TerraformContainer):
         logger.error("[red]✘ FAILED[/red]\n")
         valid_layout = False
 
-    backend_tfvars = tf.paths.account_config_dir / tf.paths.BACKEND_TF_VARS  # TODO use paths.backend_tfvars instead?
-    backend_tfvars = hcl2.loads(backend_tfvars.read_text()) if backend_tfvars.exists() else {}
+    backend_tfvars = Path(tf.paths.local_backend_tfvars)
+    backend_tfvars = parse_tf_file(backend_tfvars) if backend_tfvars.exists() else {}
 
     logger.info("Checking [bold]backend.tfvars[/bold]:\n")
     names_prefix = f"{tf.project}-{account_name}"

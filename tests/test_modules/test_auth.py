@@ -191,6 +191,8 @@ aws_session_token = session-token
 """
 
 data_dict = {
+    PosixPath("config.tf"): FILE_CONFIG_TF,
+    PosixPath("locals.tf"): FILE_LOCALS_TF,
     "~/config/backend.tfvars": FILE_BACKEND_TFVARS,
     "~/.aws/test/config": FILE_AWS_CONFIG,
     "~/.aws/test/credentials": FILE_AWS_CREDENTIALS,

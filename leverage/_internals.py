@@ -1,6 +1,7 @@
 """
 	Definitions for internal use of the cli.
 """
+
 from functools import wraps
 
 import click

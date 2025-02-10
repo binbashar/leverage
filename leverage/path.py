@@ -1,6 +1,7 @@
 """
     Utilities to obtain relevant files' and directories' locations
 """
+
 import os
 import pathlib
 from pathlib import Path
@@ -205,6 +206,10 @@ class PathsHandler:
     @property
     def host_aws_credentials_file(self):
         return self.host_aws_credentials_dir / "credentials"
+
+    @property
+    def host_git_config_file(self):
+        return self.home / ".gitconfig"
 
     @property
     def local_backend_tfvars(self):

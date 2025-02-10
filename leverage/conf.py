@@ -1,6 +1,7 @@
 """
     Env variables loading utility.
 """
+
 from pathlib import Path
 
 from yaenv.core import Env
