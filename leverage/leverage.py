@@ -1,6 +1,7 @@
 """
     Binbash Leverage Command-line tool.
 """
+
 import click
 
 from leverage import __version__

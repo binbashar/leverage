@@ -1,9 +1,13 @@
 """
     General use utilities.
 """
+
+from pathlib import Path
 from subprocess import run
 from subprocess import PIPE
 
+import hcl2
+import lark
 from click.exceptions import Exit
 from configupdater import ConfigUpdater
 from docker import DockerClient
@@ -110,6 +114,20 @@ class ExitError(Exit):
     def __init__(self, exit_code: int, error_description: str):
         logger.error(error_description)
         super(ExitError, self).__init__(exit_code)
+
+
+def parse_tf_file(file: Path):
+    """
+    Open and parse an HCL file.
+    In case of a parsing error, raise a user-friendly error.
+    """
+    with open(file) as f:
+        try:
+            parsed = hcl2.load(f)
+        except lark.exceptions.UnexpectedInput:
+            raise ExitError(1, f"There is a parsing error with the {f.name} file. Please review it.")
+        else:
+            return parsed
 
 
 class ContainerSession:

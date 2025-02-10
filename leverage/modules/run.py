@@ -1,6 +1,7 @@
 """
     Tasks running module.
 """
+
 import re
 
 import click

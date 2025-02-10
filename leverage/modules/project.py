@@ -1,6 +1,7 @@
 """
     Module for managing Leverage projects.
 """
+
 import re
 from pathlib import Path
 from shutil import copy2
