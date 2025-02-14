@@ -65,7 +65,7 @@ def get_profiles(cli):
     # these are files from the layer we are currently on
     for name in ("config.tf", "locals.tf"):
         try:
-            tf_config = parse_tf_file(Path(name))
+            tf_config = parse_tf_file(Path(cli.paths.cwd / name))
         except FileNotFoundError:
             continue
 

@@ -1,10 +1,11 @@
-from pathlib import Path
+from pathlib import Path, PosixPath
+from unittest import mock
 from unittest.mock import Mock, patch
 
 import pytest
 from click.exceptions import Exit
 
-from leverage.containers.kubectl import KubeCtlContainer
+from leverage.containers.kubectl import KubeCtlContainer, ClusterInfo
 from leverage.path import PathsHandler
 from tests.test_containers import container_fixture_factory
 
@@ -121,3 +122,43 @@ def test_start_shell_sso(mock_refresh, kubectl_container):
     # make sure we are pointing to the right AWS credentials: /tmp/ folder for SSO
     assert container_args["environment"]["AWS_CONFIG_FILE"] == "/home/leverage/tmp/test/config"
     assert container_args["environment"]["AWS_SHARED_CREDENTIALS_FILE"] == "/home/leverage/tmp/test/credentials"
+
+
+def test_scan_clusters(kubectl_container: KubeCtlContainer):
+    """
+    Test that we can find valid metadata.yaml presents in the down the path of the filesystem tree where we are staying.
+    """
+    # mock and call
+    with mock.patch("os.walk") as mock_walk:
+        with patch("builtins.open"):
+            with mock.patch("ruamel.yaml.safe_load") as mock_yaml:
+                mock_walk.return_value = [
+                    ("/foo", ["bar"], ("baz",)),
+                    ("/foo/bar", [], ("spam", "metadata.yaml")),
+                ]
+                mock_yaml.return_value = {"type": "k8s-eks-cluster"}
+
+                first_found = next(kubectl_container._scan_clusters())
+
+    # compare
+    assert first_found[0] == PosixPath("/foo/bar/")
+    assert first_found[1]["type"] == "k8s-eks-cluster"
+
+
+def test_discover(kubectl_container: KubeCtlContainer):
+    """
+    Test that, given a layer with a valid cluster file, we are able to call the k8s configuration routine.
+    """
+    mocked_cluster_data = {
+        "type": "k8s-eks-cluster",
+        "data": {"cluster_name": "test", "profile": "test", "region": "us-east-1"},
+    }
+    with patch.object(kubectl_container, "_scan_clusters", return_value=[(Path.cwd(), mocked_cluster_data)]):
+        with patch("simple_term_menu.TerminalMenu") as mkd_show:
+            mkd_show.return_value.show.return_value = 0  # simulate choosing the first result
+            with patch.object(kubectl_container.paths, "update_cwd") as mkd_update:
+                with patch.object(kubectl_container, "configure") as mkd_configure:
+                    kubectl_container.discover()
+
+    assert mkd_update.called
+    assert isinstance(mkd_configure.call_args_list[0][0][0], ClusterInfo)
