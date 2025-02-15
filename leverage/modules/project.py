@@ -116,11 +116,22 @@ def init():
 
 
 def _copy_account(account, primary_region):
-    """Copy account directory and all its files.
-
+    """
+    Copy an account's directory structure from the template repository to the project directory.
+    
+    This function creates the account directory under the project root and replicates the necessary subdirectories by:
+      - Copying the configuration directory.
+      - Duplicating all global layers as defined in the project structure.
+      - Copying primary region-specific layers into the designated region folder.
+    
+    All copy operations utilize a predefined ignore pattern (IGNORE_PATTERNS). Notably, the copy procedures for global and primary region layers are performed with symbolic link preservation (symlinks=True) to ensure that any symbolic links in the template are maintained in the destination.
+    
     Args:
-        account (str): Account name.
-        primary_region (str): Projects primary region.
+        account (str): The account name corresponding to a directory in the template.
+        primary_region (str): The project’s primary region, used to determine the target subdirectory for region-specific layers.
+    
+    Raises:
+        OSError: If directory creation or file copy operations fail.
     """
     (PROJECT_ROOT / account).mkdir()
 
@@ -149,11 +160,22 @@ def _copy_account(account, primary_region):
 
 
 def _copy_project_template(config):
-    """Copy all files and directories from the Leverage project template to the project directory.
-    It excludes al jinja templates as those will be rendered directly to their final location.
-
+    """
+    Copy project template files and directories to the project directory.
+    
+    This function initializes the project directory by copying essential files from the Leverage
+    project template. It performs the following actions:
+    1. Copies the .gitignore file from the template directory to the project root.
+    2. Copies the configuration directory (excluding Jinja templates and other ignored patterns)
+       from the template to the project's configuration directory.
+    3. Iterates over each account defined in the project structure and copies account-specific
+       files by calling the _copy_account helper, using the "primary_region" specified in the config.
+    
     Args:
-        config (dict): Project configuration.
+        config (dict): Project configuration containing at least the "primary_region" key.
+    
+    Raises:
+        OSError: If any file or directory operation fails.
     """
     logger.info("Creating project directory structure.")
 
