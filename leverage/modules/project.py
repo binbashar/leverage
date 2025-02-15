@@ -136,7 +136,7 @@ def _copy_account(account, primary_region):
             src=TEMPLATE_DIR / account / "global" / layer,
             dst=PROJECT_ROOT / account / "global" / layer,
             ignore=IGNORE_PATTERNS,
-            symlinks=True
+            symlinks=True,
         )
     # Copy all layers with a region in account
     for layer in PROJECT_STRUCTURE[account]["primary_region"]:
@@ -144,7 +144,7 @@ def _copy_account(account, primary_region):
             src=TEMPLATE_DIR / account / "primary_region" / layer,
             dst=PROJECT_ROOT / account / primary_region / layer,
             ignore=IGNORE_PATTERNS,
-            symlinks=True
+            symlinks=True,
         )
 
 
