@@ -1,7 +1,10 @@
+from unittest import mock
+
 import pytest
+from click.testing import CliRunner
 
+from leverage import leverage
 from leverage.conf import load
-
 
 ROOT_ENV_FILE = """
 # Project settings
@@ -52,3 +55,15 @@ def test_load_config(monkeypatch, click_context, tmp_path, write_files, expected
         loaded_values = load()
 
         assert dict(loaded_values) == expected_values
+
+
+def test_version_validation():
+    """
+    Test that we get a warning if we are working with a version lower than the required by the project.
+    """
+    runner = CliRunner()
+    with mock.patch("leverage.conf.load", return_value={"LEVERAGE_CLI_VERSION": "99.9.9"}):
+        result = runner.invoke(leverage)
+
+    assert "is lower than the required minimum (99.9.9)" in result.output
+    assert result.exit_code == 0
