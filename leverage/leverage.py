@@ -11,6 +11,7 @@ from leverage._internals import pass_state
 from leverage.modules.aws import aws
 from leverage.modules.credentials import credentials
 from leverage.modules import run, project, terraform, tfautomv, kubectl, shell
+from leverage.path import NotARepositoryError
 
 
 @click.group(invoke_without_command=True)
@@ -27,7 +28,11 @@ def leverage(context, state, verbose):
         click.echo(context.get_help())
 
     # if there is a version restriction set, make sure we satisfy it
-    config = conf.load()
+    try:
+        config = conf.load()
+    except NotARepositoryError:
+        # restrictions are only verified within a leverage project
+        return
     minimum_version = config.get("LEVERAGE_CLI_VERSION")
     if minimum_version and Version(__version__) < Version(minimum_version):
         click.echo(
