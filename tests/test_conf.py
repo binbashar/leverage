@@ -62,9 +62,11 @@ def test_version_validation():
     Test that we get a warning if we are working with a version lower than the required by the project.
     """
     runner = CliRunner()
-    with mock.patch("leverage.conf.load", return_value={"TERRAFORM_IMAGE_TAG": "1.1.1-2.2.2"}), \
-         mock.patch.dict("leverage.MINIMUM_VERSIONS", {"TERRAFORM": "3.3.3", "LEVERAGE_CLI": "4.4.4"}):
-            result = runner.invoke(leverage)
+    with (
+        mock.patch("leverage.conf.load", return_value={"TERRAFORM_IMAGE_TAG": "1.1.1-2.2.2"}),
+        mock.patch.dict("leverage.MINIMUM_VERSIONS", {"TERRAFORM": "3.3.3", "LEVERAGE_CLI": "4.4.4"}),
+    ):
+        result = runner.invoke(leverage)
 
     assert "Your current TERRAFORM version (1.1.1) is lower than the required minimum (3.3.3)" in result.output.replace(
         "\n", ""
