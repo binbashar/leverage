@@ -36,8 +36,11 @@ def leverage(context, state, verbose):
         return
 
     # check if the current versions are lower than the minimum required
-    current_values = config.get("TERRAFORM_IMAGE_TAG").split("-")
-    for key, current in zip(MINIMUM_VERSIONS, current_values):
+    if not (current_values := config.get("TERRAFORM_IMAGE_TAG")):
+        # at some points of the project (the init), the config file is not created yet
+        return
+    # validate both CLI and TF versions
+    for key, current in zip(MINIMUM_VERSIONS, current_values.split("-")):
         if Version(current) < Version(MINIMUM_VERSIONS[key]):
             rich.print(
                 f"[red]WARNING[/red]\tYour current {key} version ({current}) is lower than the required minimum ({MINIMUM_VERSIONS[key]})."
