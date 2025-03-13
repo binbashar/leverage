@@ -1,6 +1,7 @@
 """
     Binbash Leverage Command-line tool.
 """
+
 import rich
 from packaging.version import Version
 
