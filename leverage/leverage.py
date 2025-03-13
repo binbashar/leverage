@@ -1,12 +1,12 @@
 """
     Binbash Leverage Command-line tool.
 """
-
+import rich
 from packaging.version import Version
 
 import click
 
-from leverage import __version__, conf
+from leverage import __version__, conf, MINIMUM_VERSIONS
 from leverage._internals import pass_state
 from leverage.modules.aws import aws
 from leverage.modules.credentials import credentials
@@ -33,11 +33,14 @@ def leverage(context, state, verbose):
     except NotARepositoryError:
         # restrictions are only verified within a leverage project
         return
-    minimum_version = config.get("LEVERAGE_CLI_VERSION")
-    if minimum_version and Version(__version__) < Version(minimum_version):
-        click.echo(
-            f"\033[91mWARNING\033[0m\tYour current version ({__version__}) is lower than the required minimum ({minimum_version})."
-        )
+
+    # check if the current versions are lower than the minimum required
+    current_values = config.get("TERRAFORM_IMAGE_TAG").split("-")
+    for key, current in zip(MINIMUM_VERSIONS, current_values):
+        if Version(current) < Version(MINIMUM_VERSIONS[key]):
+            rich.print(
+                f"[red]WARNING[/red]\tYour current {key} version ({current}) is lower than the required minimum ({MINIMUM_VERSIONS[key]})."
+            )
 
 
 # Add modules to leverage
