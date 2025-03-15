@@ -7,7 +7,10 @@
 __version__ = "0.0.0"
 __toolbox_version__ = "1.3.5-0.2.0"
 
-MINIMUM_VERSIONS = {"TERRAFORM": "1.3.5", "LEVERAGE_CLI": "0.2.0"}
+MINIMUM_VERSIONS = {
+    "TERRAFORM": "1.3.5",
+    "TOOLBOX": "0.2.0",
+}
 
 import sys
 from shutil import which

@@ -64,7 +64,7 @@ def test_version_validation():
     runner = CliRunner()
     with (
         mock.patch("leverage.conf.load", return_value={"TERRAFORM_IMAGE_TAG": "1.1.1-2.2.2"}),
-        mock.patch.dict("leverage.MINIMUM_VERSIONS", {"TERRAFORM": "3.3.3", "LEVERAGE_CLI": "4.4.4"}),
+        mock.patch.dict("leverage.MINIMUM_VERSIONS", {"TERRAFORM": "3.3.3", "TOOLBOX": "4.4.4"}),
     ):
         result = runner.invoke(leverage)
 
@@ -72,7 +72,7 @@ def test_version_validation():
         "\n", ""
     )
     assert (
-        "Your current LEVERAGE_CLI version (2.2.2) is lower than the required minimum (4.4.4)"
+        "Your current TOOLBOX version (2.2.2) is lower than the required minimum (4.4.4)"
         in result.output.replace("\n", "")
     )
     assert result.exit_code == 0
