@@ -71,8 +71,7 @@ def test_version_validation():
     assert "Your current TERRAFORM version (1.1.1) is lower than the required minimum (3.3.3)" in result.output.replace(
         "\n", ""
     )
-    assert (
-        "Your current TOOLBOX version (2.2.2) is lower than the required minimum (4.4.4)"
-        in result.output.replace("\n", "")
+    assert "Your current TOOLBOX version (2.2.2) is lower than the required minimum (4.4.4)" in result.output.replace(
+        "\n", ""
     )
     assert result.exit_code == 0
