@@ -122,12 +122,13 @@ def parse_tf_file(file: Path):
     In case of a parsing error, raise a user-friendly error.
     """
     try:
-        parsed = hcl2.loads(file.read_text())
+        content = file.read_text()
+        parsed = hcl2.loads(content)
     except lark.exceptions.UnexpectedInput as error:
         raise ExitError(
             1,
             f"Possible invalid expression in file {file.name} near line {error.line}, column {error.column}\n"
-            f"{error.get_context(file.read_text())}",
+            f"{error.get_context(content)}",
         )
     else:
         return parsed
