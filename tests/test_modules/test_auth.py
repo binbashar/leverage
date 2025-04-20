@@ -198,11 +198,13 @@ data_dict = {
     "~/.aws/test/credentials": FILE_AWS_CREDENTIALS,
 }
 
+
 def read_text_side_effect(self: PosixPath, *args, **kwargs):
     """
     Every time we call read_text(), this side effect will try to get the value from data_dict rather than reading a disk file.
     """
     return data_dict[self.name]
+
 
 def open_side_effect(name: PosixPath, *args, **kwargs):
     """
