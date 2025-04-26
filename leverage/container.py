@@ -314,7 +314,7 @@ class SSOContainer(LeverageContainer):
     AWS_SSO_LOGOUT_SCRIPT = "/home/leverage/scripts/aws-sso/aws-sso-logout.sh"
 
     # SSO constants
-    AWS_SSO_LOGIN_URL = "https://device.sso.{region}.amazonaws.com/?user_code={user_code}"
+    AWS_SSO_LOGIN_URL = "{sso_url}/#/device?user_code={user_code}"
     AWS_SSO_CODE_WAIT_SECONDS = 2
     AWS_SSO_CODE_ATTEMPTS = 10
     FALLBACK_LINK_MSG = "Opening the browser... if it fails, open this link in your browser:\n{link}"
@@ -365,7 +365,7 @@ class SSOContainer(LeverageContainer):
             # now let's grab the user code from the logs
             user_code = self.get_sso_code(container)
             # with the user code, we can now autocomplete the url
-            link = self.AWS_SSO_LOGIN_URL.format(region=region.strip(), user_code=user_code)
+            link = self.AWS_SSO_LOGIN_URL.format(sso_url=self.paths.common_conf['sso_start_url'], user_code=user_code)
             webbrowser.open_new_tab(link)
             # The SSO code is only valid once: if the browser was able to open it, the fallback link will be invalid
             logger.info(self.FALLBACK_LINK_MSG.format(link=link))
