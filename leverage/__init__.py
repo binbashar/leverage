@@ -9,7 +9,7 @@ __toolbox_version__ = "1.3.5-0.2.0"
 
 MINIMUM_VERSIONS = {
     "TERRAFORM": "1.3.5",
-    "TOOLBOX": "0.2.1",  # we require awscli >= 2.22 now
+    "TOOLBOX": "0.2.1",  # update to 0.2.1 once released, we require awscli >= 2.22 now
 }
 
 import sys
