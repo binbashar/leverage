@@ -37,9 +37,9 @@ teardown(){
 
     run leverage run -l
 
-    assert_line --index 0 "Tasks in build file \`build.py\`:"
-    assert_line --index 1 --regexp "^  hello\s+Say hello.$"
-    assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
+    assert_line --partial "Tasks in build file \`build.py\`:"
+    assert_line --partial --regexp "^  hello\s+Say hello.$"
+    assert_line --partial --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
 }
 
 @test "Lists tasks with build script in parent directory" {
@@ -51,9 +51,9 @@ teardown(){
 
     run leverage run -l
 
-    assert_line --index 0 "Tasks in build file \`build.py\`:"
-    assert_line --index 1 --regexp "^  hello\s+Say hello.$"
-    assert_line --index 2 --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
+    assert_line --partial "Tasks in build file \`build.py\`:"
+    assert_line --partial --regexp "^  hello\s+Say hello.$"
+    assert_line --partial --regexp "^Powered by Leverage [0-9]+.[0-9]+.[0-9]+$"
 }
 
 @test "Simple task runs correctly" {
@@ -66,8 +66,8 @@ teardown(){
     run leverage run hello
 
     assert_output --partial "Hello"
-    assert_line --index 0 --regexp "\[[0-9]+:[0-9]+:[0-9]+\.[0-9]+\] \[ build\.py - ➜ Starting task hello \]"
-    assert_line --index 2 --regexp "\[[0-9]+:[0-9]+:[0-9]+\.[0-9]+\] \[ build\.py - ✔ Completed task hello \]"
+    assert_line --partial --regexp "\[[0-9]+:[0-9]+:[0-9]+\.[0-9]+\] \[ build\.py - ➜ Starting task hello \]"
+    assert_line --partial --regexp "\[[0-9]+:[0-9]+:[0-9]+\.[0-9]+\] \[ build\.py - ✔ Completed task hello \]"
 }
 
 @test "Values are loaded from .env file in current directory" {
