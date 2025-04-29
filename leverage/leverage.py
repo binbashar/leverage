@@ -11,7 +11,7 @@ from leverage import __version__, conf, MINIMUM_VERSIONS
 from leverage._internals import pass_state
 from leverage.modules.aws import aws
 from leverage.modules.credentials import credentials
-from leverage.modules import run, project, terraform, tfautomv, kubectl, shell
+from leverage.modules import run, project, tofu, terraform, tfautomv, kubectl, shell
 from leverage.path import NotARepositoryError
 
 
@@ -50,8 +50,9 @@ def leverage(context, state, verbose):
 # Add modules to leverage
 leverage.add_command(run)
 leverage.add_command(project)
+leverage.add_command(tofu)
+leverage.add_command(tofu, name="tf")
 leverage.add_command(terraform)
-leverage.add_command(terraform, name="tf")
 leverage.add_command(credentials)
 leverage.add_command(aws)
 leverage.add_command(tfautomv)
