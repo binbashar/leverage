@@ -433,15 +433,17 @@ class AWSCLIContainer(SSOContainer):
         return exit_code, output
 
 
-class TerraformContainer(SSOContainer):
-    """Leverage container specifically tailored to run Terraform commands.
+class TFContainer(SSOContainer):
+    """Leverage container specifically tailored to run Terraform/OpenTofu commands.
     It handles authentication and some checks regarding where the command is being executed."""
 
-    TF_BINARY = "/bin/terraform"
+    TERRAFORM_BINARY = "/bin/terraform"
+    TOFU_BINARY = "/bin/tofu"
+
 
     TF_MFA_ENTRYPOINT = "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 
-    def __init__(self, client, mounts=None, env_vars=None):
+    def __init__(self, client, terraform=False,mounts=None, env_vars=None):
         super().__init__(client, mounts=mounts, env_vars=env_vars)
 
         self.paths.assert_running_leverage_project()
@@ -474,7 +476,7 @@ class TerraformContainer(SSOContainer):
                 "SSH_AUTH_SOCK": "" if SSH_AUTH_SOCK is None else "/ssh-agent",
             }
         )
-        self.entrypoint = self.TF_BINARY
+        self.entrypoint = self.TERRAFORM_BINARY if terraform else self.TOFU_BINARY
         extra_mounts = [
             Mount(source=self.paths.root_dir.as_posix(), target=self.paths.guest_base_path, type="bind"),
             Mount(
@@ -685,7 +687,7 @@ class TerraformContainer(SSOContainer):
         self._backend_key = backend_key
 
 
-class TFautomvContainer(TerraformContainer):
+class TFautomvContainer(TFContainer):
     """Leverage Container tailored to run general commands."""
 
     TFAUTOMV_CLI_BINARY = "/usr/local/bin/tfautomv"

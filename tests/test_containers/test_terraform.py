@@ -2,24 +2,24 @@ from unittest import mock
 
 import pytest
 
-from leverage.container import TerraformContainer
+from leverage.container import TFContainer
 from tests.test_containers import container_fixture_factory
 
 
 @pytest.fixture
-def terraform_container(muted_click_context, monkeypatch):
+def tf_container(muted_click_context, monkeypatch):
     monkeypatch.setenv("TF_PLUGIN_CACHE_DIR", "/home/testing/.terraform/cache")
-    return container_fixture_factory(TerraformContainer)
+    return container_fixture_factory(TFContainer)
 
 
-def test_tf_plugin_cache_dir(terraform_container):
+def test_tf_plugin_cache_dir(tf_container):
     """
     Given `TF_PLUGIN_CACHE_DIR` is set as an env var on the host
     we expect it to be on the container too, and also as a mounted folder.
     """
     # call any command to trigger a container creation
-    terraform_container.start_shell()
-    container_args = terraform_container.client.api.create_container.call_args[1]
+    tf_container.start_shell()
+    container_args = tf_container.client.api.create_container.call_args[1]
 
     # make sure the env var is on place
     assert container_args["environment"]["TF_PLUGIN_CACHE_DIR"] == "/home/testing/.terraform/cache"
@@ -29,10 +29,10 @@ def test_tf_plugin_cache_dir(terraform_container):
 
 
 @mock.patch("leverage.container.refresh_layer_credentials")
-def test_refresh_credentials(mock_refresh, terraform_container):
-    terraform_container.enable_sso()
-    terraform_container.refresh_credentials()
-    container_args = terraform_container.client.api.create_container.call_args_list[0][1]
+def test_refresh_credentials(mock_refresh, tf_container):
+    tf_container.enable_sso()
+    tf_container.refresh_credentials()
+    container_args = tf_container.client.api.create_container.call_args_list[0][1]
 
     # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == 'echo "Done."'
@@ -40,22 +40,22 @@ def test_refresh_credentials(mock_refresh, terraform_container):
 
 
 @mock.patch("leverage.container.refresh_layer_credentials")
-def test_auth_method_sso_enabled(mock_refresh, terraform_container):
-    terraform_container.sso_enabled = True
-    terraform_container.auth_method()
+def test_auth_method_sso_enabled(mock_refresh, tf_container):
+    tf_container.sso_enabled = True
+    tf_container.auth_method()
 
     assert mock_refresh.assert_called_once
 
 
-def test_auth_method_mfa_enabled(terraform_container):
-    terraform_container.sso_enabled = False
-    terraform_container.mfa_enabled = True
+def test_auth_method_mfa_enabled(tf_container):
+    tf_container.sso_enabled = False
+    tf_container.mfa_enabled = True
 
-    assert terraform_container.auth_method() == "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
+    assert tf_container.auth_method() == "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh -- "
 
 
-def test_auth_method_else(terraform_container):
-    terraform_container.sso_enabled = False
-    terraform_container.mfa_enabled = False
+def test_auth_method_else(tf_container):
+    tf_container.sso_enabled = False
+    tf_container.mfa_enabled = False
 
-    assert terraform_container.auth_method() == ""
+    assert tf_container.auth_method() == ""

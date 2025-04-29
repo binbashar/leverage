@@ -21,7 +21,7 @@ from leverage.path import get_root_path, get_project_root_or_current_dir_path
 from leverage.path import NotARepositoryError
 from leverage._utils import git, ExitError
 from leverage.container import get_docker_client
-from leverage.container import TerraformContainer
+from leverage.container import TFContainer
 
 # Leverage related base definitions
 LEVERAGE_DIR = Path.home() / ".leverage"
@@ -326,7 +326,7 @@ def create():
     # Format the code correctly
     logger.info("Reformatting terraform configuration to the standard style.")
 
-    terraform = TerraformContainer(get_docker_client())
+    terraform = TFContainer(get_docker_client())
     terraform.ensure_image()
     terraform.disable_authentication()
     with console.status("Formatting..."):

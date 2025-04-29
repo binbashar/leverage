@@ -1,7 +1,7 @@
 import click
 
 from leverage._utils import CustomEntryPoint
-from leverage.container import get_docker_client, TerraformContainer
+from leverage.container import get_docker_client, TFContainer
 from leverage.modules.utils import env_var_option, mount_option, auth_sso, auth_mfa
 
 
@@ -28,9 +28,9 @@ def shell(mount, env_var, mfa, sso):
     """
     if env_var:
         env_var = dict(env_var)
-    # TODO: TerraformContainer is the only class supporting sso/mfa auth automagically
+    # TODO: TFContainer is the only class supporting sso/mfa auth automagically
     #       Move this capacity into a mixin later
-    container = TerraformContainer(get_docker_client(), mounts=mount, env_vars=env_var)
+    container = TFContainer(get_docker_client(), mounts=mount, env_vars=env_var)
     container.ensure_image()
 
     # auth
