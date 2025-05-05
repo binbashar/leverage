@@ -36,7 +36,7 @@ def test_refresh_credentials(mock_refresh, tf_container):
 
     # we want a shell, so -> /bin/bash and refresh_sso_credentials flag
     assert container_args["command"] == 'echo "Done."'
-    assert mock_refresh.assert_called_once
+    mock_refresh.assert_called_once()
 
 
 @mock.patch("leverage.container.refresh_layer_credentials")
