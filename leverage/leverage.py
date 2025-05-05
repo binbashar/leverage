@@ -36,11 +36,18 @@ def leverage(context, state, verbose):
         return
 
     # check if the current versions are lower than the minimum required
-    if not (current_values := config.get("TERRAFORM_IMAGE_TAG")):
+    if not (image_tag := config.get("TERRAFORM_IMAGE_TAG")):
         # at some points of the project (the init), the config file is not created yet
         return
+
     # validate both TOOLBOX and TF versions
-    for key, current in zip(MINIMUM_VERSIONS, current_values.split("-")):
+    image_versions = image_tag.split("-")
+    if "tofu" not in image_versions:
+        versions = zip(MINIMUM_VERSIONS, image_versions)
+    else:
+        versions = {"TOOLBOX": image_versions[-1]}.items()
+
+    for key, current in versions:
         if Version(current) < Version(MINIMUM_VERSIONS[key]):
             rich.print(
                 f"[red]WARNING[/red]\tYour current {key} version ({current}) is lower than the required minimum ({MINIMUM_VERSIONS[key]})."

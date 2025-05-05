@@ -56,21 +56,27 @@ def test_load_config(monkeypatch, click_context, tmp_path, write_files, expected
 
         assert dict(loaded_values) == expected_values
 
-
-def test_version_validation():
+@pytest.mark.parametrize(
+    "tofu, conf",
+    [
+        (True, {"TERRAFORM_IMAGE_TAG": "1.1.1-tofu-2.2.2"}),
+        (False, {"TERRAFORM_IMAGE_TAG": "1.1.1-2.2.2"})
+    ])
+def test_version_validation(tofu, conf):
     """
     Test that we get a warning if we are working with a version lower than the required by the project.
     """
     runner = CliRunner()
     with (
-        mock.patch("leverage.conf.load", return_value={"TERRAFORM_IMAGE_TAG": "1.1.1-2.2.2"}),
+        mock.patch("leverage.conf.load", return_value=conf),
         mock.patch.dict("leverage.MINIMUM_VERSIONS", {"TERRAFORM": "3.3.3", "TOOLBOX": "4.4.4"}),
     ):
         result = runner.invoke(leverage)
 
-    assert "Your current TERRAFORM version (1.1.1) is lower than the required minimum (3.3.3)" in result.output.replace(
-        "\n", ""
-    )
+    if not tofu:
+        assert "Your current TERRAFORM version (1.1.1) is lower than the required minimum (3.3.3)" in result.output.replace(
+            "\n", ""
+        )
     assert "Your current TOOLBOX version (2.2.2) is lower than the required minimum (4.4.4)" in result.output.replace(
         "\n", ""
     )
