@@ -82,12 +82,12 @@ class LeverageContainer:
         self.project = self.paths.project
 
         # Set image to use
-        self.image = self.env_conf.get("TERRAFORM_IMAGE", self.LEVERAGE_IMAGE)
-        self.image_tag = self.env_conf.get("TERRAFORM_IMAGE_TAG")
+        self.image = self.env_conf.get("TF_IMAGE", self.env_conf.get("TERRAFORM_IMAGE", self.LEVERAGE_IMAGE))
+        self.image_tag = self.env_conf.get("TF_IMAGE_TAG", self.env_conf.get("TERRAFORM_IMAGE_TAG"))
         if not self.image_tag:
             logger.error(
                 "No docker image tag defined.\n"
-                "Please set `TERRAFORM_IMAGE_TAG` variable in the project's [bold]build.env[/bold] file before running a Leverage command."
+                "Please set `TF_IMAGE_TAG` variable in the project's [bold]build.env[/bold] file before running a Leverage command."
             )
             raise Exit(1)
 

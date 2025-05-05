@@ -36,7 +36,7 @@ def leverage(context, state, verbose):
         return
 
     # check if the current versions are lower than the minimum required
-    if not (image_tag := config.get("TERRAFORM_IMAGE_TAG")):
+    if not (image_tag := config.get("TF_IMAGE", config.get("TERRAFORM_IMAGE_TAG"))):
         # at some points of the project (the init), the config file is not created yet
         return
 
