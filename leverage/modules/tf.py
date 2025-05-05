@@ -224,6 +224,7 @@ for subcommand in (
     apply,
     output,
     destroy,
+    version,
     shell,
     _format,
     validate,
