@@ -4,15 +4,15 @@ import pytest
 from click import get_current_context
 
 from leverage._internals import State
-from leverage.container import TerraformContainer
+from leverage.container import TFContainer
 from leverage.modules.tf import _init
 from leverage.modules.tf import has_a_plan_file
 from tests.test_containers import container_fixture_factory
 
 
 @pytest.fixture
-def terraform_container(muted_click_context):
-    tf_container = container_fixture_factory(TerraformContainer)
+def tf_container(muted_click_context):
+    tf_container = container_fixture_factory(TFContainer)
 
     # this is required because of the @pass_container decorator
     ctx = get_current_context()
@@ -33,23 +33,23 @@ def terraform_container(muted_click_context):
         (["-r1", "-r2"], ["-r1", "-r2", "-backend-config=/project/./config/backend.tfvars"]),
     ],
 )
-def test_init_arguments(terraform_container, args, expected_value):
+def test_init_arguments(tf_container, args, expected_value):
     """
     Test that the arguments for the init command are prepared correctly.
     """
-    with patch.object(terraform_container, "start_in_layer", return_value=0) as mocked:
+    with patch.object(tf_container, "start_in_layer", return_value=0) as mocked:
         _init(args)
 
     assert mocked.call_args_list[0][0][0] == "init"
     assert " ".join(mocked.call_args_list[0][0][1:]) == " ".join(expected_value)
 
 
-def test_init_with_args(terraform_container):
+def test_init_with_args(tf_container):
     """
     Test tf init with arguments.
     """
     # with patch("dockerpty.exec_command") as mocked_pty:
-    with patch.object(terraform_container, "start_in_layer", return_value=0) as mocked:
+    with patch.object(tf_container, "start_in_layer", return_value=0) as mocked:
         _init(["-migrate-state"])
 
     assert mocked.call_args_list[0][0] == ("init", "-migrate-state", "-backend-config=/project/./config/backend.tfvars")
