@@ -5,8 +5,8 @@ from click import get_current_context
 
 from leverage._internals import State
 from leverage.container import TerraformContainer
-from leverage.modules.terraform import _init
-from leverage.modules.terraform import has_a_plan_file
+from leverage.modules.tf import _init
+from leverage.modules.tf import has_a_plan_file
 from tests.test_containers import container_fixture_factory
 
 
