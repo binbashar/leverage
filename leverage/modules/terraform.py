@@ -17,6 +17,7 @@ REGION = (
     r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4])"
 )
 
+
 # ###########################################################################
 # CREATE THE TOFU AND TERRAFORM GROUPS
 # ###########################################################################
@@ -37,6 +38,7 @@ def tofu(state, env_var, mount):
     state.container = TFContainer(get_docker_client(), mounts=mount, env_vars=env_var)
     state.container.ensure_image()
 
+
 @click.group()
 @mount_option
 @env_var_option
@@ -53,6 +55,7 @@ def terraform(state, env_var, mount):
 
     state.container = TFContainer(get_docker_client(), terraform=True, mounts=mount, env_vars=env_var)
     state.container.ensure_image()
+
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 
@@ -210,13 +213,27 @@ def refresh_credentials(tf):
     if exit_code := tf.refresh_credentials():
         raise Exit(exit_code)
 
+
 # ###########################################################################
 # ATTACH SUBCOMMANDS TO TF COMMANDS
 # ###########################################################################
 
-for subcommand in (init, plan, apply, output, destroy, shell, _format, validate, validate_layout, _import, refresh_credentials):
+for subcommand in (
+    init,
+    plan,
+    apply,
+    output,
+    destroy,
+    shell,
+    _format,
+    validate,
+    validate_layout,
+    _import,
+    refresh_credentials,
+):
     tofu.add_command(subcommand)
     terraform.add_command(subcommand)
+
 
 # ###########################################################################
 # HANDLER FOR MANAGING THE BASE COMMANDS (init, plan, apply, destroy, output)

@@ -440,7 +440,6 @@ class TFContainer(SSOContainer):
     TERRAFORM_BINARY = "/bin/terraform"
     TOFU_BINARY = "/bin/tofu"
 
-
     TF_MFA_ENTRYPOINT = "/home/leverage/scripts/aws-mfa/aws-mfa-entrypoint.sh"
 
     def __init__(self, client, terraform=False, mounts=None, env_vars=None):
