@@ -22,7 +22,7 @@ def sso_container(with_click_context, propagate_logs):
     # mock PathsHandler with a named tuple?
     with mock.patch(
         "leverage.container.PathsHandler.local_backend_tfvars",
-        new_callable=PropertyMock(return_value="~/config/backend.tfvars"),
+        new_callable=PropertyMock(return_value=PosixPath("~/config/backend.tfvars")),
     ), mock.patch(
         "leverage.container.PathsHandler.host_aws_profiles_file",
         new_callable=PropertyMock(return_value="~/.aws/test/config"),
@@ -191,26 +191,26 @@ aws_session_token = session-token
 """
 
 data_dict = {
-    PosixPath("config.tf"): FILE_CONFIG_TF,
-    PosixPath("locals.tf"): FILE_LOCALS_TF,
-    "~/config/backend.tfvars": FILE_BACKEND_TFVARS,
+    "config.tf": FILE_CONFIG_TF,
+    "locals.tf": FILE_LOCALS_TF,
+    "backend.tfvars": FILE_BACKEND_TFVARS,
     "~/.aws/test/config": FILE_AWS_CONFIG,
     "~/.aws/test/credentials": FILE_AWS_CREDENTIALS,
 }
 
 
+def read_text_side_effect(self: PosixPath, *args, **kwargs):
+    """
+    Every time we call read_text(), this side effect will try to get the value from data_dict rather than reading a disk file.
+    """
+    return data_dict[self.name]
+
+
 def open_side_effect(name: PosixPath, *args, **kwargs):
     """
-    Everytime we call open(), this side effect will try to get the value from data_dict rather than reading a disk file.
+    Every time we call open(), this side effect will try to get the value from data_dict rather than reading a disk file.
     """
-    if str(name).endswith("config.tf"):
-        read_data = FILE_CONFIG_TF
-    elif str(name).endswith("locals.tf"):
-        read_data = FILE_LOCALS_TF
-    else:
-        read_data = data_dict[name]
-
-    return mock.mock_open(read_data=read_data)()
+    return mock.mock_open(read_data=data_dict[name])()
 
 
 b3_client = Mock()
@@ -229,9 +229,9 @@ b3_client.get_role_credentials = Mock(
 @mock.patch("leverage.modules.auth.get_profiles", new=Mock(return_value=("test-first-devops", ["test-first-profile"])))
 @mock.patch("leverage.modules.auth.get_or_create_section", new=Mock())
 @mock.patch("leverage.modules.aws.ConfigUpdater.update_file", new=Mock())
-@mock.patch("builtins.open", side_effect=open_side_effect)
-@mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("boto3.client", return_value=b3_client)
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect)
 def test_refresh_layer_credentials_first_time(mock_open, mock_boto, sso_container, caplog):
     refresh_layer_credentials(sso_container)
 
@@ -244,9 +244,9 @@ def test_refresh_layer_credentials_first_time(mock_open, mock_boto, sso_containe
 @mock.patch("leverage.modules.auth.get_profiles", new=Mock(return_value=("test-valid-devops", ["test-valid-profile"])))
 @mock.patch("leverage.modules.auth.get_or_create_section", new=Mock())
 @mock.patch("leverage.modules.aws.ConfigUpdater.update_file", new=Mock())
-@mock.patch("builtins.open", side_effect=open_side_effect)
-@mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("time.time", new=Mock(return_value=NOW_EPOCH))
+@mock.patch("boto3.client", return_value=b3_client)
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect)
 def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_container, caplog):
     refresh_layer_credentials(sso_container)
 
@@ -257,11 +257,12 @@ def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_contain
 
 
 @mock.patch("leverage.modules.auth.update_config_section")
-@mock.patch("builtins.open", side_effect=open_side_effect)
+@mock.patch("pathlib.Path.read_text", new=read_text_side_effect)
+@mock.patch("pathlib.Path.touch", new=Mock())
 @mock.patch("time.time", new=Mock(return_value=1705859000))
 @mock.patch("boto3.client", return_value=b3_client)
-@mock.patch("pathlib.Path.touch", new=Mock())
-def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_container, propagate_logs):
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect)
+def test_refresh_layer_credentials(mock_open, mock_boto, mock_update_conf, sso_container, propagate_logs):
     refresh_layer_credentials(sso_container)
 
     # the expiration was set
@@ -277,9 +278,10 @@ def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_c
 
 
 @mock.patch("leverage.modules.auth.update_config_section")
-@mock.patch("builtins.open", side_effect=open_side_effect)
-@mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("pathlib.Path.read_text", new=read_text_side_effect)
 @mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("time.time", new=Mock(return_value=1705859000))
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect)
 @pytest.mark.parametrize(
     "error",
     [
@@ -287,7 +289,7 @@ def test_refresh_layer_credentials(mock_boto, mock_open, mock_update_conf, sso_c
         ClientError({"Error": {"Code": "ForbiddenException", "Message": "No access"}}, "GetRoleCredentials"),
     ],
 )
-def test_refresh_layer_credentials_no_access(mock_update_conf, mock_open, sso_container, error):
+def test_refresh_layer_credentials_no_access(mock_open, mock_update_conf, sso_container, error):
     with mock.patch("boto3.client") as mocked_client:
         mocked_client_obj = MagicMock()
         mocked_client_obj.get_role_credentials.side_effect = error
