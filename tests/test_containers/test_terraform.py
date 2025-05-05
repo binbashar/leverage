@@ -44,7 +44,7 @@ def test_auth_method_sso_enabled(mock_refresh, tf_container):
     tf_container.sso_enabled = True
     tf_container.auth_method()
 
-    assert mock_refresh.assert_called_once
+    mock_refresh.assert_called_once()
 
 
 def test_auth_method_mfa_enabled(tf_container):
