@@ -252,7 +252,7 @@ def credentials(state):
             if common.tfvars
             raise an exception
 
-    If we reached the only common.tfvars scenario, we have no project name nor TERRAFORM_IMAGE_TAG.
+    If we reached the only common.tfvars scenario, we have no project name nor TF_IMAGE_TAG.
     So the best chance is to read the common.tfvars directly without a conatiner, e.g. with sed or grep
     """
     project_config = _load_project_yaml()
@@ -266,7 +266,7 @@ def credentials(state):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
         if not build_env.exists():
-            build_env.write_text(f"PROJECT={short_name}\nTERRAFORM_IMAGE_TAG={__toolbox_version__}")
+            build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG={__toolbox_version__}")
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist
@@ -280,7 +280,7 @@ def credentials(state):
                     if g:
                         found = True
                         logger.info("Reading info from common.tfvars")
-                        build_env.write_text(f"PROJECT={g[1]}\nTERRAFORM_IMAGE_TAG=1.1.9")
+                        build_env.write_text(f"PROJECT={g[1]}\nTF_IMAGE_TAG=1.1.9")
                         break
             if not found:
                 raise Exception("Config file not found")

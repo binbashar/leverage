@@ -8,7 +8,7 @@ from click.exceptions import Exit
 from leverage import logger
 from leverage._internals import pass_container, pass_state
 from leverage._utils import ExitError, parse_tf_file
-from leverage.container import TerraformContainer
+from leverage.container import TFContainer
 from leverage.container import get_docker_client
 from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
 
@@ -19,8 +19,26 @@ REGION = (
 
 
 # ###########################################################################
-# CREATE THE TERRAFORM GROUP
+# CREATE THE TOFU AND TERRAFORM GROUPS
 # ###########################################################################
+@click.group()
+@mount_option
+@env_var_option
+@pass_state
+def tofu(state, env_var, mount):
+    """Run OpenTofu commands in a custom containerized environment that provides extra functionality when interacting
+    with your cloud provider such as handling multi factor authentication for you.
+    All tofu subcommands that receive extra args will pass the given strings as is to their corresponding OpenTofu
+    counterparts in the container. For example as in `leverage tofu apply -auto-approve` or
+    `leverage tofu init -reconfigure`
+    """
+    if env_var:
+        env_var = dict(env_var)
+
+    state.container = TFContainer(get_docker_client(), mounts=mount, env_vars=env_var)
+    state.container.ensure_image()
+
+
 @click.group()
 @mount_option
 @env_var_option
@@ -35,14 +53,14 @@ def terraform(state, env_var, mount):
     if env_var:
         env_var = dict(env_var)
 
-    state.container = TerraformContainer(get_docker_client(), mounts=mount, env_vars=env_var)
+    state.container = TFContainer(get_docker_client(), terraform=True, mounts=mount, env_vars=env_var)
     state.container.ensure_image()
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 
 # ###########################################################################
-# CREATE THE TERRAFORM GROUP'S COMMANDS
+# CREATE THE TF GROUP'S COMMANDS
 # ###########################################################################
 #
 # --layers is a ordered comma separated list of layer names
@@ -72,20 +90,20 @@ layers_option = click.option(
 )
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.command(context_settings=CONTEXT_SETTINGS)
 @click.option("--skip-validation", is_flag=True, help="Skip layout validation.")
 @layers_option
 @click.argument("args", nargs=-1)
 @pass_container
 @click.pass_context
-def init(context, tf: TerraformContainer, skip_validation, layers, args):
+def init(context, tf: TFContainer, skip_validation, layers, args):
     """
     Initialize this layer.
     """
     invoke_for_all_commands(layers, _init, args, skip_validation)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
 @pass_container
@@ -95,7 +113,7 @@ def plan(context, tf, layers, args):
     invoke_for_all_commands(layers, _plan, args)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
 @pass_container
@@ -105,7 +123,7 @@ def apply(context, tf, layers, args):
     invoke_for_all_commands(layers, _apply, args)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
 @pass_container
@@ -115,7 +133,7 @@ def output(context, tf, layers, args):
     invoke_for_all_commands(layers, _output, args)
 
 
-@terraform.command(context_settings=CONTEXT_SETTINGS)
+@click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
 @pass_container
@@ -125,7 +143,7 @@ def destroy(context, tf, layers, args):
     invoke_for_all_commands(layers, _destroy, args)
 
 
-@terraform.command()
+@click.command()
 @pass_container
 def version(tf):
     """Print version."""
@@ -133,7 +151,7 @@ def version(tf):
     tf.start("version")
 
 
-@terraform.command()
+@click.command()
 @auth_mfa
 @auth_sso
 @pass_container
@@ -149,7 +167,7 @@ def shell(tf, mfa, sso):
     tf.start_shell()
 
 
-@terraform.command("format", context_settings=CONTEXT_SETTINGS)
+@click.command("format", context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
 @pass_container
 def _format(tf, args):
@@ -159,7 +177,7 @@ def _format(tf, args):
     tf.start("fmt", *args)
 
 
-@terraform.command()
+@click.command()
 @pass_container
 def validate(tf):
     """Validate code of the current directory. Previous initialization might be needed."""
@@ -167,7 +185,7 @@ def validate(tf):
     tf.start("validate")
 
 
-@terraform.command("validate-layout")
+@click.command("validate-layout")
 @pass_container
 def validate_layout(tf):
     """Validate layer conforms to Leverage convention."""
@@ -175,7 +193,7 @@ def validate_layout(tf):
     return _validate_layout()
 
 
-@terraform.command("import")
+@click.command("import")
 @click.argument("address")
 @click.argument("_id", metavar="ID")
 @pass_container
@@ -187,13 +205,35 @@ def _import(tf, address, _id):
         raise Exit(exit_code)
 
 
-@terraform.command("refresh-credentials")
+@click.command("refresh-credentials")
 @pass_container
 def refresh_credentials(tf):
     """Refresh the AWS credentials used on the current layer."""
     tf.paths.check_for_layer_location()
     if exit_code := tf.refresh_credentials():
         raise Exit(exit_code)
+
+
+# ###########################################################################
+# ATTACH SUBCOMMANDS TO TF COMMANDS
+# ###########################################################################
+
+for subcommand in (
+    init,
+    plan,
+    apply,
+    output,
+    destroy,
+    version,
+    shell,
+    _format,
+    validate,
+    validate_layout,
+    _import,
+    refresh_credentials,
+):
+    tofu.add_command(subcommand)
+    terraform.add_command(subcommand)
 
 
 # ###########################################################################
@@ -475,7 +515,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
 
 
 @pass_container
-def _validate_layout(tf: TerraformContainer):
+def _validate_layout(tf: TFContainer):
     tf.paths.check_for_layer_location()
 
     # Check for `environment = <account name>` in account.tfvars

@@ -10,7 +10,7 @@ import simple_term_menu
 
 from leverage import logger
 from leverage._utils import AwsCredsEntryPoint, ExitError, CustomEntryPoint
-from leverage.container import TerraformContainer
+from leverage.container import TFContainer
 
 
 @dataclass
@@ -24,11 +24,11 @@ class MetadataTypes(Enum):
     K8S_CLUSTER = "k8s-eks-cluster"
 
 
-class KubeCtlContainer(TerraformContainer):
+class KubeCtlContainer(TFContainer):
     """Container specifically tailored to run kubectl commands."""
 
     KUBECTL_CLI_BINARY = "/usr/local/bin/kubectl"
-    KUBECTL_CONFIG_PATH = Path(f"/home/{TerraformContainer.CONTAINER_USER}/.kube")
+    KUBECTL_CONFIG_PATH = Path(f"/home/{TFContainer.CONTAINER_USER}/.kube")
     KUBECTL_CONFIG_FILE = KUBECTL_CONFIG_PATH / Path("config")
     METADATA_FILENAME = "metadata.yaml"
 
@@ -78,7 +78,8 @@ class KubeCtlContainer(TerraformContainer):
         logger.info("Done.")
 
     def _get_eks_kube_config(self) -> str:
-        exit_code, output = self._start_with_output(f"{self.TF_BINARY} output -no-color")  # TODO: override on CM?
+        tf_binary = self.TOFU_BINARY if "tofu" in self.image_tag else self.TERRAFORM_BINARY
+        exit_code, output = self._start_with_output(f"{tf_binary} output -no-color")  # TODO: override on CM?
         if exit_code:
             raise ExitError(exit_code, output)
 
