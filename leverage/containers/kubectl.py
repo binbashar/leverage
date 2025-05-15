@@ -78,7 +78,8 @@ class KubeCtlContainer(TFContainer):
         logger.info("Done.")
 
     def _get_eks_kube_config(self) -> str:
-        exit_code, output = self._start_with_output(f"{self.entrypoint} output -no-color")  # TODO: override on CM?
+        tf_binary = self.TOFU_BINARY if "tofu" in self.image_tag else self.TERRAFORM_BINARY
+        exit_code, output = self._start_with_output(f"{tf_binary} output -no-color")  # TODO: override on CM?
         if exit_code:
             raise ExitError(exit_code, output)
 
