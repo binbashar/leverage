@@ -6,6 +6,8 @@ from pathlib import Path
 
 from yaenv.core import Env
 
+from leverage._casting import cast_value
+
 from leverage import logger
 from leverage.path import get_root_path
 from leverage.path import get_working_path
@@ -56,6 +58,6 @@ def load(config_filename=ENV_CONFIG_FILE):
         config_file = Env(config_file_path)
 
         for key, val in config_file:
-            config_dict[key] = val
+            config_dict[key] = cast_value(val)
 
     return config_dict

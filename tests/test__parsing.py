@@ -8,20 +8,35 @@ from leverage._parsing import DuplicateKeywordArgumentError
 @pytest.mark.parametrize(
     "arguments, expected_args, expected_kwargs",
     [
-        ("arg1, arg2, arg3 ", ["arg1", "arg2", "arg3"], {}),  # All positional arguments
+        ("arg1, 2, 3.5 ", ["arg1", 2, 3.5], {}),  # Cast positional arguments
         (  # All keyworded arguments
-            "kwarg1=/val/1,kwarg2 = val2, kwarg3 = val3 ",
+            "kwarg1=true,kwarg2 = val2, kwarg3 = 3 ",
             [],
-            {"kwarg1": "/val/1", "kwarg2": "val2", "kwarg3": "val3"},
+            {"kwarg1": True, "kwarg2": "val2", "kwarg3": 3},
         ),
         ("arg1, arg2, kwarg1=/val/1,kwarg2 = val2", ["arg1", "arg2"], {"kwarg1": "/val/1", "kwarg2": "val2"}),  # Both
+        # Edge cases for casting
+        ("1e10, inf, nan", [1e10, float('inf'), float('nan')], {}),
+        ("007, 0123", [7, 123], {}),  # Leading zeros
+        ("kwarg1=1.0,kwarg2=0.0", [], {"kwarg1": 1.0, "kwarg2": 0.0}),  # Ensure float casting
+        # Boolean edge cases
+        ("True, FALSE, yes, no", [True, False, True, False], {}),
+        (
+            "kwarg1=TRUE,kwarg2=false,kwarg3=1,kwarg4=0",
+            [],
+            {"kwarg1": True, "kwarg2": False, "kwarg3": 1, "kwarg4": 0},
+        ),
         (None, [], {}),  # No arguments
     ],
 )
 def test__parse_args(arguments, expected_args, expected_kwargs):
     args, kwargs = parse_task_args(arguments=arguments)
+    for received, expected in zip(args, expected_args):
+        if isinstance(expected, float) and expected != expected:  # NaN check
+            assert received != received
+        else:
+            assert received == expected
 
-    assert args == expected_args
     assert kwargs == expected_kwargs
 
 

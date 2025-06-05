@@ -2,6 +2,8 @@
     Command line arguments and tasks arguments parsing utilities.
 """
 
+from leverage._casting import cast_value
+
 
 class InvalidArgumentOrderError(RuntimeError):
     pass
@@ -40,13 +42,13 @@ def parse_task_args(arguments):
                     f"Positional argument `{argument}` from task `{{task}}` cannot follow a keyword argument."
                 )
 
-            args.append(argument.strip())
+            args.append(cast_value(argument.strip()))
 
         else:
             key, value = [part.strip() for part in argument.split("=")]
             if key in kwargs:
                 raise DuplicateKeywordArgumentError(f"Duplicated keyword argument `{key}` in task `{{task}}`.")
 
-            kwargs[key] = value
+            kwargs[key] = cast_value(value)
 
     return args, kwargs

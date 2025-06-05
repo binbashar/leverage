@@ -30,9 +30,9 @@ CONFIG_PATH=/home/user/.config/
             True,
             {
                 "PROJECT": "foobar",
-                "MFA_ENABLED": "true",
+                "MFA_ENABLED": True,
                 "ENTRYPOINT": "/bin/run",
-                "DEBUG": "true",
+                "DEBUG": True,
                 "CONFIG_PATH": "/home/user/.config/",
             },
         ),
