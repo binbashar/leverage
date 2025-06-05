@@ -8,11 +8,11 @@ from leverage._parsing import DuplicateKeywordArgumentError
 @pytest.mark.parametrize(
     "arguments, expected_args, expected_kwargs",
     [
-        ("arg1, arg2, arg3 ", ["arg1", "arg2", "arg3"], {}),  # All positional arguments
+        ("arg1, 2, 3.5 ", ["arg1", 2, 3.5], {}),  # Cast positional arguments
         (  # All keyworded arguments
-            "kwarg1=/val/1,kwarg2 = val2, kwarg3 = val3 ",
+            "kwarg1=true,kwarg2 = val2, kwarg3 = 3 ",
             [],
-            {"kwarg1": "/val/1", "kwarg2": "val2", "kwarg3": "val3"},
+            {"kwarg1": True, "kwarg2": "val2", "kwarg3": 3},
         ),
         ("arg1, arg2, kwarg1=/val/1,kwarg2 = val2", ["arg1", "arg2"], {"kwarg1": "/val/1", "kwarg2": "val2"}),  # Both
         (None, [], {}),  # No arguments
