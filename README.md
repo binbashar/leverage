@@ -70,6 +70,7 @@ Leverage CLI explicitly supports the following Python versions:
 - Python 3.10.x
 - Python 3.11.x
 - Python 3.12.x
+- Python 3.13.x
 
 These versions are not only supported but are also the only versions used in our CI/CD pipelines to ensure compatibility
 and performance. This rigorous testing helps prevent compatibility issues and ensures that the Leverage CLI performs as
@@ -111,14 +112,15 @@ pyenv install 3.9.7
 pyenv install 3.10.1
 pyenv install 3.11.8
 pyenv install 3.12.7
+pyenv install 3.13.3
 ```
 
 4. Create a virtual environment for the leverage project:
 
-Create a virtual environment for your project using Python 3.9.7:
+Create a virtual environment for your project using Python 3.12.7:
 
 ```bash
-pyenv virtualenv 3.9.7 leverage_py_39_venv
+pyenv virtualenv 3.12.7 leverage_py_312_venv
 ```
 
 5. Set your virtual environment to be used in the project:
@@ -130,7 +132,7 @@ cd <path_to_leverage_project_root>
 pyenv local leverage_py_39_venv
 ```
 
-This setup commands `pyenv` to use `leverage_py_39_venv` as the local Python version for your project directory,
+This setup commands `pyenv` to use `leverage_py_312_venv` as the local Python version for your project directory,
 ensuring that all Python operations within this directory use this isolated environment.
 
 ## Setting up development environment

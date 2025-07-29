@@ -17,7 +17,8 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12"
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13"
 ]
 packages = [
     { include = "leverage" },
@@ -26,7 +27,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.9 || ~3.10 || ~3.11 || ~3.12"
+python = "~3.9 || ~3.10 || ~3.11 || ~3.12 || ~3.13"
 click = "8.0.1"
 yaenv = "1.5.3post1"
 "ruamel.yaml" = "0.17.10"
