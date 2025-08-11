@@ -112,15 +112,15 @@ pyenv install 3.9.7
 pyenv install 3.10.1
 pyenv install 3.11.8
 pyenv install 3.12.7
-pyenv install 3.13.3
+pyenv install 3.13.6
 ```
 
 4. Create a virtual environment for the leverage project:
 
-Create a virtual environment for your project using Python 3.13.3:
+Create a virtual environment for your project using Python 3.13.x:
 
 ```bash
-pyenv virtualenv 3.13.3 leverage_py_313_venv
+pyenv virtualenv 3.13.6 leverage_py_313_venv
 ```
 
 5. Set your virtual environment to be used in the project:
