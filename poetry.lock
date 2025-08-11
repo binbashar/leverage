@@ -1250,18 +1250,19 @@ six = ">=1.5"
 
 [[package]]
 name = "python-hcl2"
-version = "7.0.1"
+version = "7.3.1"
 description = "A parser for HCL2"
 category = "main"
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "python_hcl2-7.0.1-py3-none-any.whl", hash = "sha256:f851e872397b5a77e85820bd779c58e60cbc077cf6865e91c444da49d878d032"},
-    {file = "python_hcl2-7.0.1.tar.gz", hash = "sha256:41fbae6d154d593d9f8adcbd85e76fbbb86a188561e1d22d293beddc4153d3b6"},
+    {file = "python_hcl2-7.3.1-py3-none-any.whl", hash = "sha256:6bf6036d3dffac04e05e6aa58ff6e9a3710bba2171325584dfd7b3f8c99c6d4d"},
+    {file = "python_hcl2-7.3.1.tar.gz", hash = "sha256:f8f55583703daf7bbcb595a33c68de891064d565974ea39998b81d15a4c4657b"},
 ]
 
 [package.dependencies]
-lark = ">=1,<2"
+lark = ">=1.1.5,<2.0"
+regex = ">=2024.4.16"
 
 [[package]]
 name = "pywin32"
@@ -1945,4 +1946,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.9 || ~3.10 || ~3.11 || ~3.12 || ~3.13"
-content-hash = "ad3fc0e5db6b9db9ccd2b083621e73dee8fe1b04c1e8068db63d8505c3aa6359"
+content-hash = "2987398186940f255819a005c8bfa16386b976f8cd4eae38aefc08c47f4be949"
