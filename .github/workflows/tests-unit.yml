@@ -38,7 +38,7 @@ jobs:
         shell: bash
 
       - name: Report Coveralls
-        if: matrix.python-version == '3.9'  # Run this for the first python version only!
+        if: matrix.python-version == '3.13'  # Run this for the last python version only!
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
