@@ -117,10 +117,10 @@ pyenv install 3.13.3
 
 4. Create a virtual environment for the leverage project:
 
-Create a virtual environment for your project using Python 3.12.7:
+Create a virtual environment for your project using Python 3.13.3:
 
 ```bash
-pyenv virtualenv 3.12.7 leverage_py_312_venv
+pyenv virtualenv 3.13.3 leverage_py_313_venv
 ```
 
 5. Set your virtual environment to be used in the project:
@@ -129,10 +129,10 @@ To set this virtual environment as the local environment for your project, navig
 
 ```bash
 cd <path_to_leverage_project_root>
-pyenv local leverage_py_39_venv
+pyenv local leverage_py_313_venv
 ```
 
-This setup commands `pyenv` to use `leverage_py_312_venv` as the local Python version for your project directory,
+This setup commands `pyenv` to use `leverage_py_313_venv` as the local Python version for your project directory,
 ensuring that all Python operations within this directory use this isolated environment.
 
 ## Setting up development environment
