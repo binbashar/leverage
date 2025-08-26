@@ -203,8 +203,9 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
         template_location = template_file.relative_to(TEMPLATES_REPO_DIR)
 
         template = JINJA_ENV.get_template(template_location.as_posix())
-        if not "terraform_image_tag" in config:
+        if "terraform_image_tag" not in config:
             config["terraform_image_tag"] = __toolbox_version__
+
         rendered_template = template.render(config)
 
         rendered_location = template_file.relative_to(source)
