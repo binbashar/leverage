@@ -203,8 +203,9 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
         template_location = template_file.relative_to(TEMPLATES_REPO_DIR)
 
         template = JINJA_ENV.get_template(template_location.as_posix())
-        if not "terraform_image_tag" in config:
+        if "terraform_image_tag" not in config:
             config["terraform_image_tag"] = __toolbox_version__
+
         rendered_template = template.render(config)
 
         rendered_location = template_file.relative_to(source)
@@ -324,7 +325,7 @@ def create():
     _render_project_template(config=config)
 
     # Format the code correctly
-    logger.info("Reformatting terraform configuration to the standard style.")
+    logger.info("Reformatting configuration to the standard style.")
 
     terraform = TFContainer(get_docker_client())
     terraform.ensure_image()

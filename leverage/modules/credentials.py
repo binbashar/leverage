@@ -157,7 +157,7 @@ def _ask_for_credentials_location():
             {
                 "type": "select",
                 "name": "input_type",
-                "message": "Select the means by which you'll provide the programatic keys:",
+                "message": "Select the means by which you'll provide the programmatic keys:",
                 "qmark": ">",
                 "choices": [
                     {"name": "Path to an access keys file obtained from AWS", "value": "path"},
@@ -312,7 +312,7 @@ def _load_configs_for_credentials():
     env_config = AWSCLI.env_conf
 
     terraform_config = {}
-    logger.info("Loading Terraform common configuration.")
+    logger.info("Loading tf common configuration.")
     terraform_config = AWSCLI.paths.common_conf
 
     config_values = {}

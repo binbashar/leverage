@@ -50,13 +50,13 @@ PROJECT=bb
 MFA_ENABLED=false
 
 # Terraform
-TERRAFORM_IMAGE_TAG=1.5.0-0.2.0
+TF_IMAGE_TAG=1.5.0-0.2.0
 ```
 
 So, if you have created a project with version <1.8.0 and want to use it with version >=1.8.0 you should:
 
 - remove TERRAFORM_IMAGE_NAME line
-- update TERRAFORM_IMAGE_TAG from this form '9.9.9' to this one '9.9.9-9.9.9'.
+- update TF_IMAGE_TAG from this form '9.9.9' to this one '9.9.9-9.9.9'.
 
 For the second item you can check the version [here](https://hub.docker.com/r/binbash/leverage-toolbox/tags).
 
