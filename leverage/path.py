@@ -275,7 +275,7 @@ class PathsHandler:
         """Make sure the command is being run at layer level. If not, bail."""
         path = path or self.cwd
         if path in (self.common_config_dir, self.account_config_dir):
-            raise ExitError(1, "Currently in a configuration directory, no Terraform command can be run here.")
+            raise ExitError(1, "Currently in a configuration directory, no OpenTofu/Terraform command can be run here.")
 
         if path in (self.root_dir, self.account_dir):
             raise ExitError(

@@ -490,10 +490,10 @@ class TFContainer(SSOContainer):
         if self.paths.tf_cache_dir:
             # then mount it too into the container
             self.environment["TF_PLUGIN_CACHE_DIR"] = self.paths.tf_cache_dir
-            # given that terraform use symlinks to point from the .terraform folder into the plugin folder
-            # we need to use the same directory inside the container
+            # given that opentofu/terraform uses symlinks to point from the .terraform folder
+            # into the plugin folder we need to use the same directory inside the container
             # otherwise symlinks will be broken once outside the container
-            # which will break terraform usage outside Leverage
+            # which will break opentofu/terraform usage outside Leverage
             self.mounts.append(Mount(source=self.paths.tf_cache_dir, target=self.paths.tf_cache_dir, type="bind"))
         if SSH_AUTH_SOCK is not None:
             self.mounts.append(Mount(source=SSH_AUTH_SOCK, target="/ssh-agent", type="bind"))
@@ -528,7 +528,7 @@ class TFContainer(SSOContainer):
 
     @property
     def tf_default_args(self):
-        """Array of strings containing all valid config files for layer as parameters for Terraform"""
+        """Array of strings containing all valid config files for layer as parameters for OpenTofu/Terraform"""
         common_config_files = [
             f"-var-file={self.paths.guest_config_file(common_file)}"
             for common_file in self.paths.common_config_dir.glob("*.tfvars")
@@ -669,7 +669,7 @@ class TFContainer(SSOContainer):
                     raise KeyError()
         except (KeyError, IndexError):
             logger.error(
-                "[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing Terraform backend block. In some cases you may want to skip this check by using the --skip-validation flag, e.g. the first time you initialize a terraform-backend layer."
+                "[red]✘[/red] Malformed [bold]config.tf[/bold] file. Missing backend block. In some cases you may want to skip this check by using the --skip-validation flag, e.g. the first time you initialize a tf-backend layer."
             )
             raise Exit(1)
         except Exception as e:
