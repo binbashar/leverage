@@ -280,8 +280,7 @@ class PathsHandler:
         if path in (self.root_dir, self.account_dir):
             raise ExitError(
                 1,
-                "This command cannot run neither in the root of the project or in"
-                " the root directory of an account.",
+                "This command cannot run neither in the root of the project or in" " the root directory of an account.",
             )
 
         if not list(path.glob("*.tf")):
