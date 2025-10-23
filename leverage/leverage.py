@@ -9,6 +9,9 @@ import click
 
 from leverage import __version__, conf
 from leverage._internals import pass_state
+# from leverage.modules.credentials import credentials
+from leverage.modules import aws, run, tofu, terraform
+# from leverage.modules import run, project, tofu, terraform, tfautomv, kubectl, shell
 from leverage.path import NotARepositoryError, PathsHandler
 
 
@@ -33,13 +36,13 @@ def leverage(context, state, verbose):
 
 # Add modules to leverage
 leverage.add_command(run)
-leverage.add_command(project)
+# leverage.add_command(project)
 leverage.add_command(tofu)
 leverage.add_command(tofu, name="tf")
 leverage.add_command(terraform)
-leverage.add_command(credentials)
+# leverage.add_command(credentials)
 leverage.add_command(aws)
-leverage.add_command(tfautomv)
-leverage.add_command(kubectl)
-leverage.add_command(kubectl, name="kc")
-leverage.add_command(shell)
+# leverage.add_command(tfautomv)
+# leverage.add_command(kubectl)
+# leverage.add_command(kubectl, name="kc")
+# leverage.add_command(shell)
