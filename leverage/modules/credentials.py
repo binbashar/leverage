@@ -14,7 +14,6 @@ from click.exceptions import Exit
 from questionary import Choice
 from ruamel.yaml import YAML
 
-from leverage import __toolbox_version__
 from leverage import logger
 from leverage._internals import pass_state
 from leverage._utils import ExitError
@@ -265,8 +264,6 @@ def credentials(state):
         if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
-        if not build_env.exists():
-            build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG={__toolbox_version__}")
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist
