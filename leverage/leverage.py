@@ -9,10 +9,7 @@ import click
 
 from leverage import __version__, conf
 from leverage._internals import pass_state
-from leverage.modules.aws import aws
-from leverage.modules.credentials import credentials
-from leverage.modules import run, project, tofu, terraform, tfautomv, kubectl, shell
-from leverage.path import NotARepositoryError
+from leverage.path import NotARepositoryError, PathsHandler
 
 
 @click.group(invoke_without_command=True)
@@ -28,6 +25,11 @@ def leverage(context, state, verbose):
         # leverage called with no subcommand
         click.echo(context.get_help())
 
+    try:
+        state.config = conf.load()
+    except NotARepositoryError:
+        return
+    state.paths = PathsHandler(state.config)
 
 # Add modules to leverage
 leverage.add_command(run)
