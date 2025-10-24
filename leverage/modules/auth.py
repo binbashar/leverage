@@ -1,5 +1,8 @@
 import time
+import json
 from pathlib import Path
+from datetime import datetime
+from dateutil.tz import tzutc
 from configparser import NoSectionError, NoOptionError
 
 import boto3
@@ -7,6 +10,7 @@ from botocore.exceptions import ClientError
 from configupdater import ConfigUpdater
 
 from leverage import logger
+from leverage.path import PathsHandler
 from leverage._utils import key_finder, ExitError, get_or_create_section, parse_tf_file
 
 
@@ -21,10 +25,14 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
         raise SkipProfile
 
     # if it is exactly that variable, we already know the layer profile is tf_profile
-    layer_profile = tf_profile if raw_profile == "${var.profile}" else None
+    layer_profile = tf_profile if raw_profile in ("${var.profile}", "each.value.profile") else None
 
     # replace variables with their corresponding values
-    raw = raw_profile.replace("${var.profile}", tf_profile).replace("${var.project}", project)
+    raw = (
+        raw_profile.replace("${var.profile}", tf_profile)
+        .replace("${var.project}", project)
+        .replace("each.value.profile", tf_profile)
+    )
 
     # the project and the role are at the beginning and end of the string
     _, *account_name, _ = raw.split("-")
@@ -57,15 +65,15 @@ def update_config_section(updater: ConfigUpdater, layer_profile: str, data: dict
     updater.update_file()
 
 
-def get_profiles(cli):
+def get_profiles(paths: PathsHandler):
     """
     Get the AWS profiles present on the layer by parsing some tf files.
     """
     raw_profiles = set()
     # these are files from the layer we are currently on
-    for name in ("config.tf", "locals.tf"):
+    for name in ("config.tf", "locals.tf", "runtime.tf"):
         try:
-            tf_config = parse_tf_file(Path(cli.paths.cwd / name))
+            tf_config = parse_tf_file(Path(paths.cwd / name))
         except FileNotFoundError:
             continue
 
@@ -74,25 +82,65 @@ def get_profiles(cli):
         raw_profiles.update(set(key_finder(tf_config, "profile", "lookup")))
 
     # the profile value from <layer>/config/backend.tfvars
-    backend_config = parse_tf_file(cli.paths.local_backend_tfvars)
+    backend_config = parse_tf_file(paths.backend_tfvars)
     tf_profile = backend_config["profile"]
 
     return tf_profile, raw_profiles
 
 
-def refresh_layer_credentials(cli):
-    tf_profile, raw_profiles = get_profiles(cli)
-    config_updater = ConfigUpdater()
-    config_updater.read(cli.paths.host_aws_profiles_file)
+def get_sso_access_token(sso_token_file: Path) -> str:
+    """
+    Get the SSO access token from the token file.
+    """
+    return json.loads(sso_token_file.read_text())["accessToken"]
 
-    client = boto3.client("sso", region_name=cli.sso_region_from_main_profile)
+
+def check_sso_token(paths: PathsHandler):
+    """Check for the existence and validity of the SSO token to be used to get credentials."""
+
+    # Adding `token` file name to this function in order to
+    # meet the requirement regarding to have just one
+    # token file in the sso/cache
+    sso_role = paths.account_conf.get("sso_role")
+    token_file = paths.sso_cache / sso_role
+
+    token_files = list(paths.sso_cache.glob("*"))
+    if not token_files:
+        raise ExitError(1, "No AWS SSO token found. Please log in or configure SSO.")
+
+    if token_file not in token_files and paths.sso_token_file not in token_files:
+        raise ExitError(
+            1,
+            "No valid AWS SSO token found for current account.\n"
+            "Please log out and reconfigure SSO before proceeding.",
+        )
+
+    token = json.loads(paths.sso_token_file.read_text())
+    expiry = datetime.strptime(token.get("expiresAt"), "%Y-%m-%dT%H:%M:%SZ")
+    renewal = datetime.now()
+
+    if expiry < renewal:
+        raise ExitError(
+            1,
+            "AWS SSO token has expired, please log back in by running [bold]leverage aws sso login[/bold]"
+            " to refresh your credentials before re-running the last command.",
+        )
+
+
+def refresh_layer_credentials(paths: PathsHandler):
+    tf_profile, raw_profiles = get_profiles(paths)
+    config_updater = ConfigUpdater()
+    config_updater.read(paths.aws_config_file)
+
+    region = config_updater.get(f"profile {paths.project}-sso", "sso_region").value
+    client = boto3.client("sso", region_name=region)
     for raw in raw_profiles:
         try:
             account_id, account_name, sso_role, layer_profile = get_layer_profile(
                 raw,
                 config_updater,
                 tf_profile,
-                cli.project,
+                paths.project,
             )
         except SkipProfile:
             continue
@@ -119,7 +167,7 @@ def refresh_layer_credentials(cli):
             credentials = client.get_role_credentials(
                 roleName=sso_role,
                 accountId=account_id,
-                accessToken=cli.get_sso_access_token(),
+                accessToken=get_sso_access_token(paths.sso_token_file),
             )["roleCredentials"]
         except ClientError as error:
             if error.response["Error"]["Code"] in ("AccessDeniedException", "ForbiddenException"):
@@ -140,10 +188,9 @@ def refresh_layer_credentials(cli):
             },
         )
         # write credentials on aws/<project>/credentials (create the file if it doesn't exist first)
-        creds_path = Path(cli.paths.host_aws_credentials_file)
-        creds_path.touch(exist_ok=True)
+        paths.aws_credentials_file.touch(exist_ok=True)
         credentials_updater = ConfigUpdater()
-        credentials_updater.read(cli.paths.host_aws_credentials_file)
+        credentials_updater.read(paths.aws_credentials_file)
 
         update_config_section(
             credentials_updater,
