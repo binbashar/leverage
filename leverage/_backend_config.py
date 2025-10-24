@@ -51,13 +51,15 @@ def set_backend_key(config_file_path: Union[str, Path], key: str) -> None:
         and isinstance(config_tf["terraform"][0]["backend"], list)
         and "s3" in config_tf["terraform"][0]["backend"][0]
     ):
-        raise ExitError(1, f"Malformed config.tf: File must contain a terraform block with an S3 backend. "
+        raise ExitError(
+            1,
+            f"Malformed config.tf: File must contain a terraform block with an S3 backend. "
             f"Expected structure:\n"
             f"terraform {{\n"
             f'  backend "s3" {{\n'
             f"    # configuration\n"
             f"  }}\n"
-            f"}}"
+            f"}}",
         )
 
     # Check if key already exists
@@ -157,7 +159,7 @@ def get_backend_key(config_file: Union[str, Path]) -> Optional[str]:
                 1,
                 f"Malformed [bold]config.tf[/bold] file. Missing backend block.\n"
                 f"In some cases you may want to skip this check by using the --skip-validation flag, "
-                f"e.g. the first time you initialize a tf-backend layer."
+                f"e.g. the first time you initialize a tf-backend layer.",
             )
 
     except lark.exceptions.UnexpectedInput as error:

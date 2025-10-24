@@ -144,12 +144,10 @@ def tf_default_args(paths: PathsHandler) -> tuple:
         parameters for OpenTofu/Terraform.
     """
     common_config_files = tuple(
-        f"-var-file={common_file.as_posix()}"
-        for common_file in paths.common_config_dir.glob("*.tfvars")
+        f"-var-file={common_file.as_posix()}" for common_file in paths.common_config_dir.glob("*.tfvars")
     )
     account_config_files = tuple(
-        f"-var-file={account_file.as_posix()}"
-        for account_file in paths.account_config_dir.glob("*.tfvars")
+        f"-var-file={account_file.as_posix()}" for account_file in paths.account_config_dir.glob("*.tfvars")
     )
     return common_config_files + account_config_files
 
@@ -314,10 +312,12 @@ def validate_for_all_commands(layer, skip_validation=False):
     """
     logger.debug(f"Checking layer {layer}...")
     if not skip_validation and not _validate_layout(layer):
-        raise ExitError(1,
+        raise ExitError(
+            1,
             "Layer configuration doesn't seem to be valid. Exiting.\n"
             "If you are sure your configuration is actually correct "
-            "you may skip this validation using the --skip-validation flag.")
+            "you may skip this validation using the --skip-validation flag.",
+        )
 
 
 # ###########################################################################
@@ -351,6 +351,7 @@ def _plan(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
 
     if exit_code := tf.run("plan", *tf_default_args(), *args, working_dir=working_dir):
         raise Exit(exit_code)
+
 
 def has_a_plan_file(args: Sequence[str]) -> bool:
     """Determine whether the list of arguments has a plan file at the end.

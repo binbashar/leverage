@@ -9,8 +9,10 @@ import click
 
 from leverage import __version__, conf
 from leverage._internals import pass_state
+
 # from leverage.modules.credentials import credentials
 from leverage.modules import aws, run, tofu, terraform
+
 # from leverage.modules import run, project, tofu, terraform, tfautomv, kubectl, shell
 from leverage.path import NotARepositoryError, PathsHandler
 
@@ -33,6 +35,7 @@ def leverage(context, state, verbose):
     except NotARepositoryError:
         return
     state.paths = PathsHandler(state.config)
+
 
 # Add modules to leverage
 leverage.add_command(run)
