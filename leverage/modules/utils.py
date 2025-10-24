@@ -1,18 +1,24 @@
-import click
+from typing import Optional, Tuple
+
 from click.exceptions import Exit
+from click.core import Context
+
+from leverage.modules.runner import Runner
 
 
-def _handle_subcommand(context, cli_container, args, caller_name=None):
+def _handle_subcommand(
+    context: Context, runner: Runner, args: Tuple[str, ...], caller_name: Optional[str] = None
+) -> None:
     """Decide if command corresponds to a wrapped one or not and run accordingly.
 
     Args:
         context (click.context): Current context
-        cli_container (LeverageContainer): Container where commands will be executed
+        runner (Runner): Runner where commands will be executed
         args (tuple(str)): Arguments received by Leverage
         caller_name (str, optional): Calling command. Defaults to None.
 
     Raises:
-        Exit: Whenever container execution returns a non-zero exit code
+        Exit: Whenever runner execution returns a non-zero exit code
     """
     caller_pos = args.index(caller_name) if caller_name is not None else 0
 
@@ -21,9 +27,8 @@ def _handle_subcommand(context, cli_container, args, caller_name=None):
     subcommand = next((arg for arg in args[caller_pos:] if arg in wrapped_subcommands), None)
 
     if subcommand is None:
-        # Pass command to the container directly
-        exit_code = cli_container.start(" ".join(args))
-        if not exit_code:
+        # Run the command directly
+        if exit_code := runner.run(args):
             raise Exit(exit_code)
 
     else:
