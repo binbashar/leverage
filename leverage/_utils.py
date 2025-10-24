@@ -3,8 +3,8 @@
 """
 
 from pathlib import Path
-from subprocess import run
-from subprocess import PIPE
+from subprocess import PIPE, run
+from typing import List, Optional
 
 import hcl2
 import lark
@@ -153,12 +153,12 @@ class ContainerSession:
         self.docker_client.api.remove_container(self.container_data)
 
 
-def key_finder(d: dict, target: str, avoid: str = None):
+def key_finder(d: dict, target: str, avoid: Optional[str] = None) -> List[str]:
     """
     Iterate over a dict of dicts and/or lists of dicts, looking for a key with value "target".
     Collect and return all the values that matches "target" as key.
     """
-    values = []
+    values: List[str] = []
 
     for key, value in d.items():
         if isinstance(value, dict):
