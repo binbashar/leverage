@@ -42,6 +42,7 @@ docutils = "0.17.1"
 rich = "14.1.0"
 requests = "2.31"
 simple-term-menu = "1.6.4"
+python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "2.8.3"
@@ -50,6 +51,7 @@ pytest-cov = "6.0.0"
 twine = "6.1.0"
 black = "23.3.0"
 pre-commit = "3.5.0"
+pytest-mock = "^3.15.1"
 
 
 [build-system]
