@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from leverage.modules.runner import Runner
+from leverage._utils import ExitError
 
 
 def test_init_with_valid_binary_in_path(mocker):
@@ -25,33 +26,55 @@ def test_init_with_absolute_path_existing_file(tmp_path):
     assert runner.binary_path == str(binary_file)
 
 
-def test_init_with_absolute_path_non_existing_file(tmp_path):
+def test_init_with_absolute_path_non_existing_file(tmp_path, mocker):
     binary_file = tmp_path / "non_existing_binary"
+    mock_logger = mocker.patch("leverage._utils.logger")
 
-    with pytest.raises(RuntimeError, match="Binary .* not found on system"):
+    with pytest.raises(ExitError):
         Runner(binary_file)
+
+    mock_logger.error.assert_called_once()
+    error_msg = mock_logger.error.call_args[0][0]
+    assert "not found on system" in error_msg
+    assert str(binary_file) in error_msg
 
 
 def test_init_with_binary_not_in_path(mocker):
+    mock_logger = mocker.patch("leverage._utils.logger")
     mocker.patch("shutil.which", return_value=None)
-    with pytest.raises(RuntimeError, match="Binary 'nonexistent' not found on system"):
+
+    with pytest.raises(ExitError):
         Runner("nonexistent")
+
+    mock_logger.error.assert_called_once()
+    error_msg = mock_logger.error.call_args[0][0]
+    assert "Binary 'nonexistent' not found on system" in error_msg
+    assert "Please install nonexistent" in error_msg
 
 
 def test_init_with_custom_error_message(mocker):
     custom_error = "Custom error message for missing binary"
+    mock_logger = mocker.patch("leverage._utils.logger")
     mocker.patch("shutil.which", return_value=None)
-    with pytest.raises(RuntimeError, match=custom_error):
+
+    with pytest.raises(ExitError):
         Runner("nonexistent", error_message=custom_error)
+
+    mock_logger.error.assert_called_once()
+    error_msg = mock_logger.error.call_args[0][0]
+    assert error_msg == custom_error
 
 
 def test_init_logs_error_on_missing_binary(mocker):
-    mock_logger = mocker.patch("leverage.modules.runner.logger")
+    mock_logger = mocker.patch("leverage._utils.logger")
     mocker.patch("shutil.which", return_value=None)
-    with pytest.raises(RuntimeError):
+
+    with pytest.raises(ExitError):
         Runner("nonexistent")
 
     mock_logger.error.assert_called_once()
+    error_msg = mock_logger.error.call_args[0][0]
+    assert "Binary 'nonexistent' not found on system" in error_msg
 
 
 def test_validate_version_base_implementation_does_nothing(mocker):

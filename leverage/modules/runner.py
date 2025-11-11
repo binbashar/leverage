@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 from leverage import logger
+from leverage._utils import ExitError
 
 
 class Runner:
@@ -48,8 +49,7 @@ class Runner:
                     f"Please install {self.binary_input} and ensure it's in your PATH."
                 )
 
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            raise ExitError(1, error_msg)
 
     def _validate_version(self):
         """
