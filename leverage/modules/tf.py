@@ -13,7 +13,7 @@ from leverage._internals import pass_paths, pass_runner, pass_state
 from leverage._backend_config import get_backend_key, set_backend_key
 from leverage.modules.auth import refresh_layer_credentials, check_sso_token
 
-REGION = rf"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
+REGION = r"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 
 
 # ###########################################################################
