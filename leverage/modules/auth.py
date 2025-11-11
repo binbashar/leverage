@@ -177,6 +177,8 @@ def refresh_layer_credentials(paths: PathsHandler):
                     " in this account.\nPlease check with your administrator or try"
                     " running [bold]leverage aws configure sso[/bold].",
                 )
+            else:
+                raise ExitError(50, f"Error retrieving role credentials: {error}")
 
         # update expiration on aws/<project>/config
         logger.info(f"Writing {layer_profile} profile")
