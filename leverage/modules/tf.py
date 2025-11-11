@@ -176,7 +176,7 @@ def force_unlock(tf, paths: PathsHandler, lock_id):
     """Force unlock the state file."""
     check_sso_token(paths)
     refresh_layer_credentials(paths)
-    if exit_code := tf.run("force-unlock", *tf_default_args(), lock_id):
+    if exit_code := tf.run("force-unlock", lock_id):
         raise Exit(exit_code)
 
 
