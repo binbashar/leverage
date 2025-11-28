@@ -8,7 +8,7 @@ from typing import List, Optional
 
 import hcl2
 import lark
-from click.exceptions import Exit
+from click.exceptions import ClickException
 from configupdater import ConfigUpdater
 from docker import DockerClient
 from docker.models.containers import Container
@@ -106,15 +106,17 @@ class AwsCredsEntryPoint(CustomEntryPoint):
             )
 
 
-class ExitError(Exit):
+class ExitError(ClickException):
     """
     Raise an Exit exception but also print an error description.
     """
 
     def __init__(self, exit_code: int, error_description: str):
-        logger.error(error_description)
-        super(ExitError, self).__init__(exit_code)
+        self.exit_code = exit_code
+        super(ExitError, self).__init__(message=error_description)
 
+    def show(self):
+        logger.error(self.message)
 
 def parse_tf_file(file: Path):
     """
