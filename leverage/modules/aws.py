@@ -13,15 +13,30 @@ from leverage import logger
 from leverage.path import PathsHandler
 from leverage.modules.runner import Runner
 from leverage.modules.utils import _handle_subcommand
-from leverage.modules.auth import get_sso_access_token
 from leverage._utils import get_or_create_section, ExitError
 from leverage._internals import pass_state, pass_runner, pass_paths
+from leverage.modules.auth import get_sso_access_token, check_sso_token, refresh_layer_credentials
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 
 
 AWS_SSO_LOGIN_URL = "{sso_url}/#/device?user_code={user_code}"
+
+
+@pass_paths
+def refresh_aws_credentials(paths: PathsHandler) -> None:
+    """
+    Refresh the AWS credentials for the current project.
+    """
+    check_sso_token(paths)
+
+    try: # if we are not in a layer, we don't need to refresh the credentials
+        paths.check_for_layer_location()
+    except ExitError:
+        return
+
+    refresh_layer_credentials(paths)
 
 
 def get_account_roles(sso_client: Any, access_token: str) -> Dict[str, Dict[str, str]]:
@@ -100,7 +115,7 @@ def configure_sso_profiles(paths: PathsHandler) -> None:
 @pass_state
 @click.pass_context
 def aws(context: click.Context, state: Any, args: Tuple[str, ...]) -> None:
-    """Run AWS CLI commands in a custom containerized environment."""
+    """Run AWS CLI commands in the context of the current project."""
 
     credentials_env_vars = {
         "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
@@ -115,7 +130,7 @@ def aws(context: click.Context, state: Any, args: Tuple[str, ...]) -> None:
         env_vars=credentials_env_vars,
     )
 
-    _handle_subcommand(context=context, runner=state.runner, args=args)
+    _handle_subcommand(context=context, runner=state.runner, args=args, pre_invocation_callback=refresh_aws_credentials)
 
 
 @aws.group(invoke_without_command=True, add_help_option=False, context_settings=CONTEXT_SETTINGS)

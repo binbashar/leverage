@@ -1,6 +1,7 @@
 from .run import run
 
 # from .project import project
+from .aws import aws
 from .tf import tofu, terraform
 from .credentials import credentials
 # from .kubectl import kubectl
