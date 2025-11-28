@@ -7,7 +7,7 @@ import click
 from leverage import __version__, conf
 from leverage._internals import pass_state
 from leverage.path import NotARepositoryError, PathsHandler
-from leverage.modules import aws, credentials, run, project, tofu, terraform, tfautomv
+from leverage.modules import aws, credentials, run, project, tofu, terraform, tfautomv, kubectl
 
 
 @click.group(invoke_without_command=True)
@@ -39,5 +39,5 @@ leverage.add_command(terraform)
 leverage.add_command(credentials)
 leverage.add_command(aws)
 leverage.add_command(tfautomv)
-# leverage.add_command(kubectl)
-# leverage.add_command(kubectl, name="kc")
+leverage.add_command(kubectl)
+leverage.add_command(kubectl, name="kc")
