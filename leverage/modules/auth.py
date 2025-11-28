@@ -2,7 +2,6 @@ import time
 import json
 from pathlib import Path
 from datetime import datetime
-from dateutil.tz import tzutc
 from configparser import NoSectionError, NoOptionError
 
 import boto3
