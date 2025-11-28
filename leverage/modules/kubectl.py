@@ -41,12 +41,13 @@ def refresh_kubectl_credentials(paths: PathsHandler) -> None:
     """
     check_sso_token(paths)
 
-    try: # if we are not in a layer, we don't need to refresh the credentials
+    try:  # if we are not in a layer, we don't need to refresh the credentials
         paths.check_for_layer_location()
     except ExitError:
         return
 
     refresh_layer_credentials(paths)
+
 
 @click.group(invoke_without_command=True, context_settings={"ignore_unknown_options": True})
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
@@ -71,7 +72,9 @@ def kubectl(context, state, args):
         ),
         env_vars=credentials_env_vars,
     )
-    _handle_subcommand(context=context, runner=state.runner, args=args, pre_invocation_callback=refresh_kubectl_credentials)
+    _handle_subcommand(
+        context=context, runner=state.runner, args=args, pre_invocation_callback=refresh_kubectl_credentials
+    )
 
 
 def _configure(ci: ClusterInfo = None, layer_path: Path = None):
@@ -93,6 +96,7 @@ def _configure(ci: ClusterInfo = None, layer_path: Path = None):
         raise ExitError(e.exit_code, f"Failed to configure kubectl context: {e.message}")
 
     logger.info("Done.")
+
 
 @pass_paths
 def _get_eks_kube_config(paths: PathsHandler, layer_path: Path) -> str:

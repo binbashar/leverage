@@ -31,7 +31,7 @@ def refresh_aws_credentials(paths: PathsHandler) -> None:
     """
     check_sso_token(paths)
 
-    try: # if we are not in a layer, we don't need to refresh the credentials
+    try:  # if we are not in a layer, we don't need to refresh the credentials
         paths.check_for_layer_location()
     except ExitError:
         return

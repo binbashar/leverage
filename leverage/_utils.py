@@ -74,6 +74,7 @@ class ExitError(ClickException):
     def show(self):
         logger.error(self.message)
 
+
 def parse_tf_file(file: Path):
     """
     Open and parse an HCL file.

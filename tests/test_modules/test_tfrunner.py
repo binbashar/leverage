@@ -227,8 +227,8 @@ def test_run_interactive_false(mocker):
     mocker.patch("shutil.which", return_value="/usr/bin/tofu")
     mock_subprocess = mocker.patch("subprocess.run")
     # First call for --version, second for the actual command
-    version_output = type('obj', (object,), {'stdout': 'OpenTofu v1.6.0', 'returncode': 0})()
-    run_output = type('obj', (object,), {'stdout': 'terraform output', 'stderr': '', 'returncode': 0})()
+    version_output = type("obj", (object,), {"stdout": "OpenTofu v1.6.0", "returncode": 0})()
+    run_output = type("obj", (object,), {"stdout": "terraform output", "stderr": "", "returncode": 0})()
     mock_subprocess.side_effect = [version_output, run_output]
 
     runner = TFRunner(binary="")
@@ -254,7 +254,13 @@ def test_run_with_multiple_args(mocker):
 
     assert result == 0
     # Check the last call
-    assert mock_subprocess.call_args[0][0] == ["/usr/bin/terraform", "plan", "-var", "region=us-east-1", "-out=plan.tfplan"]
+    assert mock_subprocess.call_args[0][0] == [
+        "/usr/bin/terraform",
+        "plan",
+        "-var",
+        "region=us-east-1",
+        "-out=plan.tfplan",
+    ]
     assert mock_subprocess.call_args[1]["env"] == os.environ.copy()
     assert mock_subprocess.call_args[1]["cwd"] is None
 

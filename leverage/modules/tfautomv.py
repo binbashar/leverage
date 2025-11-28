@@ -11,8 +11,7 @@ from leverage.modules.auth import check_sso_token, refresh_layer_credentials
 @click.argument("args", nargs=-1)
 @pass_state
 def tfautomv(state, args):
-    """Run TFAutomv commands in the context of the current project.`
-    """
+    """Run TFAutomv commands in the context of the current project.`"""
     tf_default_args_string = " ".join(tf_default_args())
     credentials_env_vars = {
         "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),

@@ -7,7 +7,11 @@ from leverage.modules.runner import Runner
 
 
 def _handle_subcommand(
-    context: Context, runner: Runner, args: Tuple[str, ...], caller_name: Optional[str] = None, pre_invocation_callback: Optional[Callable] = None
+    context: Context,
+    runner: Runner,
+    args: Tuple[str, ...],
+    caller_name: Optional[str] = None,
+    pre_invocation_callback: Optional[Callable] = None,
 ) -> None:
     """Decide if command corresponds to a wrapped one or not and run accordingly.
 
