@@ -1,7 +1,6 @@
 """Tests for backend configuration utilities."""
 
 import pytest
-from pathlib import Path
 from leverage._backend_config import set_backend_key, get_backend_key
 from leverage._utils import ExitError
 

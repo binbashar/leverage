@@ -4,25 +4,8 @@ import pytest
 from click import get_current_context
 
 from leverage._internals import State
-from leverage.container import TFContainer
 from leverage.modules.tf import _init
 from leverage.modules.tf import has_a_plan_file
-from tests.test_containers import container_fixture_factory
-
-
-@pytest.fixture
-def tf_container(muted_click_context):
-    tf_container = container_fixture_factory(TFContainer)
-
-    # this is required because of the @pass_container decorator
-    ctx = get_current_context()
-    state = State()
-    state.container = tf_container
-    ctx.obj = state
-
-    # assume we are on a valid location
-    with patch.object(tf_container.paths, "check_for_layer_location", Mock()):
-        yield tf_container
 
 
 @pytest.mark.parametrize(
