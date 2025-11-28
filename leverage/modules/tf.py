@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Sequence, List
+from typing import Sequence
 
 import click
 from click.exceptions import Exit

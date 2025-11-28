@@ -10,8 +10,6 @@ import hcl2
 import lark
 from click.exceptions import ClickException
 from configupdater import ConfigUpdater
-from docker import DockerClient
-from docker.models.containers import Container
 
 from leverage import logger
 
@@ -64,48 +62,6 @@ def git(command):
     run(command, stdout=PIPE, stderr=PIPE, check=True)
 
 
-class CustomEntryPoint:
-    """
-    Set a custom entrypoint on the container while entering the context.
-    Once outside, return it to its original value.
-    """
-
-    def __init__(self, container, entrypoint):
-        self.container = container
-        self.old_entrypoint = container.entrypoint
-        self.new_entrypoint = entrypoint
-
-    def __enter__(self):
-        self.container.entrypoint = self.new_entrypoint
-
-    def __exit__(self, *args, **kwargs):
-        self.container.entrypoint = self.old_entrypoint
-
-
-class AwsCredsEntryPoint(CustomEntryPoint):
-    """
-    Fetching AWS credentials by setting the SSO/MFA entrypoints.
-    """
-
-    def __init__(self, container, override_entrypoint=None):
-        auth_method = container.auth_method()
-
-        new_entrypoint = f"{auth_method}{container.entrypoint if override_entrypoint is None else override_entrypoint}"
-        super(AwsCredsEntryPoint, self).__init__(container, entrypoint=new_entrypoint)
-
-    def __exit__(self, *args, **kwargs):
-        super(AwsCredsEntryPoint, self).__exit__(*args, **kwargs)
-        if self.container.mfa_enabled:
-            self.container.environment.update(
-                {
-                    "AWS_SHARED_CREDENTIALS_FILE": self.container.environment["AWS_SHARED_CREDENTIALS_FILE"].replace(
-                        ".aws", "tmp"
-                    ),
-                    "AWS_CONFIG_FILE": self.container.environment["AWS_CONFIG_FILE"].replace(".aws", "tmp"),
-                }
-            )
-
-
 class ExitError(ClickException):
     """
     Raise an Exit exception but also print an error description.
@@ -134,25 +90,6 @@ def parse_tf_file(file: Path):
         )
     else:
         return parsed
-
-
-class ContainerSession:
-    """
-    Handle the start/stop cycle of a container.
-    Useful when you need to keep your container alive to share context between multiple commands.
-    """
-
-    def __init__(self, docker_client: DockerClient, container_data):
-        self.docker_client = docker_client
-        self.container_data = container_data
-
-    def __enter__(self) -> Container:
-        self.docker_client.api.start(self.container_data)
-        return self.docker_client.containers.get(self.container_data["Id"])
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        self.docker_client.api.stop(self.container_data)
-        self.docker_client.api.remove_container(self.container_data)
 
 
 def key_finder(d: dict, target: str, avoid: Optional[str] = None) -> List[str]:

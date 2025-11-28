@@ -2,8 +2,6 @@
     Utilities to obtain relevant files' and directories' locations
 """
 
-import os
-import pathlib
 from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import PIPE
