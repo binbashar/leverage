@@ -7,7 +7,7 @@ import click
 from leverage import __version__, conf
 from leverage._internals import pass_state
 from leverage.path import NotARepositoryError, PathsHandler
-from leverage.modules import aws, credentials, run, tofu, terraform
+from leverage.modules import aws, credentials, run, project, tofu, terraform
 
 
 @click.group(invoke_without_command=True)
@@ -32,7 +32,7 @@ def leverage(context, state, verbose):
 
 # Add modules to leverage
 leverage.add_command(run)
-# leverage.add_command(project)
+leverage.add_command(project)
 leverage.add_command(tofu)
 leverage.add_command(tofu, name="tf")
 leverage.add_command(terraform)
