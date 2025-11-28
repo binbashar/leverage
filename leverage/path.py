@@ -167,6 +167,16 @@ class PathsHandler:
             self.aws_credentials_dir.mkdir(parents=True)
         self.sso_cache = self.aws_credentials_dir / "sso" / "cache"
 
+        # If not empty make the binary path absolute
+        if tf_binary := env_conf.get("TF_BINARY", ""):
+            binary_path = Path(tf_binary)
+            if tf_binary.startswith("~"):
+                self.tf_binary = str(binary_path.expanduser())
+            elif not binary_path.is_absolute() and len(binary_path.parts) > 1:
+                self.tf_binary = str((self.root_dir / tf_binary).resolve())
+            else:
+                self.tf_binary = tf_binary
+
     def update_cwd(self, new_cwd):
         self.cwd = new_cwd
         acc_folder = new_cwd.relative_to(self.root_dir).parts[0]

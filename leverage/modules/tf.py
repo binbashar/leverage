@@ -32,7 +32,7 @@ def tofu(state):
         "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
         "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
     }
-    state.runner = TFRunner(env_vars=credentials_env_vars)
+    state.runner = TFRunner(binary=state.paths.tf_binary, env_vars=credentials_env_vars)
 
 
 @click.group()
@@ -48,7 +48,7 @@ def terraform(state):
         "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
         "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
     }
-    state.runner = TFRunner(terraform=True, env_vars=credentials_env_vars)
+    state.runner = TFRunner(binary=state.paths.tf_binary, terraform=True, env_vars=credentials_env_vars)
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}

@@ -1,6 +1,8 @@
+import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
+from leverage._utils import ExitError
 from leverage.modules.runner import Runner
 
 
@@ -10,28 +12,40 @@ class TFRunner(Runner):
     TERRAFORM_INSTALL_URL = "https://developer.hashicorp.com/terraform/install"
     OPENTOFU_INSTALL_URL = "https://opentofu.org/docs/intro/install/"
 
-    def __init__(self, terraform: bool = False, env_vars: Optional[Dict[str, str]] = None):
+    def __init__(self, binary: str, terraform: bool = False, env_vars: Optional[Dict[str, str]] = None):
         """
         Initialize TFRunner for either Terraform or OpenTofu.
 
         Args:
-            terraform: If True, use Terraform. If False, use OpenTofu (default).
+            terraform: If True, treat the binary as Terraform. If False, as OpenTofu (default).
             env_vars: Environment variables to set for all executions
         """
-        if terraform:
-            binary = "terraform"
+        self.__terraform = terraform
+
+        if not binary:
+            binary = "tofu" if not self.__terraform else "terraform"
+        if self.__terraform:
             error_message = (
                 f"Terraform binary not found on system. "
                 f"Please install Terraform following the instructions at: {self.TERRAFORM_INSTALL_URL}"
             )
         else:
-            binary = "tofu"
             error_message = (
                 f"OpenTofu binary not found on system. "
                 f"Please install OpenTofu following the instructions at: {self.OPENTOFU_INSTALL_URL}"
             )
 
         super().__init__(binary=binary, error_message=error_message, env_vars=env_vars)
+
+    def _validate_binary(self):
+        super()._validate_binary()
+
+        binary_version_stdout = subprocess.run([self.binary_path, "--version"], capture_output=True, text=True).stdout
+
+        if self.__terraform and "Terraform" not in binary_version_stdout:
+            raise ExitError(1, "The provided binary does not seem to be Terraform.")
+        elif not self.__terraform and "OpenTofu" not in binary_version_stdout:
+            raise ExitError(1, "The provided binary does not seem to be OpenTofu.")
 
     def run(
         self,
