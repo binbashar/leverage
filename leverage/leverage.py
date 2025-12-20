@@ -28,6 +28,10 @@ def leverage(context, state, verbose):
     except NotARepositoryError:
         return
     state.paths = PathsHandler(state.config)
+    state.environment = {
+        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
+        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
+    }
 
 
 # Add modules to leverage

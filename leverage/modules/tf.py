@@ -28,11 +28,7 @@ def tofu(state):
     counterparts in the container. For example as in `leverage tofu apply -auto-approve` or
     `leverage tofu init -reconfigure`
     """
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-    }
-    state.runner = TFRunner(binary=state.paths.tf_binary, env_vars=credentials_env_vars)
+    state.runner = TFRunner(binary=state.paths.tf_binary, env_vars=state.environment)
 
 
 @click.group()
@@ -44,11 +40,7 @@ def terraform(state):
     counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
     """
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-    }
-    state.runner = TFRunner(binary=state.paths.tf_binary, terraform=True, env_vars=credentials_env_vars)
+    state.runner = TFRunner(binary=state.paths.tf_binary, terraform=True, env_vars=state.environment)
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}

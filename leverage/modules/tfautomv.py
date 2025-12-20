@@ -13,19 +13,16 @@ from leverage.modules.auth import check_sso_token, refresh_layer_credentials
 def tfautomv(state, args):
     """Run TFAutomv commands in the context of the current project.`"""
     tf_default_args_string = " ".join(tf_default_args())
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-        "TF_CLI_ARGS_init": tf_default_args_string,
-        "TF_CLI_ARGS_plan": tf_default_args_string,
-    }
+    state.environment["TF_CLI_ARGS_init"] = tf_default_args_string
+    state.environment["TF_CLI_ARGS_plan"] = tf_default_args_string
+
     state.runner = Runner(
         binary="tfautomv",
         error_message=(
             f"TFAutomv not found on system. "
             f"Please install it following the instructions at: https://github.com/busser/tfautomv?tab=readme-ov-file#installation"
         ),
-        env_vars=credentials_env_vars,
+        env_vars=state.environment,
     )
 
     tf_binary = "tofu" if not state.paths.tf_binary else state.paths.tf_binary

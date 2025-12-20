@@ -116,18 +116,13 @@ def configure_sso_profiles(paths: PathsHandler) -> None:
 @click.pass_context
 def aws(context: click.Context, state: Any, args: Tuple[str, ...]) -> None:
     """Run AWS CLI commands in the context of the current project."""
-
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-    }
     state.runner = Runner(
         binary="aws",
         error_message=(
             f"AWS CLI not found on system. "
             f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
         ),
-        env_vars=credentials_env_vars,
+        env_vars=state.environment,
     )
 
     _handle_subcommand(context=context, runner=state.runner, args=args, pre_invocation_callback=refresh_aws_credentials)

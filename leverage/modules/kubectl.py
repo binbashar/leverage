@@ -15,7 +15,7 @@ from leverage.modules.runner import Runner
 from leverage.modules.tfrunner import TFRunner
 from leverage.modules.utils import _handle_subcommand
 from leverage.modules.auth import check_sso_token, refresh_layer_credentials
-from leverage._internals import pass_state, pass_paths
+from leverage._internals import pass_state, pass_paths, pass_environment
 
 
 @dataclass
@@ -58,26 +58,23 @@ def kubectl(context, state, args):
 
     kubeconfig_dir = state.paths.home / ".kube" / state.paths.project
     kubeconfig_dir.mkdir(parents=True, exist_ok=True)
+    state.environment["KUBECONFIG"] = str(kubeconfig_dir / "config")
 
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-        "KUBECONFIG": str(kubeconfig_dir / "config"),
-    }
     state.runner = Runner(
         binary="kubectl",
         error_message=(
             f"Kubectl not found on system. "
             f"Please install it following the instructions at: https://kubernetes.io/docs/tasks/tools/#kubectl"
         ),
-        env_vars=credentials_env_vars,
+        env_vars=state.environment,
     )
+
     _handle_subcommand(
         context=context, runner=state.runner, args=args, pre_invocation_callback=refresh_kubectl_credentials
     )
 
 
-def _configure(ci: ClusterInfo = None, layer_path: Path = None):
+def _configure(environment: dict, ci: ClusterInfo = None,layer_path: Path = None):
     """
     Add the given EKS cluster configuration to the .kube/ files.
     """
@@ -87,31 +84,29 @@ def _configure(ci: ClusterInfo = None, layer_path: Path = None):
     else:
         # otherwise go get them from the layer
         logger.info("Retrieving k8s cluster information...")
-        cmd = _get_eks_kube_config(layer_path).split(" ")[1:]
+        cmd = _get_eks_kube_config(environment, layer_path).split(" ")[1:]
 
     logger.info("Configuring context...")
     try:
-        click.get_current_context().invoke(aws, args=cmd)
+        exit_code, _, _ = Runner(binary="aws", env_vars=environment).exec(*cmd)
     except ExitError as e:
-        raise ExitError(e.exit_code, f"Failed to configure kubectl context: {e.message}")
+        raise ExitError(e.exit_code, f"Could not locate AWS cli binary.")
+    if exit_code:
+        raise ExitError(exit_code, f"Failed to configure kubectl context: {exit_code}")
 
     logger.info("Done.")
 
 
 @pass_paths
-def _get_eks_kube_config(paths: PathsHandler, layer_path: Path) -> str:
+def _get_eks_kube_config(paths: PathsHandler, environment: dict, layer_path: Path) -> str:
     # TODO: Get rid of this ugly workaround
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(paths.aws_config_file),
-    }
     try:
-        tfrunner = TFRunner(binary=paths.tf_binary, env_vars=credentials_env_vars)
+        tfrunner = TFRunner(binary=paths.tf_binary, env_vars=environment)
     except ExitError as e:
         try:
-            tfrunner = TFRunner(binary=paths.tf_binary, terraform=True, env_vars=credentials_env_vars)
+            tfrunner = TFRunner(binary=paths.tf_binary, terraform=True, env_vars=environment)
         except ExitError:
-            raise ExitError(1, "Could not locate TF binary.")
+            raise ExitError(e.exit_code, f"Could not locate TF binary.")
 
     refresh_kubectl_credentials()
     exit_code, output, error = tfrunner.exec("output", "-no-color", working_dir=layer_path)
@@ -128,9 +123,11 @@ def _get_eks_kube_config(paths: PathsHandler, layer_path: Path) -> str:
 
 @kubectl.command(context_settings=CONTEXT_SETTINGS)
 @pass_paths
-def configure(paths: PathsHandler):
+@pass_environment
+def configure(environment: dict, paths: PathsHandler):
     """Automatically add the EKS cluster from the layer into your kubectl config file."""
-    _configure(layer_path=paths.cwd)
+    paths.check_for_cluster_layer()
+    _configure(environment, layer_path=paths.cwd)
 
 
 def _scan_clusters(paths: PathsHandler):
@@ -160,7 +157,8 @@ def _scan_clusters(paths: PathsHandler):
 
 @kubectl.command(context_settings=CONTEXT_SETTINGS)
 @pass_paths
-def discover(paths: PathsHandler):
+@pass_environment
+def discover(environment: dict, paths: PathsHandler):
     """
     Do a scan down the tree of subdirectories looking for k8s clusters metadata files.
     Open up a menu with all the found items, where you can pick up and configure it on your .kubeconfig file.
@@ -185,4 +183,4 @@ def discover(paths: PathsHandler):
         region=cluster_data["data"]["region"],
     )
 
-    _configure(cluster_info, layer_path)
+    _configure(environment, cluster_info, layer_path)

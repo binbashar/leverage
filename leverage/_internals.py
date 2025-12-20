@@ -30,6 +30,7 @@ class State:
         self.config = None
         self.paths = None
         self.runner = None
+        self.environment = None
 
     @property
     def verbosity(self):
@@ -63,5 +64,17 @@ def pass_paths(command):
         ctx = click.get_current_context()
 
         return command(ctx.obj.paths, *args, **kwargs)
+
+    return new_command
+
+
+def pass_environment(command):
+    """Decorator to pass the current environment to the command."""
+
+    @wraps(command)
+    def new_command(*args, **kwargs):
+        ctx = click.get_current_context()
+
+        return command(ctx.obj.environment, *args, **kwargs)
 
     return new_command
