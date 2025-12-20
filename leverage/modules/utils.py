@@ -34,13 +34,14 @@ def _handle_subcommand(
         # Run the command directly
         if pre_invocation_callback:
             pre_invocation_callback()
-        if exit_code := runner.run(*args):
-            raise Exit(exit_code)
-
+        exit_code = runner.run(*args)
+        raise Exit(exit_code)
+    
+    subcommand = context.command.commands.get(subcommand)
+    # Check that the subcommand arguments are valid
+    subcommand.make_context(info_name=subcommand.name, args=list(args)[args.index(subcommand.name) + 1:], parent=context)
+    # Invoke wrapped command
+    if not subcommand.params:
+        context.invoke(subcommand)
     else:
-        # Invoke wrapped command
-        subcommand = context.command.commands.get(subcommand)
-        if not subcommand.params:
-            context.invoke(subcommand)
-        else:
-            context.forward(subcommand)
+        context.forward(subcommand)

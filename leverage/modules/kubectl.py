@@ -29,8 +29,6 @@ class MetadataTypes(Enum):
     K8S_CLUSTER = "k8s-eks-cluster"
 
 
-CONTEXT_SETTINGS = {"ignore_unknown_options": True}
-
 METADATA_FILENAME = "metadata.yaml"
 
 
@@ -121,7 +119,7 @@ def _get_eks_kube_config(paths: PathsHandler, environment: dict, layer_path: Pat
     return aws_eks_cmd + f" --region {region}"
 
 
-@kubectl.command(context_settings=CONTEXT_SETTINGS)
+@kubectl.command()
 @pass_paths
 @pass_environment
 def configure(environment: dict, paths: PathsHandler):
@@ -134,7 +132,7 @@ def _scan_clusters(paths: PathsHandler):
     """
     Scan all the subdirectories in search of "cluster" metadata files.
     """
-    for root, dirs, files in os.walk(paths.paths.cwd):
+    for root, dirs, files in os.walk(paths.cwd):
         # exclude hidden directories
         dirs[:] = [d for d in dirs if d[0] != "."]
 
@@ -155,7 +153,7 @@ def _scan_clusters(paths: PathsHandler):
                 yield Path(root), data
 
 
-@kubectl.command(context_settings=CONTEXT_SETTINGS)
+@kubectl.command()
 @pass_paths
 @pass_environment
 def discover(environment: dict, paths: PathsHandler):
