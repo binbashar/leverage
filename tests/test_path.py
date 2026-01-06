@@ -109,17 +109,15 @@ def test_get_build_script_path_no_build_script(dir_structure):
     assert get_build_script_path() is None
 
 
-def test_check_for_cluster_layer(muted_click_context, propagate_logs, caplog):
+def test_check_for_cluster_layer(muted_click_context, propagate_logs):
     """
     Test that if we are not on a cluster layer, we raise an error.
     """
-    paths = PathsHandler({"PROJECT": "test"}, "leverage")
+    paths = PathsHandler({"PROJECT": "test"})
     with patch.object(paths, "check_for_layer_location"):  # assume parent method is already tested
-        with pytest.raises(ExitError):
+        with pytest.raises(ExitError, match="This command can only run at the \[bold\]cluster layer\[/bold\]\."):
             paths.cwd = Path("/random")
             paths.check_for_cluster_layer()
-
-    assert caplog.messages[0] == "This command can only run at the [bold]cluster layer[/bold]."
 
 
 class TestGetProjectPathOrCurrentDir:
