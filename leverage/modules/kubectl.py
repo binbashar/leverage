@@ -14,7 +14,7 @@ from leverage.modules.aws import aws
 from leverage.modules.runner import Runner
 from leverage.modules.tfrunner import TFRunner
 from leverage.modules.utils import _handle_subcommand
-from leverage.modules.auth import check_sso_token, refresh_layer_credentials
+from leverage.modules.auth import _perform_authentication as perform_authentication
 from leverage._internals import pass_state, pass_paths, pass_environment
 
 
@@ -30,21 +30,6 @@ class MetadataTypes(Enum):
 
 
 METADATA_FILENAME = "metadata.yaml"
-
-
-@pass_paths
-def refresh_kubectl_credentials(paths: PathsHandler) -> None:
-    """
-    Refresh the AWS credentials for the current project to be used by kubectl.
-    """
-    check_sso_token(paths)
-
-    try:  # if we are not in a layer, we don't need to refresh the credentials
-        paths.check_for_layer_location()
-    except ExitError:
-        return
-
-    refresh_layer_credentials(paths)
 
 
 @click.group(invoke_without_command=True, context_settings={"ignore_unknown_options": True})
@@ -67,8 +52,9 @@ def kubectl(context, state, args):
         env_vars=state.environment,
     )
 
+    authenticate = pass_paths(lambda paths: perform_authentication(paths))
     _handle_subcommand(
-        context=context, runner=state.runner, args=args, pre_invocation_callback=refresh_kubectl_credentials
+        context=context, runner=state.runner, args=args, pre_invocation_callback=authenticate
     )
 
 
@@ -106,7 +92,7 @@ def _get_eks_kube_config(paths: PathsHandler, environment: dict, layer_path: Pat
         except ExitError:
             raise ExitError(e.exit_code, f"Could not locate TF binary.")
 
-    refresh_kubectl_credentials()
+    perform_authentication(paths)
     exit_code, output, error = tfrunner.exec("output", "-no-color", working_dir=layer_path)
     if exit_code:
         raise ExitError(exit_code, f"Failed to get EKS kube config: {error}")
@@ -128,11 +114,11 @@ def configure(environment: dict, paths: PathsHandler):
     _configure(environment, layer_path=paths.cwd)
 
 
-def _scan_clusters(paths: PathsHandler):
+def _scan_clusters(cwd: Path):
     """
     Scan all the subdirectories in search of "cluster" metadata files.
     """
-    for root, dirs, files in os.walk(paths.cwd):
+    for root, dirs, files in os.walk(cwd):
         # exclude hidden directories
         dirs[:] = [d for d in dirs if d[0] != "."]
 
@@ -161,7 +147,7 @@ def discover(environment: dict, paths: PathsHandler):
     Do a scan down the tree of subdirectories looking for k8s clusters metadata files.
     Open up a menu with all the found items, where you can pick up and configure it on your .kubeconfig file.
     """
-    cluster_files = [(path, data) for path, data in _scan_clusters(paths)]
+    cluster_files = [(path, data) for path, data in _scan_clusters(paths.cwd)]
     if not cluster_files:
         raise ExitError(1, "No clusters found.")
 

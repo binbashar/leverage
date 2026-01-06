@@ -4,11 +4,12 @@ from click.exceptions import Exit
 from leverage._internals import pass_state
 from leverage.modules.runner import Runner
 from leverage.modules.tf import tf_default_args
-from leverage.modules.auth import check_sso_token, refresh_layer_credentials
+from leverage.modules.auth import authenticate
 
 
 @click.command()
 @click.argument("args", nargs=-1)
+@authenticate
 @pass_state
 def tfautomv(state, args):
     """Run TFAutomv commands in the context of the current project.`"""
@@ -32,9 +33,6 @@ def tfautomv(state, args):
         if not str(arg).startswith("--terraform-bin") or not arg[index - 1] == "--terraform-bin"
     )
     tfautomv_args = (*filtered_args, f"--terraform-bin={tf_binary}")
-
-    check_sso_token(state.paths)
-    refresh_layer_credentials(state.paths)
 
     if exit_code := state.runner.run(*tfautomv_args):
         raise Exit(exit_code)

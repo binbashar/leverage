@@ -11,6 +11,7 @@ from leverage.modules.tfrunner import TFRunner
 from leverage._utils import ExitError, parse_tf_file
 from leverage._internals import pass_paths, pass_runner, pass_state
 from leverage._backend_config import get_backend_key, set_backend_key
+from leverage.modules.auth import authenticate
 
 REGION = r"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 
@@ -161,22 +162,20 @@ def _format(tf, args):
 
 @click.command("force-unlock")
 @click.argument("lock_id", metavar="LOCK_ID")
+@authenticate
 @pass_paths
 @pass_runner
 def force_unlock(tf, paths: PathsHandler, lock_id):
     """Force unlock the state file."""
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
     tf.run("force-unlock", lock_id)
 
 
 @click.command()
+@authenticate
 @pass_paths
 @pass_runner
 def validate(tf, paths: PathsHandler):
     """Validate code of the current directory. Previous initialization might be needed."""
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
     tf.run("validate", *tf_default_args())
 
 
@@ -197,12 +196,11 @@ def _import(tf, address, _id):
 
 
 @click.command("refresh-credentials")
+@authenticate
 @pass_paths
 def refresh_credentials(paths):
     """Refresh the AWS credentials used on the current layer."""
     paths.check_for_layer_location()
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
 
 
 # ###########################################################################
@@ -311,6 +309,7 @@ def validate_for_all_commands(layer, skip_validation=False):
 # ###########################################################################
 # BASE COMMAND EXECUTORS
 # ###########################################################################
+@authenticate
 @pass_paths
 @pass_runner
 def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
@@ -323,19 +322,14 @@ def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
     )
     init_args = (*filtered_args, f"-backend-config={paths.backend_tfvars}")
 
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
-
     tf.run("init", *init_args, working_dir=working_dir)
 
 
+@authenticate
 @pass_paths
 @pass_runner
 def _plan(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Generate an execution plan for this layer."""
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
-
     tf.run("plan", *tf_default_args(), *args, working_dir=working_dir)
 
 
@@ -393,6 +387,7 @@ def has_a_plan_file(args: Sequence[str]) -> bool:
     return True
 
 
+@authenticate
 @pass_paths
 @pass_runner
 def _apply(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
@@ -400,29 +395,22 @@ def _apply(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: 
     default_args = () if has_a_plan_file(args) else tf_default_args()
     logger.debug(f"Default args passed to apply command: {default_args}")
 
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
-
     tf.run("apply", *default_args, *args, working_dir=working_dir)
 
 
+@authenticate
 @pass_paths
 @pass_runner
 def _output(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Show all output variables of this layer."""
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
-
     tf.run("output", *args, working_dir=working_dir)
 
 
+@authenticate
 @pass_paths
 @pass_runner
 def _destroy(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Destroy infrastructure in this layer."""
-    check_sso_token(paths)
-    refresh_layer_credentials(paths)
-
     tf.run("destroy", *tf_default_args(), *args, working_dir=working_dir)
 
 

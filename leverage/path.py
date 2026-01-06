@@ -129,7 +129,7 @@ def get_build_script_path(filename="build.py"):
         cur_path = cur_path.parent
 
 
-class PathsHandler:
+class PathsHandler: # TODO: Turn this class into a something that represents a leverage project
     COMMON_TF_VARS = "common.tfvars"
     ACCOUNT_TF_VARS = "account.tfvars"
     BACKEND_TF_VARS = "backend.tfvars"
@@ -153,6 +153,12 @@ class PathsHandler:
         account_config = self.account_config_dir / self.ACCOUNT_TF_VARS
         self.account_conf = hcl2.loads(account_config.read_text()) if account_config.exists() else {}
 
+        backend_config = self.account_config_dir / self.BACKEND_TF_VARS
+        self.backend_conf = hcl2.loads(backend_config.read_text()) if backend_config.exists() else {}
+
+        # Get MFA enabled status
+        self.mfa_enabled = env_conf.get("MFA_ENABLED", "false")
+
         # Get project name
         self.project = self.common_conf.get("project", env_conf.get("PROJECT", False))
         if not self.project:
@@ -175,14 +181,6 @@ class PathsHandler:
         else:
             self.tf_binary = tf_binary
 
-    def update_cwd(self, new_cwd):
-        self.cwd = new_cwd
-        acc_folder = new_cwd.relative_to(self.root_dir).parts[0]
-
-        self.account_config_dir = self.root_dir / acc_folder / "config"
-        account_config_path = self.account_config_dir / self.ACCOUNT_TF_VARS
-        self.account_conf = hcl2.loads(account_config_path.read_text())
-
     @property
     def common_tfvars(self):
         return f"{self.root_dir}/config/{self.COMMON_TF_VARS}"
@@ -202,6 +200,10 @@ class PathsHandler:
     @property
     def aws_credentials_file(self):
         return self.aws_credentials_dir / "credentials"
+    
+    @property
+    def aws_cache_dir(self):
+        return self.aws_credentials_dir / "cache"
 
     @property
     def sso_token_file(self):
@@ -243,7 +245,7 @@ class PathsHandler:
         if path in (self.root_dir, self.account_dir):
             raise ExitError(
                 1,
-                "This command cannot run neither in the root of the project or in" " the root directory of an account.",
+                "This command cannot run neither in the root of the project or in the root directory of an account.",
             )
 
         if not list(path.glob("*.tf")):
