@@ -2,9 +2,10 @@
     Credentials managing module.
 """
 
+import re
 import csv
 import json
-import re
+import shutil
 from pathlib import Path
 from functools import wraps
 from typing import Optional, Union
@@ -287,17 +288,13 @@ def credentials(state):
     else:
         logger.info("Reading info from build.env")
 
-    credentials_env_vars = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-    }
     state.runner = Runner(
         binary="aws",
         error_message=(
             f"AWS CLI not found on system. "
             f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
         ),
-        env_vars=credentials_env_vars,
+        env_vars=state.environment,
     )
 
 
@@ -375,7 +372,7 @@ def _profile_is_configured(awscli: Runner, profile: str):
     Returns:
         bool: Whether the profile was already configured or not.
     """
-    exit_code, _ = awscli.exec("configure", "list", "--profile", profile)
+    exit_code, _, _ = awscli.exec("configure", "list", "--profile", profile)
 
     return not exit_code
 
@@ -444,12 +441,12 @@ def configure_credentials(
 
     if make_backup:
         logger.info("Backing up credentials file.")
-        Path(paths.aws_credentials_file).copy(Path(paths.aws_credentials_file).with_suffix(".bkp"))
+        shutil.copy(paths.aws_credentials_file, paths.aws_credentials_file.with_suffix(".bkp"))
 
     values = {"aws_access_key_id": key_id, "aws_secret_access_key": secret_key}
 
     for key, value in values.items():
-        exit_code, output = awscli.exec("configure", "set", key, value, "--profile", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
@@ -470,7 +467,7 @@ def _credentials_are_valid(awscli: Runner, profile: str):
     Returns:
         bool: Whether the credentials are valid.
     """
-    error_code, output = awscli.exec("sts", "get-caller-identity", "--profile", profile)
+    error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile)
 
     return error_code != 255 and "InvalidClientTokenId" not in output
 
@@ -485,7 +482,7 @@ def _get_management_account_id(awscli: Runner, profile: str):
     Returns:
         str: Management account id.
     """
-    exit_code, caller_identity = awscli.exec("sts", "get-caller-identity", "--output", "json", "--profile", profile)
+    exit_code, caller_identity, _ = awscli.exec("sts", "get-caller-identity", "--output", "json", "--profile", profile)
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {caller_identity}")
 
@@ -504,7 +501,7 @@ def _get_organization_accounts(awscli: Runner, profile: str, project_name: str):
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    exit_code, organization_accounts = awscli.exec(
+    exit_code, organization_accounts, _ = awscli.exec(
         "organizations", "list-accounts", "--output", "json", "--profile", profile
     )
 
@@ -533,7 +530,7 @@ def _get_mfa_serial(awscli: Runner, profile: str):
     Returns:
         str: MFA device serial.
     """
-    exit_code, mfa_devices = awscli.exec("iam", "list-mfa-devices", "--output", "json", "--profile", profile)
+    exit_code, mfa_devices, _ = awscli.exec("iam", "list-mfa-devices", "--output", "json", "--profile", profile)
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {mfa_devices}")
     mfa_devices = json.loads(mfa_devices)
@@ -561,7 +558,7 @@ def configure_profile(awscli: Runner, profile: str, values: dict):
     """
     logger.info(f"\tConfiguring profile [bold]{profile}[/bold]")
     for key, value in values.items():
-        exit_code, output = awscli.exec("configure", "set", key, value, "--profile", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
@@ -617,7 +614,7 @@ def configure_accounts_profiles(
         account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}"] = account_profile
 
     logger.info("Backing up account profiles file.")
-    Path(paths.aws_config_file).copy(Path(paths.aws_config_file).with_suffix(".bkp"))
+    shutil.copy(paths.aws_config_file, paths.aws_config_file.with_suffix(".bkp"))
 
     for profile_identifier, profile_values in account_profiles.items():
         configure_profile(profile_identifier, profile_values)
