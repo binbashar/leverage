@@ -131,6 +131,7 @@ def authenticate(command):
         def some_command(tf: TFRunner, paths: PathsHandler, args):
             # command logic
     """
+
     @wraps(command)
     def new_command(*args, **kwargs):
         ctx = click.get_current_context()
@@ -251,6 +252,7 @@ def refresh_layer_credentials(paths: PathsHandler):
         )
         logger.info(f"Credentials for {account_name} account written successfully.")
 
+
 def refresh_layer_credentials_mfa(paths: PathsHandler):
     tf_profile, raw_profiles = get_profiles(paths)
     config_updater = ConfigUpdater()
@@ -271,7 +273,11 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
         layer_profile = tf_profile if raw_profile in ("${var.profile}", "each.value.profile") else None
 
         # replace variables with their corresponding values
-        profile_name = raw_profile.replace("${var.profile}", tf_profile).replace("${var.project}", paths.project).replace("each.value.profile", tf_profile)
+        profile_name = (
+            raw_profile.replace("${var.profile}", tf_profile)
+            .replace("${var.project}", paths.project)
+            .replace("each.value.profile", tf_profile)
+        )
 
         # if layer_profile wasn't set, use profile_name
         if layer_profile is None:
@@ -286,14 +292,17 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
             raise ExitError(
                 40,
                 f"Credentials for profile {profile_name} have not been properly configured. Please check your configuration.\n"
-                f"Check the following link for possible solutions: https://leverage.binbash.co/user-guide/troubleshooting/credentials/")
-        
+                f"Check the following link for possible solutions: https://leverage.binbash.co/user-guide/troubleshooting/credentials/",
+            )
+
         cache_file = paths.aws_cache_dir / profile_name
         if cache_file.exists():
             logger.debug(f"Found cached credentials in {cache_file}.")
             cached_credentials = json.loads(cache_file.read_text())
-            
-            expiration = datetime.strptime(cached_credentials.get("Expiration"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=tzutc())
+
+            expiration = datetime.strptime(cached_credentials.get("Expiration"), "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=tzutc()
+            )
             renewal = datetime.now(tzutc()) + timedelta(seconds=(30 * 60))
             if renewal < expiration:
                 logger.info("Using cached credentials.")
@@ -302,10 +311,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
         else:
             logger.debug("No cached credentials found.")
 
-        client_session = boto3.Session(
-            botocore_session=session,
-            profile_name=source_profile
-        )
+        client_session = boto3.Session(botocore_session=session, profile_name=source_profile)
         client = client_session.client("sts")
         credentials = None
         for _ in range(3):
@@ -315,7 +321,9 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 raise ExitError(1, "Aborted by user.")
 
             try:
-                logger.debug(f"Assuming role {role_arn} for {profile_name} profile with serial {mfa_serial} and token code {mfa_token_code}")
+                logger.debug(
+                    f"Assuming role {role_arn} for {profile_name} profile with serial {mfa_serial} and token code {mfa_token_code}"
+                )
                 credentials = client.assume_role(
                     RoleArn=role_arn,
                     SourceIdentity=source_profile,
@@ -342,15 +350,15 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 elif error.response["Error"]["Code"] == "ExpiredToken":
                     logger.error("Token has expired. Please try again.")
                     continue
-                elif error.response["Error"]["Code"] == "ValidationError" and "Invalid length for parameter TokenCode" in error.response["Error"]["Message"]:
+                elif (
+                    error.response["Error"]["Code"] == "ValidationError"
+                    and "Invalid length for parameter TokenCode" in error.response["Error"]["Message"]
+                ):
                     logger.error("Invalid token length, it must be 6 digits long. Please try again.")
                     continue
                 elif "An error occurred" in error.response["Error"]["Message"]:
-                    raise ExitError(
-                        50,
-                        f"Error assuming role: {error}"
-                    )
-        
+                    raise ExitError(50, f"Error assuming role: {error}")
+
         if credentials is None:
             raise ExitError(60, "Failed to get credentials after 3 attempts. Please try again later.")
 

@@ -70,7 +70,13 @@ class TFRunner(Runner):
         """
         return super().run(*args, env_vars=env_vars, working_dir=working_dir, raises=raises)
 
-    def exec(self, *args: str, env_vars: Optional[Dict[str, str]] = None, working_dir: Optional[Path] = None, raises: bool = False):
+    def exec(
+        self,
+        *args: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        working_dir: Optional[Path] = None,
+        raises: bool = False,
+    ):
         """
         Execute the Terraform/OpenTofu binary in non-interactive mode (captures output).
 

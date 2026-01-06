@@ -121,10 +121,7 @@ def leverage_project(tmp_path):
     # Create account/config
     account_config = account_dir / "config"
     account_config.mkdir()
-    (account_config / "account.tfvars").write_text(
-        'environment = "account"\n'
-        'sso_role = "test-sso-role"\n'
-    )
+    (account_config / "account.tfvars").write_text('environment = "account"\n' 'sso_role = "test-sso-role"\n')
     (account_config / "backend.tfvars").write_text(
         'profile = "bb-account-profile"\n'
         'bucket = "bb-account-terraform-backend"\n'
@@ -153,11 +150,11 @@ def leverage_project(tmp_path):
     security_base.mkdir()
     (security_base / "security-base.tf").write_text("# Security base configuration\n")
     (security_base / "config.tf").write_text(
-        'terraform {\n'
+        "terraform {\n"
         '  backend "s3" {\n'
         '    key = "account/us-east-1/security-base/terraform.tfstate"\n'
-        '  }\n'
-        '}\n'
+        "  }\n"
+        "}\n"
     )
     (security_base / "backend.tfvars").write_text(
         'profile = "bb-account-profile"\n'
@@ -167,6 +164,7 @@ def leverage_project(tmp_path):
     )
 
     return root
+
 
 @pytest.fixture
 def leverage_runner(monkeypatch):
@@ -217,6 +215,7 @@ def leverage_runner(monkeypatch):
         yield cli_runner
 
     return runner
+
 
 @pytest.fixture
 def leverage_context(leverage_project, monkeypatch):

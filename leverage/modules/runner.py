@@ -95,15 +95,23 @@ class Runner:
         logger.debug(f"Working directory: {working_dir or Path.cwd()}")
         logger.debug(f"Additional environment variables: {merged_env_vars}")
 
-        process = subprocess.run(command, env=env, cwd=working_dir, capture_output=not interactive, text=not interactive)
+        process = subprocess.run(
+            command, env=env, cwd=working_dir, capture_output=not interactive, text=not interactive
+        )
 
         if raises and not interactive and process.returncode:
-            raise ExitError(process.returncode,  f"Command execution failed: {process.stderr.strip()}")
+            raise ExitError(process.returncode, f"Command execution failed: {process.stderr.strip()}")
 
-        return process.returncode if interactive else (process.returncode, process.stdout.strip(), process.stderr.strip())
+        return (
+            process.returncode if interactive else (process.returncode, process.stdout.strip(), process.stderr.strip())
+        )
 
     def exec(
-        self, *args: str, env_vars: Optional[Dict[str, str]] = None, working_dir: Optional[Path] = None, raises: bool = True
+        self,
+        *args: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        working_dir: Optional[Path] = None,
+        raises: bool = True,
     ) -> Tuple[int, str, str]:
         """
         Execute command with the binary in non-interactive mode (captures output).

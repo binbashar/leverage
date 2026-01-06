@@ -36,10 +36,12 @@ def _handle_subcommand(
             pre_invocation_callback()
         exit_code = runner.run(*args)
         raise Exit(exit_code)
-    
+
     subcommand = context.command.commands.get(subcommand)
     # Check that the subcommand arguments are valid
-    subcommand.make_context(info_name=subcommand.name, args=list(args)[args.index(subcommand.name) + 1:], parent=context)
+    subcommand.make_context(
+        info_name=subcommand.name, args=list(args)[args.index(subcommand.name) + 1 :], parent=context
+    )
     # Invoke wrapped command
     if not subcommand.params:
         context.invoke(subcommand)

@@ -7,6 +7,7 @@ from click.testing import CliRunner
 from leverage import leverage
 from leverage.modules.kubectl import _scan_clusters, ClusterInfo
 
+
 def test_scan_clusters():
     """
     Test that we can find valid metadata.yaml presents in the down the path of the filesystem tree where we are staying.
@@ -38,7 +39,9 @@ def test_discover(leverage_project):
     }
     cli_runner = CliRunner()
     with cli_runner.isolated_filesystem(leverage_project) as leverage_project_folder:
-        with patch("leverage.modules.kubectl._scan_clusters", return_value=[(leverage_project_folder, mocked_cluster_data)]) as mkd_scan_clusters:
+        with patch(
+            "leverage.modules.kubectl._scan_clusters", return_value=[(leverage_project_folder, mocked_cluster_data)]
+        ) as mkd_scan_clusters:
             with patch("simple_term_menu.TerminalMenu") as mkd_show:
                 mkd_show.return_value.show.return_value = 0  # simulate choosing the first result
                 with patch("leverage.modules.kubectl._configure") as mkd_configure:

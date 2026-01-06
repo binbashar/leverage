@@ -53,12 +53,10 @@ def kubectl(context, state, args):
     )
 
     authenticate = pass_paths(lambda paths: perform_authentication(paths))
-    _handle_subcommand(
-        context=context, runner=state.runner, args=args, pre_invocation_callback=authenticate
-    )
+    _handle_subcommand(context=context, runner=state.runner, args=args, pre_invocation_callback=authenticate)
 
 
-def _configure(environment: dict, ci: ClusterInfo = None,layer_path: Path = None):
+def _configure(environment: dict, ci: ClusterInfo = None, layer_path: Path = None):
     """
     Add the given EKS cluster configuration to the .kube/ files.
     """

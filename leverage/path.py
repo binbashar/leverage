@@ -129,7 +129,7 @@ def get_build_script_path(filename="build.py"):
         cur_path = cur_path.parent
 
 
-class PathsHandler: # TODO: Turn this class into a something that represents a leverage project
+class PathsHandler:  # TODO: Turn this class into a something that represents a leverage project
     COMMON_TF_VARS = "common.tfvars"
     ACCOUNT_TF_VARS = "account.tfvars"
     BACKEND_TF_VARS = "backend.tfvars"
@@ -200,7 +200,7 @@ class PathsHandler: # TODO: Turn this class into a something that represents a l
     @property
     def aws_credentials_file(self):
         return self.aws_credentials_dir / "credentials"
-    
+
     @property
     def aws_cache_dir(self):
         return self.aws_credentials_dir / "cache"

@@ -46,7 +46,10 @@ def test_init_with_args(leverage_project, leverage_runner):
 
         assert mocked_run.call_args_list[0][0][0] == "init"
         assert mocked_run.call_args_list[0][0][1] == "-migrate-state"
-        assert mocked_run.call_args_list[0][0][2] == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
+        assert (
+            mocked_run.call_args_list[0][0][2]
+            == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
+        )
 
 
 @pytest.mark.parametrize(
