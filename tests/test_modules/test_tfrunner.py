@@ -134,6 +134,8 @@ def test_run_without_env_vars(mocker):
     assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "plan", "-out=plan.tfplan"]
     assert mock_subprocess.call_args[1]["env"] == os.environ.copy()
     assert mock_subprocess.call_args[1]["cwd"] is None
+    assert mock_subprocess.call_args[1]["capture_output"] is False
+    assert mock_subprocess.call_args[1]["text"] is False
 
 
 def test_run_with_instance_env_vars_only(mocker):
@@ -154,6 +156,8 @@ def test_run_with_instance_env_vars_only(mocker):
     assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "apply", "-auto-approve"]
     assert mock_subprocess.call_args[1]["env"] == expected_env
     assert mock_subprocess.call_args[1]["cwd"] is None
+    assert mock_subprocess.call_args[1]["capture_output"] is False
+    assert mock_subprocess.call_args[1]["text"] is False
 
 
 def test_run_with_run_env_vars_only(mocker):
@@ -174,6 +178,8 @@ def test_run_with_run_env_vars_only(mocker):
     assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "plan"]
     assert mock_subprocess.call_args[1]["env"] == expected_env
     assert mock_subprocess.call_args[1]["cwd"] is None
+    assert mock_subprocess.call_args[1]["capture_output"] is False
+    assert mock_subprocess.call_args[1]["text"] is False
 
 
 def test_run_merges_instance_and_run_env_vars(mocker):
@@ -198,6 +204,8 @@ def test_run_merges_instance_and_run_env_vars(mocker):
     assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "apply"]
     assert mock_subprocess.call_args[1]["env"] == expected_env
     assert mock_subprocess.call_args[1]["cwd"] is None
+    assert mock_subprocess.call_args[1]["capture_output"] is False
+    assert mock_subprocess.call_args[1]["text"] is False
 
 
 def test_run_env_vars_override_instance_env_vars(mocker):
@@ -221,26 +229,8 @@ def test_run_env_vars_override_instance_env_vars(mocker):
     assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "plan"]
     assert mock_subprocess.call_args[1]["env"] == expected_env
     assert mock_subprocess.call_args[1]["cwd"] is None
-
-
-def test_run_interactive_false(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    # First call for --version, second for the actual command
-    version_output = type("obj", (object,), {"stdout": "OpenTofu v1.6.0", "returncode": 0})()
-    run_output = type("obj", (object,), {"stdout": "terraform output", "stderr": "", "returncode": 0})()
-    mock_subprocess.side_effect = [version_output, run_output]
-
-    runner = TFRunner(binary="")
-    exit_code, stdout, stderr = runner.run("output", "-json", interactive=False)
-
-    assert exit_code == 0
-    assert stdout == "terraform output"  # Already stripped
-    assert stderr == ""
-    # Check the last call (the actual run)
-    assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "output", "-json"]
-    assert "capture_output" in mock_subprocess.call_args[1]
-    assert mock_subprocess.call_args[1]["capture_output"] is True
+    assert mock_subprocess.call_args[1]["capture_output"] is False
+    assert mock_subprocess.call_args[1]["text"] is False
 
 
 def test_run_with_multiple_args(mocker):
@@ -263,6 +253,8 @@ def test_run_with_multiple_args(mocker):
     ]
     assert mock_subprocess.call_args[1]["env"] == os.environ.copy()
     assert mock_subprocess.call_args[1]["cwd"] is None
+    assert mock_subprocess.call_args[1]["capture_output"] is False
+    assert mock_subprocess.call_args[1]["text"] is False
 
 
 def test_run_preserves_instance_env_vars_across_multiple_calls(mocker):
