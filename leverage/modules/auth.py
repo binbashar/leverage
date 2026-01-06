@@ -24,7 +24,7 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
         raise SkipProfile
 
     # if it is exactly that variable, we already know the layer profile is tf_profile
-    layer_profile = tf_profile if raw_profile in ("${var.profile}", "each.value.profile") else None
+    layer_profile = tf_profile if raw_profile in ("var.profile", "each.value.profile") else None
 
     # replace variables with their corresponding values
     raw = (
