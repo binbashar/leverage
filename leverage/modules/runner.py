@@ -64,6 +64,7 @@ class Runner:
         env_vars: Optional[Dict[str, str]] = None,
         working_dir: Optional[Path] = None,
         interactive: bool = True,
+        raises: bool = False,
     ) -> Union[int, Tuple[int, str, str]]:
         """
         Execute command with the binary.
@@ -73,6 +74,7 @@ class Runner:
             env_vars: Environment variables to set during execution (overrides instance env_vars)
             working_dir: Working directory for command execution
             interactive: If True, run interactively. If False, capture output
+            raises: If True, raise an ExitError if the command fails
 
         Returns:
             If interactive=True: Exit code (int)
@@ -93,17 +95,15 @@ class Runner:
         logger.debug(f"Working directory: {working_dir or Path.cwd()}")
         logger.debug(f"Additional environment variables: {merged_env_vars}")
 
-        if interactive:
-            # Interactive execution
-            process = subprocess.run(command, env=env, cwd=working_dir)
-            return process.returncode
-        else:
-            # Silent execution with output capture
-            process = subprocess.run(command, env=env, cwd=working_dir, capture_output=True, text=True)
-            return process.returncode, process.stdout.strip(), process.stderr.strip()
+        process = subprocess.run(command, env=env, cwd=working_dir, capture_output=not interactive, text=not interactive)
+
+        if raises and not interactive and process.returncode:
+            raise ExitError(process.returncode,  f"Command execution failed: {process.stderr.strip()}")
+
+        return process.returncode if interactive else (process.returncode, process.stdout.strip(), process.stderr.strip())
 
     def exec(
-        self, *args: str, env_vars: Optional[Dict[str, str]] = None, working_dir: Optional[Path] = None
+        self, *args: str, env_vars: Optional[Dict[str, str]] = None, working_dir: Optional[Path] = None, raises: bool = True
     ) -> Tuple[int, str, str]:
         """
         Execute command with the binary in non-interactive mode (captures output).
@@ -114,11 +114,12 @@ class Runner:
             *args: Command arguments to pass to the binary
             env_vars: Environment variables to set during execution (overrides instance env_vars)
             working_dir: Working directory for command execution
+            raises: If True, raise an ExitError if the command fails. If False, return the exit code.
 
         Returns:
             Tuple of (exit_code, stdout, stderr)
         """
-        return self.run(*args, env_vars=env_vars, working_dir=working_dir, interactive=False)
+        return self.run(*args, env_vars=env_vars, working_dir=working_dir, interactive=False, raises=raises)
 
     def __repr__(self):
         return f"Runner(binary_input='{self.binary_input}', binary_path='{self.binary_path}')"

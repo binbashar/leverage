@@ -2,6 +2,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
+from click.exceptions import Exit
+
 from leverage._utils import ExitError
 from leverage.modules.runner import Runner
 
@@ -52,7 +54,7 @@ class TFRunner(Runner):
         *args: str,
         env_vars: Optional[Dict[str, str]] = None,
         working_dir: Optional[Path] = None,
-        interactive: bool = True,
+        raises: bool = True,
     ):
         """
         Run the Terraform/OpenTofu binary with the given arguments.
@@ -61,15 +63,14 @@ class TFRunner(Runner):
             *args: Command and arguments to pass (e.g., 'plan', '-out=plan.tfplan')
             env_vars: Environment variables for this specific execution
             working_dir: Working directory for command execution
-            interactive: If True, run interactively. If False, capture output
+            raises: If True, raise an ExitError if the command fails. If False, return the exit code.
 
         Returns:
-            If interactive=True: Exit code (int)
-            If interactive=False: Tuple of (exit_code, stdout, stderr)
+            Exit code (int)
         """
-        return super().run(*args, env_vars=env_vars, working_dir=working_dir, interactive=interactive)
+        return super().run(*args, env_vars=env_vars, working_dir=working_dir, raises=raises)
 
-    def exec(self, *args: str, env_vars: Optional[Dict[str, str]] = None, working_dir: Optional[Path] = None):
+    def exec(self, *args: str, env_vars: Optional[Dict[str, str]] = None, working_dir: Optional[Path] = None, raises: bool = False):
         """
         Execute the Terraform/OpenTofu binary in non-interactive mode (captures output).
 
@@ -79,8 +80,9 @@ class TFRunner(Runner):
             *args: Command and arguments to pass (e.g., 'plan', '-out=plan.tfplan')
             env_vars: Environment variables for this specific execution
             working_dir: Working directory for command execution
+            raises: If True, raise an ExitError if the command fails. If False, return the exit code.
 
         Returns:
             Tuple of (exit_code, stdout, stderr)
         """
-        return self.run(*args, env_vars=env_vars, working_dir=working_dir, interactive=False)
+        return super().run(*args, env_vars=env_vars, working_dir=working_dir, interactive=False, raises=raises)

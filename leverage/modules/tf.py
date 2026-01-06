@@ -11,7 +11,6 @@ from leverage.modules.tfrunner import TFRunner
 from leverage._utils import ExitError, parse_tf_file
 from leverage._internals import pass_paths, pass_runner, pass_state
 from leverage._backend_config import get_backend_key, set_backend_key
-from leverage.modules.auth import refresh_layer_credentials, check_sso_token
 
 REGION = r"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 
@@ -168,8 +167,7 @@ def force_unlock(tf, paths: PathsHandler, lock_id):
     """Force unlock the state file."""
     check_sso_token(paths)
     refresh_layer_credentials(paths)
-    if exit_code := tf.run("force-unlock", lock_id):
-        raise Exit(exit_code)
+    tf.run("force-unlock", lock_id)
 
 
 @click.command()
@@ -179,8 +177,7 @@ def validate(tf, paths: PathsHandler):
     """Validate code of the current directory. Previous initialization might be needed."""
     check_sso_token(paths)
     refresh_layer_credentials(paths)
-    if exit_code := tf.run("validate", *tf_default_args()):
-        raise Exit(exit_code)
+    tf.run("validate", *tf_default_args())
 
 
 @click.command("validate-layout")
@@ -196,8 +193,7 @@ def validate_layout(paths):
 @pass_runner
 def _import(tf, address, _id):
     """Import a resource."""
-    if exit_code := tf.run("import", *tf_default_args(), address, _id):
-        raise Exit(exit_code)
+    tf.run("import", *tf_default_args(), address, _id)
 
 
 @click.command("refresh-credentials")
@@ -330,8 +326,7 @@ def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
     check_sso_token(paths)
     refresh_layer_credentials(paths)
 
-    if exit_code := tf.run("init", *init_args, working_dir=working_dir):
-        raise Exit(exit_code)
+    tf.run("init", *init_args, working_dir=working_dir)
 
 
 @pass_paths
@@ -341,8 +336,7 @@ def _plan(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
     check_sso_token(paths)
     refresh_layer_credentials(paths)
 
-    if exit_code := tf.run("plan", *tf_default_args(), *args, working_dir=working_dir):
-        raise Exit(exit_code)
+    tf.run("plan", *tf_default_args(), *args, working_dir=working_dir)
 
 
 def has_a_plan_file(args: Sequence[str]) -> bool:
@@ -409,8 +403,7 @@ def _apply(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: 
     check_sso_token(paths)
     refresh_layer_credentials(paths)
 
-    if exit_code := tf.run("apply", *default_args, *args, working_dir=working_dir):
-        raise Exit(exit_code)
+    tf.run("apply", *default_args, *args, working_dir=working_dir)
 
 
 @pass_paths
@@ -420,8 +413,7 @@ def _output(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir:
     check_sso_token(paths)
     refresh_layer_credentials(paths)
 
-    if exit_code := tf.run("output", *args, working_dir=working_dir):
-        raise Exit(exit_code)
+    tf.run("output", *args, working_dir=working_dir)
 
 
 @pass_paths
@@ -431,8 +423,7 @@ def _destroy(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir
     check_sso_token(paths)
     refresh_layer_credentials(paths)
 
-    if exit_code := tf.run("destroy", *tf_default_args(), *args, working_dir=working_dir):
-        raise Exit(exit_code)
+    tf.run("destroy", *tf_default_args(), *args, working_dir=working_dir)
 
 
 # ###########################################################################
