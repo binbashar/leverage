@@ -322,7 +322,7 @@ def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
     )
     init_args = (*filtered_args, f"-backend-config={paths.backend_tfvars}")
 
-    tf.run("init", *init_args, working_dir=working_dir)
+    tf.run("init", *tf_default_args(), *init_args, working_dir=working_dir)
 
 
 @authenticate
