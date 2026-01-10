@@ -611,7 +611,7 @@ def configure_accounts_profiles(
         if mfa_serial:
             account_profile["mfa_serial"] = mfa_serial
         # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}"] = account_profile
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}-mfa"] = account_profile
 
     logger.info("Backing up account profiles file.")
     shutil.copy(paths.aws_config_file, paths.aws_config_file.with_suffix(".bkp"))

@@ -270,7 +270,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
             continue
 
         # if it is exactly that variable, we already know the layer profile is tf_profile
-        layer_profile = tf_profile if raw_profile in ("${var.profile}", "each.value.profile") else None
+        layer_profile = tf_profile if raw_profile in ("var.profile", "each.value.profile") else None
 
         # replace variables with their corresponding values
         profile_name = (
@@ -284,7 +284,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
             layer_profile = profile_name
 
         logger.info(f"Attempting to get temporary credentials for {profile_name} profile.")
-        if profile := config_updater.get_section(f"profile {profile_name}"):
+        if profile := config_updater.get_section(f"profile {profile_name}-mfa"):
             role_arn = profile.get("role_arn").value
             mfa_serial = profile.get("mfa_serial").value
             source_profile = profile.get("source_profile").value
@@ -294,6 +294,9 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 f"Credentials for profile {profile_name} have not been properly configured. Please check your configuration.\n"
                 f"Check the following link for possible solutions: https://leverage.binbash.co/user-guide/troubleshooting/credentials/",
             )
+
+        if not paths.aws_cache_dir.exists():
+            paths.aws_cache_dir.mkdir(parents=True)
 
         cache_file = paths.aws_cache_dir / profile_name
         if cache_file.exists():
@@ -321,12 +324,8 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 raise ExitError(1, "Aborted by user.")
 
             try:
-                logger.debug(
-                    f"Assuming role {role_arn} for {profile_name} profile with serial {mfa_serial} and token code {mfa_token_code}"
-                )
                 credentials = client.assume_role(
                     RoleArn=role_arn,
-                    SourceIdentity=source_profile,
                     RoleSessionName=f"leverage-{profile_name}",
                     SerialNumber=mfa_serial,
                     TokenCode=mfa_token_code,
