@@ -248,7 +248,7 @@ def login(awscli: Runner, paths: PathsHandler) -> None:
     logger.info(
         f"Attempting to automatically open the SSO authorization page in your default browser.\n"
         f"If the browser does not open or you wish to use a different device to authorize this request, open the following URL:\n"
-        f"\n{paths.common_conf.get('sso_start_url')}\n"
+        f"\n{paths.common_conf.get('sso_start_url')}/#/device\n"
         f"\nThen enter the code:\n"
         f"\n{device_authorization['userCode']}\n"
     )
