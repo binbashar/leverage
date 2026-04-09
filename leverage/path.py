@@ -2,8 +2,6 @@
     Utilities to obtain relevant files' and directories' locations
 """
 
-import os
-import pathlib
 from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import PIPE
@@ -131,13 +129,12 @@ def get_build_script_path(filename="build.py"):
         cur_path = cur_path.parent
 
 
-class PathsHandler:
+class PathsHandler:  # TODO: Turn this class into a something that represents a leverage project
     COMMON_TF_VARS = "common.tfvars"
     ACCOUNT_TF_VARS = "account.tfvars"
     BACKEND_TF_VARS = "backend.tfvars"
 
-    def __init__(self, env_conf: dict, container_user: str):
-        self.container_user = container_user
+    def __init__(self, env_conf: dict):
         self.home = Path.home()
         self.cwd = Path.cwd()
         try:
@@ -156,68 +153,61 @@ class PathsHandler:
         account_config = self.account_config_dir / self.ACCOUNT_TF_VARS
         self.account_conf = hcl2.loads(account_config.read_text()) if account_config.exists() else {}
 
+        backend_config = self.account_config_dir / self.BACKEND_TF_VARS
+        self.backend_conf = hcl2.loads(backend_config.read_text()) if backend_config.exists() else {}
+
+        # Get MFA enabled status
+        self.mfa_enabled = env_conf.get("MFA_ENABLED", "false")
+
         # Get project name
         self.project = self.common_conf.get("project", env_conf.get("PROJECT", False))
         if not self.project:
             raise ExitError(1, "Project name has not been set. Exiting.")
-
-        # Project mount location
-        self.project_long = self.common_conf.get("project_long", "project")
-        self.guest_base_path = f"/{self.project_long}"
+        self.project_long = self.common_conf.get("project_long", env_conf.get("PROJECT_LONG", False))
 
         # Ensure credentials directory
-        self.host_aws_credentials_dir = self.home / ".aws" / self.project
-        if not self.host_aws_credentials_dir.exists():
-            self.host_aws_credentials_dir.mkdir(parents=True)
-        self.sso_cache = self.host_aws_credentials_dir / "sso" / "cache"
+        self.aws_credentials_dir = self.home / ".aws" / self.project
+        if not self.aws_credentials_dir.exists():
+            self.aws_credentials_dir.mkdir(parents=True)
+        self.sso_cache = self.aws_credentials_dir / "sso" / "cache"
 
-    def update_cwd(self, new_cwd):
-        self.cwd = new_cwd
-        acc_folder = new_cwd.relative_to(self.root_dir).parts[0]
-
-        self.account_config_dir = self.root_dir / acc_folder / "config"
-        account_config_path = self.account_config_dir / self.ACCOUNT_TF_VARS
-        self.account_conf = hcl2.loads(account_config_path.read_text())
-
-    @property
-    def guest_account_base_path(self):
-        return f"{self.guest_base_path}/{self.account_dir.relative_to(self.root_dir).as_posix()}"
+        # Make the binary path absolute
+        tf_binary = env_conf.get("TF_BINARY", "")
+        binary_path = Path(tf_binary)
+        if tf_binary.startswith("~"):
+            self.tf_binary = str(binary_path.expanduser())
+        elif not binary_path.is_absolute() and len(binary_path.parts) > 1:
+            self.tf_binary = str((self.root_dir / tf_binary).resolve())
+        else:
+            self.tf_binary = tf_binary
 
     @property
     def common_tfvars(self):
-        return f"{self.guest_base_path}/config/{self.COMMON_TF_VARS}"
+        return f"{self.root_dir}/config/{self.COMMON_TF_VARS}"
 
     @property
     def account_tfvars(self):
-        return f"{self.guest_account_base_path}/config/{self.ACCOUNT_TF_VARS}"
+        return f"{self.account_dir}/config/{self.ACCOUNT_TF_VARS}"
 
     @property
     def backend_tfvars(self):
-        return f"{self.guest_account_base_path}/config/{self.BACKEND_TF_VARS}"
-
-    @property
-    def guest_aws_credentials_dir(self):
-        return str(f"/home/{self.container_user}/tmp" / Path(self.project))
-
-    @property
-    def host_aws_profiles_file(self):
-        return f"{self.host_aws_credentials_dir}/config"
-
-    @property
-    def host_aws_credentials_file(self):
-        return self.host_aws_credentials_dir / "credentials"
-
-    @property
-    def host_git_config_file(self):
-        return self.home / ".gitconfig"
-
-    @property
-    def local_backend_tfvars(self):
         return self.account_config_dir / self.BACKEND_TF_VARS
 
     @property
+    def aws_config_file(self):
+        return self.aws_credentials_dir / "config"
+
+    @property
+    def aws_credentials_file(self):
+        return self.aws_credentials_dir / "credentials"
+
+    @property
+    def aws_cache_dir(self):
+        return self.aws_credentials_dir / "cache"
+
+    @property
     def sso_token_file(self):
-        return f"{self.sso_cache}/token"
+        return self.sso_cache / "token"
 
     def get_location_type(self):
         """
@@ -246,31 +236,6 @@ class PathsHandler:
         if self.root_dir == self.account_dir == self.common_config_dir == self.account_config_dir == self.cwd:
             raise ExitError(1, "Not running in a Leverage project. Exiting.")
 
-    def guest_config_file(self, file):
-        """Map config file in host to location in guest.
-
-        Args:
-            file (pathlib.Path): File in host to map
-
-        Raises:
-            Exit: If file is not contained in any valid config directory
-
-        Returns:
-            str: Path in guest to config file
-        """
-        file_name = file.name
-
-        if file.parent == self.account_config_dir:
-            return f"{self.guest_account_base_path}/config/{file_name}"
-        if file.parent == self.common_config_dir:
-            return f"{self.guest_base_path}/config/{file_name}"
-
-        raise ExitError(1, "File is not part of any config directory.")
-
-    @property
-    def tf_cache_dir(self):
-        return os.getenv("TF_PLUGIN_CACHE_DIR")
-
     def check_for_layer_location(self, path: Path = None):
         """Make sure the command is being run at layer level. If not, bail."""
         path = path or self.cwd
@@ -280,7 +245,7 @@ class PathsHandler:
         if path in (self.root_dir, self.account_dir):
             raise ExitError(
                 1,
-                "This command cannot run neither in the root of the project or in" " the root directory of an account.",
+                "This command cannot run neither in the root of the project or in the root directory of an account.",
             )
 
         if not list(path.glob("*.tf")):

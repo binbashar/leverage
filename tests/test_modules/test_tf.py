@@ -1,58 +1,55 @@
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 import pytest
-from click import get_current_context
 
-from leverage._internals import State
-from leverage.container import TFContainer
-from leverage.modules.tf import _init
+from leverage import leverage
 from leverage.modules.tf import has_a_plan_file
-from tests.test_containers import container_fixture_factory
-
-
-@pytest.fixture
-def tf_container(muted_click_context):
-    tf_container = container_fixture_factory(TFContainer)
-
-    # this is required because of the @pass_container decorator
-    ctx = get_current_context()
-    state = State()
-    state.container = tf_container
-    ctx.obj = state
-
-    # assume we are on a valid location
-    with patch.object(tf_container.paths, "check_for_layer_location", Mock()):
-        yield tf_container
 
 
 @pytest.mark.parametrize(
-    "args, expected_value",
+    "args",
     [
-        ([], ["-backend-config=/project/./config/backend.tfvars"]),
-        (["-migrate-state"], ["-migrate-state", "-backend-config=/project/./config/backend.tfvars"]),
-        (["-r1", "-r2"], ["-r1", "-r2", "-backend-config=/project/./config/backend.tfvars"]),
+        ([]),
+        (["-migrate-state"]),
+        (["-r1", "-r2"]),
     ],
 )
-def test_init_arguments(tf_container, args, expected_value):
+def test_init_arguments(leverage_project, leverage_runner, args):
     """
     Test that the arguments for the init command are prepared correctly.
     """
-    with patch.object(tf_container, "start_in_layer", return_value=0) as mocked:
-        _init(args)
+    with leverage_runner(leverage_project) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
+            result = runner.invoke(leverage, ["tf", "init", *args])
 
-    assert mocked.call_args_list[0][0][0] == "init"
-    assert " ".join(mocked.call_args_list[0][0][1:]) == " ".join(expected_value)
+        # Check that init was called
+        assert mocked_run.call_args_list[0][0][0] == "init"
+
+        # Check that backend-config is included with the correct path
+        backend_config_path = str(leverage_project / "account" / "config" / "backend.tfvars")
+        backend_config_arg = f"-backend-config={backend_config_path}"
+
+        # Build expected args: user args + backend-config
+        expected_args = list(args) + [backend_config_arg]
+        actual_args = list(mocked_run.call_args_list[0][0][1:])
+
+        assert actual_args == expected_args
 
 
-def test_init_with_args(tf_container):
+def test_init_with_args(leverage_project, leverage_runner):
     """
     Test tf init with arguments.
     """
-    # with patch("dockerpty.exec_command") as mocked_pty:
-    with patch.object(tf_container, "start_in_layer", return_value=0) as mocked:
-        _init(["-migrate-state"])
+    with leverage_runner(leverage_project) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
+            result = runner.invoke(leverage, ["tf", "init", "-migrate-state"])
 
-    assert mocked.call_args_list[0][0] == ("init", "-migrate-state", "-backend-config=/project/./config/backend.tfvars")
+        assert mocked_run.call_args_list[0][0][0] == "init"
+        assert mocked_run.call_args_list[0][0][1] == "-migrate-state"
+        assert (
+            mocked_run.call_args_list[0][0][2]
+            == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
+        )
 
 
 @pytest.mark.parametrize(

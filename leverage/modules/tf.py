@@ -6,55 +6,41 @@ import click
 from click.exceptions import Exit
 
 from leverage import logger
-from leverage._internals import pass_container, pass_state
+from leverage.path import PathsHandler
+from leverage.modules.tfrunner import TFRunner
 from leverage._utils import ExitError, parse_tf_file
-from leverage.container import TFContainer
-from leverage.container import get_docker_client
-from leverage.modules.utils import env_var_option, mount_option, auth_mfa, auth_sso
+from leverage._internals import pass_paths, pass_runner, pass_state
+from leverage._backend_config import get_backend_key, set_backend_key
+from leverage.modules.auth import authenticate
 
-REGION = (
-    r"global|(?:[a-z]{2}-(?:gov-)?"
-    r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-4])"
-)
+REGION = r"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 
 
 # ###########################################################################
 # CREATE THE TOFU AND TERRAFORM GROUPS
 # ###########################################################################
 @click.group()
-@mount_option
-@env_var_option
 @pass_state
-def tofu(state, env_var, mount):
+def tofu(state):
     """Run OpenTofu commands in a custom containerized environment that provides extra functionality when interacting
     with your cloud provider such as handling multi factor authentication for you.
     All tofu subcommands that receive extra args will pass the given strings as is to their corresponding OpenTofu
     counterparts in the container. For example as in `leverage tofu apply -auto-approve` or
     `leverage tofu init -reconfigure`
     """
-    if env_var:
-        env_var = dict(env_var)
-
-    state.container = TFContainer(get_docker_client(), mounts=mount, env_vars=env_var)
-    state.container.ensure_image()
+    state.runner = TFRunner(binary=state.paths.tf_binary, env_vars=state.environment)
 
 
 @click.group()
-@mount_option
-@env_var_option
 @pass_state
-def terraform(state, env_var, mount):
+def terraform(state):
     """Run Terraform commands in a custom containerized environment that provides extra functionality when interacting
     with your cloud provider such as handling multi factor authentication for you.
     All terraform subcommands that receive extra args will pass the given strings as is to their corresponding Terraform
     counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
     """
-    if env_var:
-        env_var = dict(env_var)
-
-    state.container = TFContainer(get_docker_client(), terraform=True, mounts=mount, env_vars=env_var)
-    state.container.ensure_image()
+    state.runner = TFRunner(binary=state.paths.tf_binary, terraform=True, env_vars=state.environment)
 
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
@@ -94,124 +80,127 @@ layers_option = click.option(
 @click.option("--skip-validation", is_flag=True, help="Skip layout validation.")
 @layers_option
 @click.argument("args", nargs=-1)
-@pass_container
-@click.pass_context
-def init(context, tf: TFContainer, skip_validation, layers, args):
-    """
-    Initialize this layer.
-    """
-    invoke_for_all_commands(layers, _init, args, skip_validation)
+@pass_runner
+def init(tf: TFRunner, args: Sequence[str], layers: str, skip_validation: bool):
+    """Initialize this layer."""
+    invoke_for_all_commands(layers, _init, *args, skip_validation=skip_validation)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
-@pass_container
-@click.pass_context
-def plan(context, tf, layers, args):
+@pass_runner
+def plan(tf: TFRunner, args: Sequence[str], layers: str):
     """Generate an execution plan for this layer."""
-    invoke_for_all_commands(layers, _plan, args)
+    invoke_for_all_commands(layers, _plan, *args)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
-@pass_container
-@click.pass_context
-def apply(context, tf, layers, args):
+@pass_runner
+def apply(tf: TFRunner, args: Sequence[str], layers: str):
     """Build or change the infrastructure in this layer."""
-    invoke_for_all_commands(layers, _apply, args)
+    invoke_for_all_commands(layers, _apply, *args)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
-@pass_container
-@click.pass_context
-def output(context, tf, layers, args):
+@pass_runner
+def output(tf: TFRunner, args: Sequence[str], layers: str):
     """Show all output variables of this layer."""
-    invoke_for_all_commands(layers, _output, args)
+    invoke_for_all_commands(layers, _output, *args)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @layers_option
 @click.argument("args", nargs=-1)
-@pass_container
-@click.pass_context
-def destroy(context, tf, layers, args):
+@pass_runner
+def destroy(tf: TFRunner, args: Sequence[str], layers: str):
     """Destroy infrastructure in this layer."""
-    invoke_for_all_commands(layers, _destroy, args)
+    invoke_for_all_commands(layers, _destroy, *args)
+
+
+@pass_paths
+def tf_default_args(paths: PathsHandler) -> tuple:
+    """
+        Returns a tuple of strings containing all valid config files for layer as
+        parameters for OpenTofu/Terraform.
+
+    Args:
+        paths: PathsHandler object
+
+    Returns:
+        tuple: Tuple of strings containing all valid config files for layer as
+        parameters for OpenTofu/Terraform.
+    """
+    common_config_files = tuple(
+        f"-var-file={common_file.as_posix()}" for common_file in paths.common_config_dir.glob("*.tfvars")
+    )
+    account_config_files = tuple(
+        f"-var-file={account_file.as_posix()}" for account_file in paths.account_config_dir.glob("*.tfvars")
+    )
+    return common_config_files + account_config_files
 
 
 @click.command()
-@pass_container
+@pass_runner
 def version(tf):
     """Print version."""
-    tf.disable_authentication()
-    tf.start("version")
-
-
-@click.command()
-@auth_mfa
-@auth_sso
-@pass_container
-def shell(tf, mfa, sso):
-    """Open a shell into the Terraform container in this layer."""
-    tf.disable_authentication()
-    if sso:
-        tf.enable_sso()
-
-    if mfa:
-        tf.enable_mfa()
-
-    tf.start_shell()
+    tf.run("version")
 
 
 @click.command("format", context_settings=CONTEXT_SETTINGS)
 @click.argument("args", nargs=-1)
-@pass_container
+@pass_runner
 def _format(tf, args):
     """Check if all files meet the canonical format and rewrite them accordingly."""
     args = args if "-recursive" in args else (*args, "-recursive")
-    tf.disable_authentication()
-    tf.start("fmt", *args)
+    tf.run("fmt", *args)
+
+
+@click.command("force-unlock")
+@click.argument("lock_id", metavar="LOCK_ID")
+@authenticate
+@pass_paths
+@pass_runner
+def force_unlock(tf, paths: PathsHandler, lock_id):
+    """Force unlock the state file."""
+    tf.run("force-unlock", lock_id)
 
 
 @click.command()
-@pass_container
-def validate(tf):
+@authenticate
+@pass_paths
+@pass_runner
+def validate(tf, paths: PathsHandler):
     """Validate code of the current directory. Previous initialization might be needed."""
-    tf.disable_authentication()
-    tf.start("validate")
+    tf.run("validate", *tf_default_args())
 
 
 @click.command("validate-layout")
-@pass_container
-def validate_layout(tf):
+@pass_paths
+def validate_layout(paths):
     """Validate layer conforms to Leverage convention."""
-    tf.set_backend_key()
-    return _validate_layout()
+    return _validate_layout(paths.cwd)
 
 
 @click.command("import")
 @click.argument("address")
 @click.argument("_id", metavar="ID")
-@pass_container
+@pass_runner
 def _import(tf, address, _id):
     """Import a resource."""
-    exit_code = tf.start_in_layer("import", *tf.tf_default_args, address, _id)
-
-    if exit_code:
-        raise Exit(exit_code)
+    tf.run("import", *tf_default_args(), address, _id)
 
 
 @click.command("refresh-credentials")
-@pass_container
-def refresh_credentials(tf):
+@authenticate
+@pass_paths
+def refresh_credentials(paths):
     """Refresh the AWS credentials used on the current layer."""
-    tf.paths.check_for_layer_location()
-    if exit_code := tf.refresh_credentials():
-        raise Exit(exit_code)
+    paths.check_for_layer_location()
 
 
 # ###########################################################################
@@ -225,8 +214,8 @@ for subcommand in (
     output,
     destroy,
     version,
-    shell,
     _format,
+    force_unlock,
     validate,
     validate_layout,
     _import,
@@ -239,8 +228,8 @@ for subcommand in (
 # ###########################################################################
 # HANDLER FOR MANAGING THE BASE COMMANDS (init, plan, apply, destroy, output)
 # ###########################################################################
-@pass_container
-def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
+@pass_paths
+def invoke_for_all_commands(paths, layers, command, *args: Sequence[str], skip_validation=True):
     """
     Invoke helper for "all" commands.
 
@@ -254,10 +243,10 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
     layers = layers.split(",") if len(layers) > 0 else []
 
     # based on the location type manage the layers parameter
-    location_type = tf.paths.get_location_type()
+    location_type = paths.get_location_type()
     if location_type == "layer" and len(layers) == 0:
         # running on a layer
-        layers = [tf.paths.cwd]
+        layers = [paths.cwd]
     elif location_type == "layer":
         # running on a layer but --layers was set
         raise ExitError(1, "Can not set [bold]--layers[/bold] inside a layer.")
@@ -269,52 +258,32 @@ def invoke_for_all_commands(tf, layers, command, args, skip_validation=True):
         raise ExitError(1, "This command has to be run inside a layer or account directory.")
     else:
         # running on an account with --layers set
-        layers = [tf.paths.cwd / x for x in layers]
-
-    # get current location
-    original_location = tf.paths.cwd
-    original_working_dir = tf.container_config["working_dir"]
+        layers = [paths.cwd / x for x in layers]
 
     # validate each layer before calling the execute command
     for layer in layers:
         logger.debug(f"Checking for layer {layer}...")
-        # change to current dir and set it in the container
-        tf.paths.cwd = layer
 
         # check layers existence
         if not layer.is_dir():
-            logger.error(f"Directory [red]{layer}[/red] does not exist or is not a directory\n")
-            raise Exit(1)
-
-        # set the s3 key
-        tf.set_backend_key(skip_validation)
+            raise ExitError(1, f"Directory [red]{layer}[/red] does not exist or is not a directory\n")
 
         # validate layer
         validate_for_all_commands(layer, skip_validation=skip_validation)
 
-        # change to original dir and set it in the container
-        tf.paths.cwd = original_location
+        # set the s3 key
+        if not get_backend_key(layer / "config.tf"):
+            backend_key_base = f"{paths.cwd.relative_to(paths.root_dir).as_posix()}/terraform.tfstate"
+            backend_key = backend_key_base.replace("/base-", "/").replace("/tools-", "/")
+            set_backend_key(layer / "config.tf", backend_key)
 
     # check layers existence
     for layer in layers:
         if len(layers) > 1:
             logger.info(f"Invoking command for layer {layer}...")
 
-        # change to current dir and set it in the container
-        tf.paths.cwd = layer
-
-        # set the working dir
-        working_dir = f"{tf.paths.guest_base_path}/{tf.paths.cwd.relative_to(tf.paths.root_dir).as_posix()}"
-        tf.container_config["working_dir"] = working_dir
-
         # execute the actual command
-        command(args=args)
-
-        # change to original dir and set it in the container
-        tf.paths.cwd = original_location
-
-        # change to original working dir
-        tf.container_config["working_dir"] = original_working_dir
+        command(args, working_dir=layer)
 
     return layers
 
@@ -327,53 +296,49 @@ def validate_for_all_commands(layer, skip_validation=False):
     Args:
         layer: a full layer directory
     """
-
     logger.debug(f"Checking layer {layer}...")
-    if not skip_validation and not _validate_layout():
-        logger.error(
+    if not skip_validation and not _validate_layout(layer):
+        raise ExitError(
+            1,
             "Layer configuration doesn't seem to be valid. Exiting.\n"
             "If you are sure your configuration is actually correct "
-            "you may skip this validation using the --skip-validation flag."
+            "you may skip this validation using the --skip-validation flag.",
         )
-        raise Exit(1)
 
 
 # ###########################################################################
 # BASE COMMAND EXECUTORS
 # ###########################################################################
-@pass_container
-def _init(tf, args):
+@authenticate
+@pass_paths
+@pass_runner
+def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Initialize this layer."""
 
-    args = [
+    filtered_args = (
         arg
-        for index, arg in enumerate(args)
-        if not arg.startswith("-backend-config") or not arg[index - 1] == "-backend-config"
-    ]
-    args.append(f"-backend-config={tf.paths.backend_tfvars}")
+        for index, arg in list(enumerate(args))
+        if not str(arg).startswith("-backend-config") or not arg[index - 1] == "-backend-config"
+    )
+    init_args = (*filtered_args, f"-backend-config={paths.backend_tfvars}")
 
-    tf.paths.check_for_layer_location()
-
-    exit_code = tf.start_in_layer("init", *args)
-    if exit_code:
-        raise Exit(exit_code)
+    tf.run("init", *tf_default_args(), *init_args, working_dir=working_dir)
 
 
-@pass_container
-def _plan(tf, args):
+@authenticate
+@pass_paths
+@pass_runner
+def _plan(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Generate an execution plan for this layer."""
-    exit_code = tf.start_in_layer("plan", *tf.tf_default_args, *args)
-
-    if exit_code:
-        raise Exit(exit_code)
+    tf.run("plan", *tf_default_args(), *args, working_dir=working_dir)
 
 
 def has_a_plan_file(args: Sequence[str]) -> bool:
     """Determine whether the list of arguments has a plan file at the end.
 
-    Terraform apply arguments have the form "-target ADDRESS" or "-target=ADDRESS"
-    in one case "-var 'NAME=value'" or "-var='NAME=value'". There are also flags
-    with the form "-flag".
+    OpenTofu/Terraform apply arguments have the form "-target ADDRESS" or
+    "-target=ADDRESS" in one case "-var 'NAME=value'" or "-var='NAME=value'".
+    There are also flags with the form "-flag".
     We just need to know if there is or not a plan file as a last argument to
     decide if we prepend our default terraform arguments or not.
 
@@ -391,9 +356,11 @@ def has_a_plan_file(args: Sequence[str]) -> bool:
 
     """
 
-    # Valid 'terraform apply' flags:
+    # Valid 'apply' flags:
     # https://developer.hashicorp.com/terraform/cli/commands/apply
+    # https://opentofu.org/docs/cli/commands/apply
     tf_flags = [
+        # OpenTofu/Terraform flags:
         "-destroy",
         "-refresh-only",
         "-detailed-exitcode",
@@ -401,6 +368,11 @@ def has_a_plan_file(args: Sequence[str]) -> bool:
         "-compact-warnings",
         "-json",
         "-no-color",
+        # OpenTofu exclusive flags:
+        "-consolidate-warnings",
+        "-consolidate-errors",
+        "-concise",
+        "-show-sensitive",
     ]
 
     if not args or args[-1].startswith("-"):
@@ -415,32 +387,31 @@ def has_a_plan_file(args: Sequence[str]) -> bool:
     return True
 
 
-@pass_container
-def _apply(tf, args: Sequence[str]) -> None:
+@authenticate
+@pass_paths
+@pass_runner
+def _apply(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Build or change the infrastructure in this layer."""
-    default_args = [] if has_a_plan_file(args) else tf.tf_default_args
+    default_args = () if has_a_plan_file(args) else tf_default_args()
     logger.debug(f"Default args passed to apply command: {default_args}")
 
-    exit_code = tf.start_in_layer("apply", *default_args, *args)
-
-    if exit_code:
-        logger.error(f"Command execution failed with exit code: {exit_code}")
-        raise Exit(exit_code)
+    tf.run("apply", *default_args, *args, working_dir=working_dir)
 
 
-@pass_container
-def _output(tf, args):
+@authenticate
+@pass_paths
+@pass_runner
+def _output(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Show all output variables of this layer."""
-    tf.start_in_layer("output", *args)
+    tf.run("output", *args, working_dir=working_dir)
 
 
-@pass_container
-def _destroy(tf, args):
+@authenticate
+@pass_paths
+@pass_runner
+def _destroy(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Destroy infrastructure in this layer."""
-    exit_code = tf.start_in_layer("destroy", *tf.tf_default_args, *args)
-
-    if exit_code:
-        raise Exit(exit_code)
+    tf.run("destroy", *tf_default_args(), *args, working_dir=working_dir)
 
 
 # ###########################################################################
@@ -455,7 +426,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         account_name (str): Account Name
 
     Returns:
-        list of lists: Backend bucket key parts
+        list of strings: Backend bucket key parts
     """
     resp = []
 
@@ -509,55 +480,52 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         curated_layer_paths_withDR.append(curated_layer_path)
 
     for layer_path in curated_layer_paths_withDR:
-        resp.append([account_name, *layer_path])
+        resp.append(f"{'/'.join([account_name, *layer_path])}/terraform.tfstate")
 
     return resp
 
 
-@pass_container
-def _validate_layout(tf: TFContainer):
-    tf.paths.check_for_layer_location()
+@pass_paths
+def _validate_layout(paths, layer: str):
+    paths.check_for_layer_location()
 
     # Check for `environment = <account name>` in account.tfvars
-    account_name = tf.paths.account_conf.get("environment")
+    account_name = paths.account_conf.get("environment")
     logger.info("Checking environment name definition in [bold]account.tfvars[/bold]...")
     if account_name is None:
-        logger.error("[red]✘ FAILED[/red]\n")
-        raise Exit(1)
+        raise ExitError(1, "[red]✘ FAILED[/red]\n")
     logger.info("[green]✔ OK[/green]\n")
 
     # Check if account directory name matches with environment name
-    if tf.paths.account_dir.stem != account_name:
+    if paths.account_dir.stem != account_name:
         logger.warning(
             "[yellow]‼[/yellow] Account directory name does not match environment name.\n"
-            f"  Expected [bold]{account_name}[/bold], found [bold]{tf.paths.account_dir.stem}[/bold]\n"
+            f"  Expected [bold]{account_name}[/bold], found [bold]{paths.account_dir.stem}[/bold]\n"
         )
-
-    backend_key = tf.backend_key.split("/")
 
     # Flag to report layout validity
     valid_layout = True
 
     # Check backend bucket key
-    expected_backend_keys = _make_layer_backend_key(tf.paths.cwd, tf.paths.account_dir, account_name)
-    logger.info("Checking backend key...")
-    logger.info(f"Found: '{'/'.join(backend_key)}'")
-    backend_key = backend_key[:-1]
+    if backend_key := get_backend_key(Path(layer) / "config.tf"):
+        expected_backend_keys = _make_layer_backend_key(Path(layer), paths.account_dir, account_name)
+        logger.info("Checking backend key...")
+        logger.info(f"Found: '{backend_key}'")
 
-    if backend_key in expected_backend_keys:
-        logger.info("[green]✔ OK[/green]\n")
+        if backend_key in expected_backend_keys:
+            logger.info("[green]✔ OK[/green]\n")
+        else:
+            logger.info(f"Expected one of: {'; '.join(expected_backend_keys)}")
+            logger.error("[red]✘ FAILED[/red]\n")
+            valid_layout = False
     else:
-        exp_message = [f"{'/'.join(x)}/terraform.tfstate" for x in expected_backend_keys]
-        logger.info(f"Expected one of: {';'.join(exp_message)}")
-        logger.error("[red]✘ FAILED[/red]\n")
-        valid_layout = False
+        logger.info("No backend key found. Skipping backend key validation.\n")
 
-    backend_tfvars = Path(tf.paths.local_backend_tfvars)
-    backend_tfvars = parse_tf_file(backend_tfvars) if backend_tfvars.exists() else {}
+    backend_tfvars = parse_tf_file(paths.backend_tfvars) if paths.backend_tfvars.exists() else {}
 
     logger.info("Checking [bold]backend.tfvars[/bold]:\n")
-    names_prefix = f"{tf.project}-{account_name}"
-    names_prefix_bootstrap = f"{tf.project}-bootstrap"
+    names_prefix = f"{paths.project}-{account_name}"
+    names_prefix_bootstrap = f"{paths.project}-bootstrap"
 
     # Check profile, bucket and dynamo table names:
     for field in ("profile", "bucket", "dynamodb_table"):

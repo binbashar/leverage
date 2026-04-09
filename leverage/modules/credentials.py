@@ -2,27 +2,30 @@
     Credentials managing module.
 """
 
+import re
 import csv
 import json
-import re
-from functools import wraps
+import shutil
 from pathlib import Path
+from functools import wraps
+from typing import Optional, Union
 
 import click
 import questionary
-from click.exceptions import Exit
-from questionary import Choice
 from ruamel.yaml import YAML
+from questionary import Choice
+from click.exceptions import Exit
 
-from leverage import __toolbox_version__
 from leverage import logger
-from leverage._internals import pass_state
 from leverage._utils import ExitError
-from leverage.container import AWSCLIContainer
-from leverage.container import get_docker_client
-from leverage.path import NotARepositoryError
-from leverage.path import get_global_config_path
-from leverage.path import get_project_root_or_current_dir_path
+from leverage.modules.runner import Runner
+from leverage._internals import State, pass_runner, pass_paths, pass_state
+from leverage.path import (
+    NotARepositoryError,
+    PathsHandler,
+    get_global_config_path,
+    get_project_root_or_current_dir_path,
+)
 
 # Regexes for general validation
 PROJECT_SHORT = r"[a-z]{2,4}"
@@ -213,9 +216,6 @@ def _ask_for_credentials():
     return list(credentials.values())
 
 
-AWSCLI = None
-
-
 def _load_project_yaml():
     """Load project.yaml file contents."""
     if not PROJECT_CONFIG.exists():
@@ -253,7 +253,7 @@ def credentials(state):
             raise an exception
 
     If we reached the only common.tfvars scenario, we have no project name nor TF_IMAGE_TAG.
-    So the best chance is to read the common.tfvars directly without a conatiner, e.g. with sed or grep
+    So the best chance is to read the common.tfvars directly without a container, e.g. with sed or grep
     """
     project_config = _load_project_yaml()
     build_env = Path(f"{PROJECT_ROOT}/build.env")
@@ -265,8 +265,6 @@ def credentials(state):
         if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
-        if not build_env.exists():
-            build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG={__toolbox_version__}")
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist
@@ -290,13 +288,19 @@ def credentials(state):
     else:
         logger.info("Reading info from build.env")
 
-    state.container = AWSCLIContainer(get_docker_client())
-    state.container.ensure_image()
-    global AWSCLI
-    AWSCLI = state.container
+    state.runner = Runner(
+        binary="aws",
+        error_message=(
+            f"AWS CLI not found on system. "
+            f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+        ),
+        env_vars=state.environment,
+    )
 
 
-def _load_configs_for_credentials():
+@pass_state
+@pass_paths
+def _load_configs_for_credentials(paths: PathsHandler, state: State):
     """Load all required values to configure credentials.
 
     Raises:
@@ -309,11 +313,11 @@ def _load_configs_for_credentials():
     project_config = _load_project_yaml()
 
     logger.info("Loading project environment configuration file.")
-    env_config = AWSCLI.env_conf
+    env_config = state.config
 
     terraform_config = {}
     logger.info("Loading tf common configuration.")
-    terraform_config = AWSCLI.paths.common_conf
+    terraform_config = paths.common_conf
 
     config_values = {}
     config_values["short_name"] = (
@@ -324,7 +328,7 @@ def _load_configs_for_credentials():
     )
     config_values["project_name"] = project_config.get("project_name") or terraform_config.get("project_long")
 
-    # region_primary was added in refarch v1
+    # region_primary was added in ref-arch v1
     # for v2 it was replaced by region at project level
     region_primary = "region_primary"
     if not "region_primary" in project_config and not "region_primary" in terraform_config:
@@ -358,7 +362,8 @@ def _load_configs_for_credentials():
     return config_values
 
 
-def _profile_is_configured(profile):
+@pass_runner
+def _profile_is_configured(awscli: Runner, profile: str):
     """Check if given profile is already configured.
 
     Args:
@@ -367,7 +372,7 @@ def _profile_is_configured(profile):
     Returns:
         bool: Whether the profile was already configured or not.
     """
-    exit_code, _ = AWSCLI.exec("configure list", profile)
+    exit_code, _, _ = awscli.exec("configure", "list", "--profile", profile)
 
     return not exit_code
 
@@ -387,7 +392,7 @@ def _extract_credentials(file):
     Returns:
         str, str: Key ID, Secret Key
     """
-    with open(file) as access_keys_file:
+    with open(file, encoding="utf-8-sig") as access_keys_file:
         try:
             keys = next(csv.DictReader(access_keys_file))
 
@@ -410,19 +415,15 @@ def _extract_credentials(file):
     return access_key_id, secret_access_key
 
 
-def _backup_file(filename):
-    """Create backup of a credential file using docker image.
-
-    Args:
-        filename (str): File to backup, either `config` or `credentials`
-    """
-    credential_files_env_vars = {"config": "AWS_CONFIG_FILE", "credentials": "AWS_SHARED_CREDENTIALS_FILE"}
-    env_var = credential_files_env_vars.get(filename)
-
-    AWSCLI.system_exec(f"sh -c 'cp ${env_var} \"${{{env_var}}}.bkp\"'")
-
-
-def configure_credentials(profile, file=None, make_backup=False):
+@pass_paths
+@pass_runner
+def configure_credentials(
+    awscli: Runner,
+    paths: PathsHandler,
+    profile: str,
+    file: Optional[Union[Path, str]] = None,
+    make_backup: bool = False,
+):
     """Set credentials in `credentials` file for AWS cli. Make backup if required.
 
     Args:
@@ -440,17 +441,18 @@ def configure_credentials(profile, file=None, make_backup=False):
 
     if make_backup:
         logger.info("Backing up credentials file.")
-        _backup_file("credentials")
+        shutil.copy(paths.aws_credentials_file, paths.aws_credentials_file.with_suffix(".bkp"))
 
     values = {"aws_access_key_id": key_id, "aws_secret_access_key": secret_key}
 
     for key, value in values.items():
-        exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
 
-def _credentials_are_valid(profile):
+@pass_runner
+def _credentials_are_valid(awscli: Runner, profile: str):
     """Check if credentials for given profile are valid.
     If credentials are invalid, the command output will be as follows:
     Exit code:
@@ -465,12 +467,13 @@ def _credentials_are_valid(profile):
     Returns:
         bool: Whether the credentials are valid.
     """
-    error_code, output = AWSCLI.exec("sts get-caller-identity", profile)
+    error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile)
 
     return error_code != 255 and "InvalidClientTokenId" not in output
 
 
-def _get_management_account_id(profile):
+@pass_runner
+def _get_management_account_id(awscli: Runner, profile: str):
     """Get management account id through AWS cli.
 
     Args:
@@ -479,7 +482,7 @@ def _get_management_account_id(profile):
     Returns:
         str: Management account id.
     """
-    exit_code, caller_identity = AWSCLI.exec("--output json sts get-caller-identity", profile)
+    exit_code, caller_identity, _ = awscli.exec("sts", "get-caller-identity", "--output", "json", "--profile", profile)
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {caller_identity}")
 
@@ -487,7 +490,8 @@ def _get_management_account_id(profile):
     return caller_identity["Account"]
 
 
-def _get_organization_accounts(profile, project_name):
+@pass_runner
+def _get_organization_accounts(awscli: Runner, profile: str, project_name: str):
     """Get organization accounts names and ids. Removing the prefixed project name from the account names.
 
     Args:
@@ -497,7 +501,9 @@ def _get_organization_accounts(profile, project_name):
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    exit_code, organization_accounts = AWSCLI.exec("--output json organizations list-accounts", profile)
+    exit_code, organization_accounts, _ = awscli.exec(
+        "organizations", "list-accounts", "--output", "json", "--profile", profile
+    )
 
     if exit_code:
         return {}
@@ -514,7 +520,8 @@ def _get_organization_accounts(profile, project_name):
     return accounts
 
 
-def _get_mfa_serial(profile):
+@pass_runner
+def _get_mfa_serial(awscli: Runner, profile: str):
     """Get MFA serial for the given profile credentials.
 
     Args:
@@ -523,7 +530,7 @@ def _get_mfa_serial(profile):
     Returns:
         str: MFA device serial.
     """
-    exit_code, mfa_devices = AWSCLI.exec("--output json iam list-mfa-devices", profile)
+    exit_code, mfa_devices, _ = awscli.exec("iam", "list-mfa-devices", "--output", "json", "--profile", profile)
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {mfa_devices}")
     mfa_devices = json.loads(mfa_devices)
@@ -541,7 +548,8 @@ def _get_mfa_serial(profile):
     )
 
 
-def configure_profile(profile, values):
+@pass_runner
+def configure_profile(awscli: Runner, profile: str, values: dict):
     """Set profile in `config` file for AWS cli.
 
     Args:
@@ -550,12 +558,20 @@ def configure_profile(profile, values):
     """
     logger.info(f"\tConfiguring profile [bold]{profile}[/bold]")
     for key, value in values.items():
-        exit_code, output = AWSCLI.exec(f"configure set {key} {value}", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
 
-def configure_accounts_profiles(profile, region, organization_accounts, project_accounts, fetch_mfa_device):
+@pass_paths
+def configure_accounts_profiles(
+    paths: PathsHandler,
+    profile: str,
+    region: str,
+    organization_accounts: dict,
+    project_accounts: list,
+    fetch_mfa_device: bool,
+):
     """Set up the required profiles for all accounts to be used with AWS cli. Backup previous profiles.
 
     Args:
@@ -595,19 +611,19 @@ def configure_accounts_profiles(profile, region, organization_accounts, project_
         if mfa_serial:
             account_profile["mfa_serial"] = mfa_serial
         # A profile identifier looks like `le-security-oaar`
-        account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}"] = account_profile
+        account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}-mfa"] = account_profile
 
     logger.info("Backing up account profiles file.")
-    _backup_file("config")
+    shutil.copy(paths.aws_config_file, paths.aws_config_file.with_suffix(".bkp"))
 
     for profile_identifier, profile_values in account_profiles.items():
         configure_profile(profile_identifier, profile_values)
 
 
-def _update_account_ids(config):
+@pass_paths
+def _update_account_ids(paths: PathsHandler, config: dict):
     """Update accounts ids in global configuration file.
-    It updates both `[account name]_account_id` and `accounts` variables.
-    This last one maintaning the format:
+    It updates `accounts` variables maintaining the format:
     ```
     account = {
       account_name = {
@@ -620,11 +636,8 @@ def _update_account_ids(config):
     Args:
         config (dict): Project configuration values.
     """
-    if not PROJECT_COMMON_TFVARS.exists():
+    if not paths.common_tfvars.exists():
         return
-
-    container_base_dir = f"/{config['project_name']}/config"
-    container_common_tfvars_file = f"{container_base_dir}/{PROJECT_COMMON_TFVARS_FILE}"
 
     accs = []
     for account in config["organization"]["accounts"]:
@@ -632,12 +645,6 @@ def _update_account_ids(config):
 
         acc = [f'\n    email = "{acc_email}"']
         if acc_id:
-            AWSCLI.system_exec(
-                "hcledit "
-                f"-f {container_common_tfvars_file} -u"
-                f' attribute set {acc_name}_account_id "\\"{acc_id}\\""'
-            )
-
             acc.append(f'    id = "{acc_id}"')
         acc = ",\n".join(acc)
 
@@ -646,7 +653,11 @@ def _update_account_ids(config):
     accs = ",".join(accs)
     accs = f"{{{accs}\n}}"
 
-    AWSCLI.system_exec("hcledit " f"-f {container_common_tfvars_file} -u" f" attribute set accounts '{accs}'")
+    common_tfvars = paths.common_tfvars.read_text()
+    common_tfvars = re.sub(
+        r"accounts\s*=\s*\{.*?\}(?=\s*(?:\n|$))", f"accounts = {accs}", common_tfvars, flags=re.DOTALL
+    )
+    paths.common_tfvars.write_text(common_tfvars)
 
 
 def mutually_exclusive(context, param, value):

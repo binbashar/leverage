@@ -14,14 +14,11 @@ from ruamel.yaml import YAML
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
 
-from leverage import __toolbox_version__
 from leverage import logger
-from leverage.logger import console
-from leverage.path import get_root_path, get_project_root_or_current_dir_path
+from leverage.path import get_project_root_or_current_dir_path
 from leverage.path import NotARepositoryError
+from leverage.modules.tfrunner import TFRunner
 from leverage._utils import git, ExitError
-from leverage.container import get_docker_client
-from leverage.container import TFContainer
 
 # Leverage related base definitions
 LEVERAGE_DIR = Path.home() / ".leverage"
@@ -204,7 +201,7 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
 
         template = JINJA_ENV.get_template(template_location.as_posix())
         if "terraform_image_tag" not in config:
-            config["terraform_image_tag"] = __toolbox_version__
+            config["terraform_image_tag"] = ""
 
         rendered_template = template.render(config)
 
@@ -326,12 +323,17 @@ def create():
 
     # Format the code correctly
     logger.info("Reformatting configuration to the standard style.")
-
-    terraform = TFContainer(get_docker_client())
-    terraform.ensure_image()
-    terraform.disable_authentication()
-    with console.status("Formatting..."):
-        terraform.exec("fmt", "-recursive")
+    # TODO: Get rid of this ugly workaround
+    try:
+        TFRunner(binary="tofu").run("fmt", "-recursive")
+    except ExitError:
+        try:
+            TFRunner(binary="terraform").run("fmt", "-recursive")
+        except ExitError:
+            logger.warning(
+                "Could not reformat configuration to the standard style."
+                "\nPlease run `terraform fmt -recursive` or `tofu fmt -recursive` manually."
+            )
 
     logger.info("Finished setting up project.")
 

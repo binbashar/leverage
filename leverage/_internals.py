@@ -27,7 +27,10 @@ class State:
     def __init__(self):
         self._verbosity = None
         self.module = Module()
-        self.container = None
+        self.config = None
+        self.paths = None
+        self.runner = None
+        self.environment = None
 
     @property
     def verbosity(self):
@@ -41,13 +44,37 @@ class State:
 pass_state = click.make_pass_decorator(State, ensure=True)
 
 
-def pass_container(command):
-    """Decorator to pass the current container to the command."""
+def pass_runner(command):
+    """Decorator to pass the current runner (Terraform/OpenTofu runner) to the command."""
 
     @wraps(command)
     def new_command(*args, **kwargs):
         ctx = click.get_current_context()
 
-        return command(ctx.obj.container, *args, **kwargs)
+        return command(ctx.obj.runner, *args, **kwargs)
+
+    return new_command
+
+
+def pass_paths(command):
+    """Decorator to pass the current project paths to the command."""
+
+    @wraps(command)
+    def new_command(*args, **kwargs):
+        ctx = click.get_current_context()
+
+        return command(ctx.obj.paths, *args, **kwargs)
+
+    return new_command
+
+
+def pass_environment(command):
+    """Decorator to pass the current environment to the command."""
+
+    @wraps(command)
+    def new_command(*args, **kwargs):
+        ctx = click.get_current_context()
+
+        return command(ctx.obj.environment, *args, **kwargs)
 
     return new_command
