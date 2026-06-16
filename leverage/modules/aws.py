@@ -15,7 +15,7 @@ from leverage.modules.runner import Runner
 from leverage.modules.utils import _handle_subcommand
 from leverage._utils import get_or_create_section, ExitError
 from leverage._internals import pass_state, pass_runner, pass_paths
-from leverage.modules.auth import get_sso_access_token
+from leverage.modules.auth import get_sso_access_token, refresh_all_accounts_credentials
 from leverage.modules.auth import _perform_authentication as perform_authentication
 
 
@@ -217,9 +217,15 @@ def sso(context: click.Context, awscli: Runner, args: Tuple[str, ...]) -> None:
 
 
 @sso.command()
+@click.option(
+    "--refresh-all",
+    is_flag=True,
+    default=False,
+    help="Automatically refresh credentials for all configured accounts after login.",
+)
 @pass_paths
 @pass_runner
-def login(awscli: Runner, paths: PathsHandler) -> None:
+def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
     """Login"""
     exit_code, region, _ = awscli.exec("configure", "get", "sso_region", "--profile", f"{paths.project}-sso")
     if exit_code:
@@ -298,6 +304,22 @@ def login(awscli: Runner, paths: PathsHandler) -> None:
     token_file.write_text(json.dumps(token))
 
     logger.info(f"Successfully logged in!.")
+
+    if refresh_all:
+        refresh_all_accounts_credentials(paths, force_refresh=False)
+
+
+@sso.command()
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Force refresh all credentials, even if they haven't expired.",
+)
+@pass_paths
+def refresh(paths: PathsHandler, force: bool) -> None:
+    """Refresh credentials for all configured accounts"""
+    refresh_all_accounts_credentials(paths, force_refresh=force)
 
 
 @sso.command()

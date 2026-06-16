@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from functools import wraps
 from configparser import NoSectionError, NoOptionError
+from typing import Tuple
 
 import boto3
 import click
@@ -54,6 +55,23 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
     # if we are processing a profile from a different layer, we need to build it
     layer_profile = layer_profile or f"{project}-{account_name}-{sso_role.lower()}"
 
+    return account_id, account_name, sso_role, layer_profile
+
+
+def _get_sso_profile_from_section(
+    config_updater: ConfigUpdater, profile_section: str, project: str
+) -> Tuple[str, str, str, str]:
+    """
+    Read account_id, account_name, sso_role and build layer_profile from an SSO config section.
+
+    Section name format: "profile <project>-sso-<account_name>".
+    Used by refresh_all_accounts_credentials, where iteration starts from already-known
+    section names rather than profile references parsed from .tf files.
+    """
+    account_name = profile_section.replace(f"profile {project}-sso-", "")
+    account_id = config_updater.get(profile_section, "account_id").value
+    sso_role = config_updater.get(profile_section, "role_name").value
+    layer_profile = f"{project}-{account_name}-{sso_role.lower()}"
     return account_id, account_name, sso_role, layer_profile
 
 
@@ -174,13 +192,16 @@ def check_sso_token(paths: PathsHandler):
         )
 
 
-def refresh_layer_credentials(paths: PathsHandler):
+def refresh_layer_credentials(paths: PathsHandler) -> None:
     tf_profile, raw_profiles = get_profiles(paths)
     config_updater = ConfigUpdater()
     config_updater.read(paths.aws_config_file)
 
     region = config_updater.get(f"profile {paths.project}-sso", "sso_region").value
     client = boto3.client("sso", region_name=region)
+    access_token = _get_sso_token_or_raise(paths)
+    credentials_updater = None  # created lazily on the first profile that needs to be written
+
     for raw in raw_profiles:
         try:
             account_id, account_name, sso_role, layer_profile = get_layer_profile(
@@ -192,65 +213,227 @@ def refresh_layer_credentials(paths: PathsHandler):
         except SkipProfile:
             continue
 
-        # check if credentials need to be renewed
+        if _check_credentials_expiration(config_updater, layer_profile):
+            continue
+
+        if credentials_updater is None:
+            credentials_updater = _get_credentials_updater(paths)
+
+        _retrieve_and_update_credentials(
+            paths=paths,
+            client=client,
+            access_token=access_token,
+            account_id=account_id,
+            sso_role=sso_role,
+            layer_profile=layer_profile,
+            account_name=account_name,
+            config_updater=config_updater,
+            credentials_updater=credentials_updater,
+            raise_on_permission_error=True,
+        )
+
+
+def _check_credentials_expiration(
+    config_updater: ConfigUpdater, layer_profile: str, force_refresh: bool = False
+) -> bool:
+    """
+    Check if credentials need to be renewed based on expiration time.
+
+    Args:
+        config_updater: ConfigUpdater instance with the config file loaded.
+        layer_profile: The layer profile name to check.
+        force_refresh: If True, skip expiration check and return False (needs refresh).
+
+    Returns:
+        bool: True if credentials are still valid and should be skipped, False if they need refresh.
+    """
+    if force_refresh:
+        return False
+
+    try:
+        expiration = int(config_updater.get(f"profile {layer_profile}", "expiration").value) / 1000
+    except (NoSectionError, NoOptionError):
+        # first time using this profile, skip into the credential's retrieval step
+        logger.debug("No cached credentials found.")
+        return False
+
+    # we reduce the validity 30 minutes, to avoid expiration over long-standing tasks
+    renewal = time.time() + (30 * 60)
+    logger.debug(f"Token expiration time: {expiration}")
+    logger.debug(f"Token renewal time: {renewal}")
+    if renewal < expiration:
+        # still valid, nothing to do with this profile!
+        logger.info("Using already configured temporary credentials.")
+        return True
+
+    return False
+
+
+def _get_credentials_updater(paths: PathsHandler) -> ConfigUpdater:
+    """
+    Prepare and return a ConfigUpdater for the credentials file.
+    """
+    paths.aws_credentials_file.touch(exist_ok=True)
+    credentials_updater = ConfigUpdater()
+    credentials_updater.read(paths.aws_credentials_file)
+    return credentials_updater
+
+
+def _retrieve_and_update_credentials(
+    paths: PathsHandler,
+    client,
+    access_token: str,
+    account_id: str,
+    sso_role: str,
+    layer_profile: str,
+    account_name: str,
+    config_updater: ConfigUpdater,
+    credentials_updater: ConfigUpdater,
+    raise_on_permission_error: bool = True,
+) -> bool:
+    """
+    Retrieve credentials from SSO and update both config and credentials files.
+
+    Args:
+        paths: PathsHandler instance.
+        client: boto3 SSO client.
+        access_token: SSO access token.
+        account_id: AWS account ID.
+        sso_role: SSO role name.
+        layer_profile: Layer profile name.
+        account_name: Account name for logging.
+        config_updater: ConfigUpdater instance for config file.
+        credentials_updater: ConfigUpdater instance for credentials file.
+        raise_on_permission_error: If True, raise ExitError on permission errors.
+                                   If False, log warning and return False.
+
+    Returns:
+        bool: True if successful, False if permission error occurred (only when raise_on_permission_error=False).
+
+    Raises:
+        ExitError: If raise_on_permission_error=True and permission error occurs, or for any other ClientError.
+    """
+    logger.debug(f"Retrieving role credentials for {sso_role}...")
+    try:
+        credentials = client.get_role_credentials(
+            roleName=sso_role,
+            accountId=account_id,
+            accessToken=access_token,
+        )["roleCredentials"]
+    except ClientError as error:
+        if error.response["Error"]["Code"] in ("AccessDeniedException", "ForbiddenException"):
+            error_msg = (
+                f"User does not have permission to assume role [bold]{sso_role}[/bold]"
+                " in this account.\nPlease check with your administrator or try"
+                " running [bold]leverage aws configure sso[/bold]."
+            )
+            if raise_on_permission_error:
+                raise ExitError(40, error_msg) from error
+            logger.warning(f"No permission to assume role [bold]{sso_role}[/bold] in {account_name} account. Skipping.")
+            return False
+        raise ExitError(50, f"Error retrieving role credentials: {error}") from error
+
+    # Update expiration on aws/<project>/config
+    logger.info(f"Writing {layer_profile} profile")
+    update_config_section(
+        config_updater,
+        f"profile {layer_profile}",
+        data={
+            "expiration": credentials["expiration"],
+        },
+    )
+
+    # Write credentials on aws/<project>/credentials
+    update_config_section(
+        credentials_updater,
+        layer_profile,
+        data={
+            "aws_access_key_id": credentials["accessKeyId"],
+            "aws_secret_access_key": credentials["secretAccessKey"],
+            "aws_session_token": credentials["sessionToken"],
+        },
+    )
+
+    logger.info(f"Credentials for {account_name} account written successfully.")
+    return True
+
+
+def _get_sso_token_or_raise(paths: PathsHandler) -> str:
+    """Get the SSO access token, or raise a friendly ExitError on failure.
+
+    Wraps file/JSON/key errors so callers (e.g. `leverage aws sso refresh` invoked without
+    a prior `check_sso_token`) get a clear message instead of a raw stacktrace.
+    """
+    try:
+        return get_sso_access_token(paths.sso_token_file)
+    except (OSError, ValueError, KeyError) as e:
+        raise ExitError(1, f"Failed to get SSO access token: {e}") from e
+
+
+def refresh_all_accounts_credentials(paths: PathsHandler, force_refresh: bool = False) -> None:
+    """
+    Refresh credentials for all configured SSO accounts.
+
+    Iterates through every `profile <project>-sso-<account>` section in the AWS config
+    file and refreshes their credentials using the current SSO access token.
+
+    Args:
+        paths: PathsHandler instance with access to project paths and configuration.
+        force_refresh: If True, refresh all credentials regardless of expiration.
+                      If False, only refresh expired credentials.
+    """
+    logger.info("Refreshing credentials for all accounts...")
+
+    config_updater = ConfigUpdater()
+    config_updater.read(paths.aws_config_file)
+    # SSO account profiles use the section name "profile <project>-sso-<account>"; the trailing
+    # dash naturally excludes the parent "profile <project>-sso" section.
+    sso_prefix = f"profile {paths.project}-sso-"
+    sso_profiles = [s for s in config_updater.sections() if s.startswith(sso_prefix)]
+
+    if not sso_profiles:
+        logger.warning("No SSO account profiles found. Run 'leverage aws configure sso' first.")
+        return
+
+    logger.info(f"Found {len(sso_profiles)} account(s) to refresh.")
+    region = config_updater.get(f"profile {paths.project}-sso", "sso_region").value
+    client = boto3.client("sso", region_name=region)
+    access_token = _get_sso_token_or_raise(paths)
+    credentials_updater = _get_credentials_updater(paths)
+
+    refreshed = skipped = failed = 0
+    for profile_section in sso_profiles:
         try:
-            expiration = int(config_updater.get(f"profile {layer_profile}", "expiration").value) / 1000
-        except (NoSectionError, NoOptionError):
-            # first time using this profile, skip into the credential's retrieval step
-            logger.debug("No cached credentials found.")
-        else:
-            # we reduce the validity 30 minutes, to avoid expiration over long-standing tasks
-            renewal = time.time() + (30 * 60)
-            logger.debug(f"Token expiration time: {expiration}")
-            logger.debug(f"Token renewal time: {renewal}")
-            if renewal < expiration:
-                # still valid, nothing to do with these profile!
-                logger.info("Using already configured temporary credentials.")
+            account_id, account_name, sso_role, layer_profile = _get_sso_profile_from_section(
+                config_updater, profile_section, paths.project
+            )
+            if _check_credentials_expiration(config_updater, layer_profile, force_refresh=force_refresh):
+                logger.info(f"Credentials for {account_name} account are still valid, skipping.")
+                skipped += 1
                 continue
 
-        # retrieve credentials
-        logger.debug(f"Retrieving role credentials for {sso_role}...")
-        try:
-            credentials = client.get_role_credentials(
-                roleName=sso_role,
-                accountId=account_id,
-                accessToken=get_sso_access_token(paths.sso_token_file),
-            )["roleCredentials"]
-        except ClientError as error:
-            if error.response["Error"]["Code"] in ("AccessDeniedException", "ForbiddenException"):
-                raise ExitError(
-                    40,
-                    f"User does not have permission to assume role [bold]{sso_role}[/bold]"
-                    " in this account.\nPlease check with your administrator or try"
-                    " running [bold]leverage aws configure sso[/bold].",
-                )
+            logger.info(f"Retrieving credentials for {account_name} account...")
+            if _retrieve_and_update_credentials(
+                paths=paths,
+                client=client,
+                access_token=access_token,
+                account_id=account_id,
+                sso_role=sso_role,
+                layer_profile=layer_profile,
+                account_name=account_name,
+                config_updater=config_updater,
+                credentials_updater=credentials_updater,
+                raise_on_permission_error=False,
+            ):
+                logger.info(f"Credentials for {account_name} account refreshed successfully.")
+                refreshed += 1
             else:
-                raise ExitError(50, f"Error retrieving role credentials: {error}")
+                failed += 1
+        except Exception as e:
+            logger.exception(f"Failed to refresh credentials for {profile_section}: {e}")
+            failed += 1
 
-        # update expiration on aws/<project>/config
-        logger.info(f"Writing {layer_profile} profile")
-        update_config_section(
-            config_updater,
-            f"profile {layer_profile}",
-            data={
-                "expiration": credentials["expiration"],
-            },
-        )
-        # write credentials on aws/<project>/credentials (create the file if it doesn't exist first)
-        paths.aws_credentials_file.touch(exist_ok=True)
-        credentials_updater = ConfigUpdater()
-        credentials_updater.read(paths.aws_credentials_file)
-
-        update_config_section(
-            credentials_updater,
-            layer_profile,
-            data={
-                "aws_access_key_id": credentials["accessKeyId"],
-                "aws_secret_access_key": credentials["secretAccessKey"],
-                "aws_session_token": credentials["sessionToken"],
-            },
-        )
-        logger.info(f"Credentials for {account_name} account written successfully.")
+    logger.info(f"Credential refresh complete: {refreshed} refreshed, {skipped} skipped, {failed} failed.")
 
 
 def refresh_layer_credentials_mfa(paths: PathsHandler):

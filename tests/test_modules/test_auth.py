@@ -1,36 +1,56 @@
 from collections import namedtuple
 from pathlib import PosixPath
 from unittest import mock
-from unittest.mock import Mock, MagicMock, PropertyMock
+from unittest.mock import Mock, MagicMock
 
 import pytest
 from botocore.exceptions import ClientError
 from configupdater import ConfigUpdater
 
+from leverage import leverage
 from leverage._utils import ExitError
-from leverage.container import SSOContainer
-from leverage.modules.auth import refresh_layer_credentials, get_layer_profile, SkipProfile
+from leverage.path import PathsHandler
+from leverage.modules.auth import (
+    refresh_layer_credentials,
+    get_layer_profile,
+    SkipProfile,
+    refresh_all_accounts_credentials,
+)
 from leverage.modules.aws import get_account_roles, add_sso_profile, configure_sso_profiles
-from tests.test_containers import container_fixture_factory
 
 
 @pytest.fixture
-def sso_container(with_click_context, propagate_logs):
-    mocked_cont = container_fixture_factory(SSOContainer)
-    mocked_cont.get_sso_access_token = Mock(return_value="testing-token")
+def paths(with_click_context, propagate_logs):
+    """
+    Mock PathsHandler used by auth.py functions.
 
-    # mock PathsHandler with a named tuple?
-    with mock.patch(
-        "leverage.container.PathsHandler.local_backend_tfvars",
-        new_callable=PropertyMock(return_value=PosixPath("~/config/backend.tfvars")),
-    ), mock.patch(
-        "leverage.container.PathsHandler.host_aws_profiles_file",
-        new_callable=PropertyMock(return_value="~/.aws/test/config"),
-    ), mock.patch(
-        "leverage.container.PathsHandler.host_aws_credentials_file",
-        new_callable=PropertyMock(return_value="~/.aws/test/credentials"),
+    Backed by a MagicMock(spec=PathsHandler) so unexpected attribute access fails loudly. Path-like
+    attributes are real PosixPath instances so the patched `pathlib.Path.read_text` and
+    `configupdater.parser.open` side effects in the tests can resolve files via `data_dict`.
+    """
+    mocked = MagicMock(spec=PathsHandler)
+    mocked.project = "test"
+    mocked.project_long = "binbash-test"
+    mocked.aws_config_file = PosixPath("~/.aws/test/config")
+    mocked.aws_credentials_file = PosixPath("~/.aws/test/credentials")
+    mocked.backend_tfvars = PosixPath("~/config/backend.tfvars")
+    mocked.cwd = PosixPath("~/some/layer")
+    mocked.sso_cache = PosixPath("~/.aws/test/sso/cache")
+    mocked.sso_token_file = PosixPath("~/.aws/test/sso/cache/token")
+    return mocked
+
+
+@pytest.fixture
+def mock_sso_token():
+    """Mock get_sso_access_token() to return a fixed token without touching disk.
+
+    Patches both bindings (auth.py defines it, aws.py imports it) so any caller in either
+    module hits the same fake.
+    """
+    with mock.patch("leverage.modules.auth.get_sso_access_token", return_value="testing-token") as m, mock.patch(
+        "leverage.modules.aws.get_sso_access_token", return_value="testing-token"
     ):
-        yield mocked_cont
+        yield m
 
 
 ACC_ROLES = {
@@ -85,11 +105,11 @@ mocked_updater.__getitem__.return_value = {
 
 
 @mock.patch("boto3.client")
-def test_configure_sso_profiles(mocked_boto, sso_container):
+def test_configure_sso_profiles(mocked_boto, paths, mock_sso_token):
     with mock.patch("leverage.modules.aws.ConfigUpdater.__new__", return_value=mocked_updater):
         with mock.patch("leverage.modules.aws.get_account_roles", return_value=ACC_ROLES):
             with mock.patch("leverage.modules.aws.add_sso_profile") as mocked_add_profile:
-                configure_sso_profiles(sso_container)
+                configure_sso_profiles(paths)
 
     # 2 profiles were added
     assert mocked_add_profile.call_args_list[0].args[1:] == (
@@ -202,15 +222,21 @@ data_dict = {
 def read_text_side_effect(self: PosixPath, *args, **kwargs):
     """
     Every time we call read_text(), this side effect will try to get the value from data_dict rather than reading a disk file.
+    Raises FileNotFoundError for unknown files so the caller's `except FileNotFoundError`
+    paths (e.g. optional tf files in get_profiles) work as expected.
     """
-    return data_dict[self.name]
+    try:
+        return data_dict[self.name]
+    except KeyError:
+        raise FileNotFoundError(self.name)
 
 
-def open_side_effect(name: PosixPath, *args, **kwargs):
+def open_side_effect(name, *args, **kwargs):
     """
     Every time we call open(), this side effect will try to get the value from data_dict rather than reading a disk file.
+    Accepts either a string or PosixPath for `name`.
     """
-    return mock.mock_open(read_data=data_dict[name])()
+    return mock.mock_open(read_data=data_dict.get(str(name), data_dict.get(name, "")))()
 
 
 b3_client = Mock()
@@ -232,13 +258,13 @@ b3_client.get_role_credentials = Mock(
 @mock.patch("pathlib.Path.touch", new=Mock())
 @mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("configupdater.parser.open", side_effect=open_side_effect)
-def test_refresh_layer_credentials_first_time(mock_open, mock_boto, sso_container, caplog):
-    refresh_layer_credentials(sso_container)
+def test_refresh_layer_credentials_first_time(mock_open, mock_boto, paths, mock_sso_token, caplog):
+    refresh_layer_credentials(paths)
 
     # there was no previous profile set for the layer
-    assert caplog.messages[1] == "No cached credentials found."
+    assert "No cached credentials found." in caplog.messages
     # so we retrieve it
-    assert caplog.messages[2] == "Retrieving role credentials for devops..."
+    assert "Retrieving role credentials for devops..." in caplog.messages
 
 
 @mock.patch("leverage.modules.auth.get_profiles", new=Mock(return_value=("test-valid-devops", ["test-valid-profile"])))
@@ -247,13 +273,13 @@ def test_refresh_layer_credentials_first_time(mock_open, mock_boto, sso_containe
 @mock.patch("time.time", new=Mock(return_value=NOW_EPOCH))
 @mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("configupdater.parser.open", side_effect=open_side_effect)
-def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_container, caplog):
-    refresh_layer_credentials(sso_container)
+def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, paths, mock_sso_token, caplog):
+    refresh_layer_credentials(paths)
 
-    assert caplog.messages[1] == f"Token expiration time: 170600900.0"
-    assert caplog.messages[2] == f"Token renewal time: 170501800"  # NOW_EPOCH - 30*60
+    assert "Token expiration time: 170600900.0" in caplog.messages
+    assert "Token renewal time: 170501800" in caplog.messages  # NOW_EPOCH + 30*60
     # renewal is less than expiration, so our credentials are still fine
-    assert caplog.messages[3] == "Using already configured temporary credentials."
+    assert "Using already configured temporary credentials." in caplog.messages
 
 
 @mock.patch("leverage.modules.auth.update_config_section")
@@ -262,8 +288,8 @@ def test_refresh_layer_credentials_still_valid(mock_open, mock_boto, sso_contain
 @mock.patch("time.time", new=Mock(return_value=1705859000))
 @mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("configupdater.parser.open", side_effect=open_side_effect)
-def test_refresh_layer_credentials(mock_open, mock_boto, mock_update_conf, sso_container, propagate_logs):
-    refresh_layer_credentials(sso_container)
+def test_refresh_layer_credentials(mock_open, mock_boto, mock_update_conf, paths, mock_sso_token, propagate_logs):
+    refresh_layer_credentials(paths)
 
     # the expiration was set
     assert mock_update_conf.call_args_list[0].args[1] == "profile test-apps-devstg-devops"
@@ -289,11 +315,305 @@ def test_refresh_layer_credentials(mock_open, mock_boto, mock_update_conf, sso_c
         ClientError({"Error": {"Code": "ForbiddenException", "Message": "No access"}}, "GetRoleCredentials"),
     ],
 )
-def test_refresh_layer_credentials_no_access(mock_open, mock_update_conf, sso_container, error):
+def test_refresh_layer_credentials_no_access(mock_open, mock_update_conf, paths, mock_sso_token, error):
     with mock.patch("boto3.client") as mocked_client:
         mocked_client_obj = MagicMock()
         mocked_client_obj.get_role_credentials.side_effect = error
         mocked_client.return_value = mocked_client_obj
 
         with pytest.raises(ExitError):
-            refresh_layer_credentials(sso_container)
+            refresh_layer_credentials(paths)
+
+
+# Tests for refresh_all_accounts_credentials
+
+
+FILE_AWS_CONFIG_MULTI_ACCOUNTS = """
+[profile test-sso]
+sso_region = us-test-1
+
+[profile test-sso-security]
+account_id = 123456
+role_name = DevOps
+
+[profile test-sso-shared]
+account_id = 234567
+role_name = DevOps
+
+[profile test-sso-network]
+account_id = 345678
+role_name = DevOps
+
+[profile test-security-devops]
+expiration=1705859470
+
+[profile test-shared-devops]
+expiration=170600900000
+
+[profile test-network-devops]
+"""
+
+data_dict_multi = {
+    "~/.aws/test/config": FILE_AWS_CONFIG_MULTI_ACCOUNTS,
+    "~/.aws/test/credentials": "",
+}
+
+
+def open_side_effect_multi(name: PosixPath, *_args, **_kwargs):
+    """
+    Side effect for opening multi-account config files.
+    """
+    file_content = data_dict_multi.get(str(name), data_dict_multi.get(name, ""))
+    return mock.mock_open(read_data=file_content)()
+
+
+b3_client_multi = Mock()
+b3_client_multi.get_role_credentials = Mock(
+    return_value={
+        "roleCredentials": {
+            "expiration": "1705859500",
+            "accessKeyId": "new-access-key",
+            "secretAccessKey": "new-secret-key",
+            "sessionToken": "new-session-token",
+        }
+    }
+)
+
+
+@mock.patch("leverage.modules.auth.update_config_section")
+@mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("time.time", new=Mock(return_value=NOW_EPOCH))
+@mock.patch("boto3.client", return_value=b3_client_multi)
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect_multi)
+def test_refresh_all_accounts_credentials_success(
+    _mock_open, _mock_boto, _mock_update_conf, paths, mock_sso_token, caplog
+):
+    """
+    Test successful credential refresh for multiple accounts with smart expiration checking.
+
+    Verifies:
+    1. The function correctly identifies SSO profiles from the config file.
+    2. It skips accounts with valid (non-expired) credentials when force_refresh=False.
+    3. It refreshes credentials for accounts that need renewal.
+    4. It provides clear progress logging for each account.
+    5. It returns a summary of successful vs failed operations.
+    """
+    refresh_all_accounts_credentials(paths, force_refresh=False)
+
+    assert "Refreshing credentials for all accounts..." in caplog.text
+    assert "Found 3 account(s) to refresh." in caplog.text
+
+    assert "Retrieving credentials for security account..." in caplog.text
+    assert "Credentials for security account refreshed successfully" in caplog.text
+    assert "Retrieving credentials for network account..." in caplog.text
+    assert "Credentials for network account refreshed successfully" in caplog.text
+
+    assert "Credentials for shared account are still valid, skipping." in caplog.text
+
+    assert "Credential refresh complete: 2 refreshed, 1 skipped, 0 failed." in caplog.text
+
+
+@mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("boto3.client", return_value=b3_client_multi)
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect_multi)
+def test_refresh_all_accounts_credentials_force_refresh(_mock_open, _mock_boto, paths, mock_sso_token, caplog):
+    """
+    Test that force_refresh=True bypasses expiration checks and refreshes all credentials.
+    """
+    with mock.patch("leverage.modules.auth.update_config_section"):
+        refresh_all_accounts_credentials(paths, force_refresh=True)
+
+    assert "Retrieving credentials for security account..." in caplog.text
+    assert "Retrieving credentials for shared account..." in caplog.text
+    assert "Retrieving credentials for network account..." in caplog.text
+
+    assert "are still valid, skipping" not in caplog.text
+
+
+FILE_AWS_CONFIG_NO_SSO_PROFILES = """
+[profile test-sso]
+sso_region = us-test-1
+"""
+
+data_dict_no_profiles = {
+    "~/.aws/test/config": FILE_AWS_CONFIG_NO_SSO_PROFILES,
+    "~/.aws/test/credentials": "",
+}
+
+
+def open_side_effect_no_profiles(name: PosixPath, *_args, **_kwargs):
+    """
+    Side effect for opening config with no SSO profiles.
+    """
+    file_content = data_dict_no_profiles.get(str(name), data_dict_no_profiles.get(name, ""))
+    return mock.mock_open(read_data=file_content)()
+
+
+@mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("boto3.client", return_value=b3_client_multi)
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect_no_profiles)
+def test_refresh_all_accounts_credentials_no_profiles(_mock_open, _mock_boto, paths, mock_sso_token, caplog):
+    """
+    Test graceful handling when no SSO account profiles are configured.
+    """
+    refresh_all_accounts_credentials(paths, force_refresh=False)
+
+    assert "No SSO account profiles found" in caplog.text
+
+
+@mock.patch("leverage.modules.auth.update_config_section")
+@mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("time.time", new=Mock(return_value=NOW_EPOCH))
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect_multi)
+def test_refresh_all_accounts_credentials_permission_error(
+    _mock_open, _mock_update_conf, paths, mock_sso_token, caplog
+):
+    """
+    Test graceful handling of permission errors for specific accounts while continuing with others.
+    """
+    with mock.patch("boto3.client") as mocked_client:
+        mocked_client_obj = MagicMock()
+        # First call succeeds, second call fails with permission error, third call succeeds
+        mocked_client_obj.get_role_credentials.side_effect = [
+            {
+                "roleCredentials": {
+                    "expiration": "1705859500",
+                    "accessKeyId": "access-key",
+                    "secretAccessKey": "secret-key",
+                    "sessionToken": "session-token",
+                }
+            },
+            ClientError({"Error": {"Code": "AccessDeniedException", "Message": "No access"}}, "GetRoleCredentials"),
+            {
+                "roleCredentials": {
+                    "expiration": "1705859500",
+                    "accessKeyId": "access-key",
+                    "secretAccessKey": "secret-key",
+                    "sessionToken": "session-token",
+                }
+            },
+        ]
+        mocked_client.return_value = mocked_client_obj
+
+        refresh_all_accounts_credentials(paths, force_refresh=True)
+
+    assert "No permission to assume role" in caplog.text
+    assert "Skipping." in caplog.text
+
+    assert "Credential refresh complete: 2 refreshed, 0 skipped, 1 failed." in caplog.text
+
+
+@mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect_multi)
+def test_refresh_all_accounts_credentials_token_error(_mock_open, paths):
+    """
+    Test that the function properly handles SSO access token retrieval failures.
+    """
+    with mock.patch("leverage.modules.auth.get_sso_access_token", side_effect=FileNotFoundError("Token not found")):
+        with mock.patch("boto3.client", return_value=b3_client_multi):
+            with pytest.raises(ExitError, match="Failed to get SSO access token"):
+                refresh_all_accounts_credentials(paths, force_refresh=False)
+
+
+@mock.patch("leverage.modules.auth.update_config_section")
+@mock.patch("pathlib.Path.touch", new=Mock())
+@mock.patch("time.time", new=Mock(return_value=NOW_EPOCH))
+@mock.patch("boto3.client", return_value=b3_client_multi)
+@mock.patch("configupdater.parser.open", side_effect=open_side_effect_multi)
+def test_refresh_all_accounts_credentials_calls_update_correctly(
+    _mock_open, _mock_boto, mock_update_conf, paths, mock_sso_token
+):
+    """
+    Test that the function correctly updates both AWS config and credentials files with proper data.
+    """
+    refresh_all_accounts_credentials(paths, force_refresh=True)
+
+    # 3 accounts with force_refresh => 6 calls (config + credentials for each)
+    assert mock_update_conf.call_count == 6
+
+    profile_calls = [call.args[1] for call in mock_update_conf.call_args_list]
+    assert "profile test-security-devops" in profile_calls
+    assert "test-security-devops" in profile_calls
+    assert "profile test-shared-devops" in profile_calls
+    assert "test-shared-devops" in profile_calls
+    assert "profile test-network-devops" in profile_calls
+    assert "test-network-devops" in profile_calls
+
+
+# Integration-style test with real file operations
+def test_refresh_all_accounts_credentials_integration(tmp_path, paths, mock_sso_token, caplog):
+    """
+    Integration test using real file operations to verify end-to-end functionality.
+    """
+    # Create real temporary files
+    config_file = tmp_path / "config"
+    credentials_file = tmp_path / "credentials"
+
+    config_content = """[profile test-sso]
+sso_region = us-test-1
+
+[profile test-sso-security]
+account_id = 123456
+role_name = DevOps
+
+[profile test-sso-shared]
+account_id = 234567
+role_name = DevOps
+
+[profile test-security-devops]
+expiration=170600900000
+"""
+    config_file.write_text(config_content)
+    credentials_file.write_text("")
+
+    # Point the mocked PathsHandler at the real files
+    paths.aws_config_file = config_file
+    paths.aws_credentials_file = credentials_file
+
+    with mock.patch("time.time", return_value=NOW_EPOCH):
+        with mock.patch("boto3.client", return_value=b3_client_multi):
+            with mock.patch("leverage.modules.auth.update_config_section") as mock_update:
+                refresh_all_accounts_credentials(paths, force_refresh=False)
+
+    # Security account should be skipped (valid credentials), shared account should be refreshed
+    assert mock_update.call_count == 2  # 1 account refreshed (config + credentials)
+
+    profile_calls = [call.args[1] for call in mock_update.call_args_list]
+    assert "profile test-shared-devops" in profile_calls
+    assert "test-shared-devops" in profile_calls
+
+    assert "Found 2 account(s) to refresh." in caplog.text
+    assert "Credentials for security account are still valid, skipping." in caplog.text
+    assert "Retrieving credentials for shared account..." in caplog.text
+    assert "Credentials for shared account refreshed successfully." in caplog.text
+
+
+# CLI-level regression tests for the click subcommand dispatch path.
+#
+# Before the fix in `leverage.modules.utils._handle_subcommand`, invoking any sso subcommand
+# that declared its own click options (e.g. `aws sso login --refresh-all`, `aws sso refresh
+# [--force]`) crashed with `TypeError: <cmd>() got an unexpected keyword argument 'args'`
+# because `context.forward(subcommand)` was copying the parent group's `args` parameter into
+# the child callback's kwargs.
+
+
+def test_aws_sso_refresh_invokes_refresh_all_accounts(leverage_project, leverage_runner):
+    """`leverage aws sso refresh` reaches refresh_all_accounts_credentials with force_refresh=False."""
+    with leverage_runner(leverage_project) as runner:
+        with mock.patch("leverage.modules.aws.refresh_all_accounts_credentials") as mock_refresh:
+            result = runner.invoke(leverage, ["aws", "sso", "refresh"])
+
+    assert result.exit_code == 0, result.output + (str(result.exception) if result.exception else "")
+    mock_refresh.assert_called_once()
+    assert mock_refresh.call_args.kwargs == {"force_refresh": False}
+
+
+def test_aws_sso_refresh_force_invokes_refresh_all_accounts(leverage_project, leverage_runner):
+    """`leverage aws sso refresh --force` forwards force_refresh=True."""
+    with leverage_runner(leverage_project) as runner:
+        with mock.patch("leverage.modules.aws.refresh_all_accounts_credentials") as mock_refresh:
+            result = runner.invoke(leverage, ["aws", "sso", "refresh", "--force"])
+
+    assert result.exit_code == 0, result.output + (str(result.exception) if result.exception else "")
+    mock_refresh.assert_called_once()
+    assert mock_refresh.call_args.kwargs == {"force_refresh": True}
