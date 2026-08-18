@@ -22,8 +22,7 @@ REGION = r"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 @click.group()
 @pass_state
 def tofu(state):
-    """Run OpenTofu commands in a custom containerized environment that provides extra functionality when interacting
-    with your cloud provider such as handling multi factor authentication for you.
+    """Run OpenTofu commands in the context of the current project.
     All tofu subcommands that receive extra args will pass the given strings as is to their corresponding OpenTofu
     counterparts in the container. For example as in `leverage tofu apply -auto-approve` or
     `leverage tofu init -reconfigure`
@@ -34,8 +33,7 @@ def tofu(state):
 @click.group()
 @pass_state
 def terraform(state):
-    """Run Terraform commands in a custom containerized environment that provides extra functionality when interacting
-    with your cloud provider such as handling multi factor authentication for you.
+    """Run Terraform commands in the context of the current project.
     All terraform subcommands that receive extra args will pass the given strings as is to their corresponding Terraform
     counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
@@ -272,7 +270,7 @@ def invoke_for_all_commands(paths, layers, command, *args: Sequence[str], skip_v
         validate_for_all_commands(layer, skip_validation=skip_validation)
 
         # set the s3 key
-        if not get_backend_key(layer / "config.tf"):
+        if not skip_validation and not get_backend_key(layer / "config.tf"):
             backend_key_base = f"{paths.cwd.relative_to(paths.root_dir).as_posix()}/terraform.tfstate"
             backend_key = backend_key_base.replace("/base-", "/").replace("/tools-", "/")
             set_backend_key(layer / "config.tf", backend_key)
