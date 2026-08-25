@@ -24,7 +24,13 @@ def _handle_subcommand(
     Raises:
         Exit: Whenever runner execution returns a non-zero exit code
     """
-    caller_pos = args.index(caller_name) if caller_name is not None else 0
+    # When this function is called from a click subcommand callback (e.g. the `sso` group),
+    # `args` is the subcontext's args slice and no longer contains the caller's own name. Treat
+    # that as "search from the start" rather than crashing on ValueError.
+    try:
+        caller_pos = args.index(caller_name) if caller_name is not None else 0
+    except ValueError:
+        caller_pos = 0
 
     # Find if one of the wrapped subcommand was invoked
     wrapped_subcommands = context.command.commands.keys()
@@ -38,12 +44,15 @@ def _handle_subcommand(
         raise Exit(exit_code)
 
     subcommand = context.command.commands.get(subcommand)
-    # Check that the subcommand arguments are valid
-    subcommand.make_context(
-        info_name=subcommand.name, args=list(args)[args.index(subcommand.name) + 1 :], parent=context
+    # Build the subcommand's own context from its slice of the CLI args and invoke it through that
+    # context. We can't use context.invoke / context.forward here: invoke ignores user-supplied
+    # options (everything falls back to defaults) and forward copies the parent group's params
+    # (notably `args`) into the child callback's kwargs, which raises TypeError as soon as the
+    # child has its own click options (e.g. `sso login --refresh-all`, `sso refresh --force`).
+    sub_ctx = subcommand.make_context(
+        info_name=subcommand.name,
+        args=list(args)[args.index(subcommand.name) + 1 :],
+        parent=context,
     )
-    # Invoke wrapped command
-    if not subcommand.params:
-        context.invoke(subcommand)
-    else:
-        context.forward(subcommand)
+    with sub_ctx:
+        sub_ctx.command.invoke(sub_ctx)
