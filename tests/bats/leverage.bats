@@ -1,5 +1,6 @@
 setup_file(){
-    echo "$(tput bold)========================== bats tests session starts ===========================" >&3
+    # No `tput` here: it needs a terminal, and there is none when running on CI
+    echo "========================== bats tests session starts ===========================" >&3
 }
 
 setup(){

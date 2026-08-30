@@ -28,8 +28,9 @@ test-unit: ## Run unit tests and create a coverage report
 test-unit-no-cov: ## Run unit tests with no coverage report
 	pytest --verbose --no-cov
 
+# No formatter is forced: bats picks the pretty one on a terminal, and tap when there is none
 test-int: ## Run integration tests (requires bats, terraform and tofu, see README)
-	bats --verbose-run --show-output-of-passing-tests --print-output-on-failure -T -t -p -r tests/bats
+	bats --verbose-run --show-output-of-passing-tests --print-output-on-failure -T -r tests/bats
 
 tests: test-unit-no-cov test-int ## Run full set of tests
 
