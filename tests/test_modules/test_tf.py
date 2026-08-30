@@ -20,20 +20,26 @@ def test_init_arguments(leverage_project, leverage_runner, args):
     """
     with leverage_runner(leverage_project) as runner:
         with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
-            result = runner.invoke(leverage, ["tf", "init", *args])
+            runner.invoke(leverage, ["tf", "init", *args])
 
-        # Check that init was called
-        assert mocked_run.call_args_list[0][0][0] == "init"
+    called_args = list(mocked_run.call_args_list[0][0])
 
-        # Check that backend-config is included with the correct path
-        backend_config_path = str(leverage_project / "account" / "config" / "backend.tfvars")
-        backend_config_arg = f"-backend-config={backend_config_path}"
+    # Check that init was called
+    assert called_args[0] == "init"
 
-        # Build expected args: user args + backend-config
-        expected_args = list(args) + [backend_config_arg]
-        actual_args = list(mocked_run.call_args_list[0][0][1:])
+    # The layer tfvars are injected before the user arguments. They are discovered by globbing
+    # the config directories, so their order depends on the filesystem and cannot be asserted.
+    assert {arg for arg in called_args if arg.startswith("-var-file=")} == {
+        f"-var-file={(leverage_project / 'config' / 'common.tfvars').as_posix()}",
+        f"-var-file={(leverage_project / 'account' / 'config' / 'account.tfvars').as_posix()}",
+        f"-var-file={(leverage_project / 'account' / 'config' / 'backend.tfvars').as_posix()}",
+    }
 
-        assert actual_args == expected_args
+    # Check that the user arguments are preserved and backend-config is appended last
+    backend_config_arg = f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
+    remaining_args = [arg for arg in called_args[1:] if not arg.startswith("-var-file=")]
+
+    assert remaining_args == [*args, backend_config_arg]
 
 
 def test_init_with_args(leverage_project, leverage_runner):
@@ -42,14 +48,14 @@ def test_init_with_args(leverage_project, leverage_runner):
     """
     with leverage_runner(leverage_project) as runner:
         with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
-            result = runner.invoke(leverage, ["tf", "init", "-migrate-state"])
+            runner.invoke(leverage, ["tf", "init", "-migrate-state"])
 
-        assert mocked_run.call_args_list[0][0][0] == "init"
-        assert mocked_run.call_args_list[0][0][1] == "-migrate-state"
-        assert (
-            mocked_run.call_args_list[0][0][2]
-            == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
-        )
+    called_args = list(mocked_run.call_args_list[0][0])
+
+    # User arguments are placed after the layer tfvars and before the backend configuration
+    assert called_args[0] == "init"
+    assert called_args[-2] == "-migrate-state"
+    assert called_args[-1] == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
 
 
 @pytest.mark.parametrize(
