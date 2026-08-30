@@ -183,12 +183,8 @@ poetry run pre-commit install
 To run unit tests, pytest is the tool of choice, and the required dependencies are available in the
 corresponding `dev-requirements.txt`.
 
-Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/). Bear in mind that bats tests
-are meant to be run in a throwaway environment since they perform filesystem manipulations and installation and removal
-of packages, and the cleanup may not be completely thorough. As such, is highly recommended to run these tests using the
-docker image.
-
-### Manually
+Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/). They drive the installed
+`leverage` command, and work on temporary directories of their own, so they can be run directly on your machine.
 
 1. Unit tests:
 
@@ -207,17 +203,21 @@ brew install bats-support
 brew install bats-assert
 ```
 
+The cli runs the infrastructure binaries directly, so `terraform` and `tofu` need to be installed as well. See
+[System requirements](#system-requirements).
+
 ```bash
 bats -r tests/bats
 ```
 
-### Using docker image
+If `bats-support` and `bats-assert` are not installed in a location bats searches by default, point `BATS_LIB_PATH` at
+the directory holding them:
 
-A Docker image suitable for running all tests can be crafted by running `make build-image`. After crafting the image all
-tests can be executed.
+```bash
+BATS_LIB_PATH=/opt/homebrew/lib bats -r tests/bats
+```
 
-To run all tests, run `make tests`. Alternatively `make test-unit` or `make test-int` for unit or integration tests
-respectively.
+Alternatively, `make tests` runs both suites, and `make test-unit` or `make test-int` runs one of them.
 
 ## Release Process
 

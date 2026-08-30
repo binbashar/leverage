@@ -1,7 +1,4 @@
 .PHONY: help build
-LEVERAGE_TESTING_IMAGE := binbash/leverage-cli-testing
-LEVERAGE_TESTING_TAG   := 2.5.0
-LEVERAGE_IMAGE_TAG     := 1.3.5-0.2.0
 PYPROJECT_FILE := pyproject.toml
 INIT_FILE := leverage/__init__.py
 PLACEHOLDER := 0.0.0
@@ -25,17 +22,15 @@ help:
 	@echo 'Available Commands:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | $(SORT) | awk 'BEGIN {FS = ":.*?## "}; {printf " - \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-build-image: ## Build docker image for testing
-	docker build . -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG}
- 
 test-unit: ## Run unit tests and create a coverage report
-	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} pytest --verbose --cov=./ --cov-report=xml
+	pytest --verbose --cov=./leverage/ --cov-report=xml
 
 test-unit-no-cov: ## Run unit tests with no coverage report
-	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} pytest --verbose --no-cov
+	pytest --verbose --no-cov
 
-test-int: ## Run integration tests
-	docker run --rm --privileged --mount type=bind,src=$(shell pwd),dst=/leverage --env LEVERAGE_IMAGE_TAG=${LEVERAGE_IMAGE_TAG} -t ${LEVERAGE_TESTING_IMAGE}:${LEVERAGE_TESTING_TAG} bash -c "bats --verbose-run --show-output-of-passing-tests --print-output-on-failure -T -t -p -r tests/bats"
+# No formatter is forced: bats picks the pretty one on a terminal, and tap when there is none
+test-int: ## Run integration tests (requires bats, terraform and tofu, see README)
+	bats --verbose-run --show-output-of-passing-tests --print-output-on-failure -T -r tests/bats
 
 tests: test-unit-no-cov test-int ## Run full set of tests
 
