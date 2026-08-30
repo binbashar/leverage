@@ -620,6 +620,70 @@ def configure_accounts_profiles(
         configure_profile(profile_identifier, profile_values)
 
 
+def _find_matching_brace(content: str, start: int):
+    """Find the position of the brace closing the one opened at `start`.
+
+    Braces appearing inside double quoted strings are ignored.
+
+    Args:
+        content (str): Text to scan.
+        start (int): Position of the opening brace.
+
+    Returns:
+        int: Position of the matching closing brace, or None if it is unbalanced.
+    """
+    depth = 0
+    in_string = False
+    position = start
+
+    while position < len(content):
+        char = content[position]
+
+        if in_string:
+            if char == "\\":
+                position += 1
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if not depth:
+                return position
+
+        position += 1
+
+    return None
+
+
+def _replace_hcl_attribute(content: str, attribute: str, value: str):
+    """Replace the value of a brace delimited HCL attribute, honoring nested blocks.
+
+    A non greedy regex cannot be used for this: it stops at the first closing brace, which for a
+    nested block leaves the remaining entries orphaned and the file with unbalanced braces.
+
+    Args:
+        content (str): Full text of the HCL file.
+        attribute (str): Name of the attribute to replace, e.g. `accounts`.
+        value (str): New value for the attribute, enclosing braces included.
+
+    Returns:
+        str: Content with the attribute replaced, unchanged if the attribute was not found.
+    """
+    attribute_definition = re.search(rf"^{re.escape(attribute)}\s*=\s*\{{", content, flags=re.MULTILINE)
+    if attribute_definition is None:
+        return content
+
+    opening_brace = attribute_definition.end() - 1
+    closing_brace = _find_matching_brace(content, opening_brace)
+    if closing_brace is None:
+        return content
+
+    return f"{content[:attribute_definition.start()]}{attribute} = {value}{content[closing_brace + 1:]}"
+
+
 @pass_paths
 def _update_account_ids(paths: PathsHandler, config: dict):
     """Update accounts ids in global configuration file.
@@ -654,9 +718,7 @@ def _update_account_ids(paths: PathsHandler, config: dict):
     accs = f"{{{accs}\n}}"
 
     common_tfvars = paths.common_tfvars.read_text()
-    common_tfvars = re.sub(
-        r"accounts\s*=\s*\{.*?\}(?=\s*(?:\n|$))", f"accounts = {accs}", common_tfvars, flags=re.DOTALL
-    )
+    common_tfvars = _replace_hcl_attribute(common_tfvars, "accounts", accs)
     paths.common_tfvars.write_text(common_tfvars)
 
 
