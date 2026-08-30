@@ -45,7 +45,9 @@ def test_discover(leverage_project):
     }
     cli_runner = CliRunner()
     with cli_runner.isolated_filesystem(leverage_project) as leverage_project_folder:
-        with patch.object(
+        # The command only reaches _configure, so the binary does not need to be installed here.
+        # Runner binary discovery is covered on its own in tests/test_modules/test_runner.py.
+        with patch.object(kubectl_module.Runner, "_validate_binary", lambda runner: None), patch.object(
             kubectl_module, "_scan_clusters", return_value=[(leverage_project_folder, mocked_cluster_data)]
         ) as mkd_scan_clusters:
             with patch("simple_term_menu.TerminalMenu") as mkd_show:
