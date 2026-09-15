@@ -115,7 +115,7 @@ def test_check_for_cluster_layer(muted_click_context, propagate_logs):
     """
     paths = PathsHandler({"PROJECT": "test"})
     with patch.object(paths, "check_for_layer_location"):  # assume parent method is already tested
-        with pytest.raises(ExitError, match="This command can only run at the \[bold\]cluster layer\[/bold\]\."):
+        with pytest.raises(ExitError, match=r"This command can only run at the \[bold\]cluster layer\[/bold\]\."):
             paths.cwd = Path("/random")
             paths.check_for_cluster_layer()
 

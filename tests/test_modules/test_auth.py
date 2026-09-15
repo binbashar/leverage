@@ -1,4 +1,5 @@
 from collections import namedtuple
+from importlib import import_module
 from pathlib import PosixPath
 from unittest import mock
 from unittest.mock import Mock, MagicMock
@@ -17,6 +18,11 @@ from leverage.modules.auth import (
     refresh_all_accounts_credentials,
 )
 from leverage.modules.aws import get_account_roles, add_sso_profile, configure_sso_profiles
+
+# `leverage.modules.aws` resolves to the click Group of the same name, since it is re-exported
+# in `leverage/modules/__init__.py`. Patching by string would target that Group instead of the
+# module, so the module itself is imported and patched by object.
+aws_module = import_module("leverage.modules.aws")
 
 
 @pytest.fixture
@@ -47,8 +53,8 @@ def mock_sso_token():
     Patches both bindings (auth.py defines it, aws.py imports it) so any caller in either
     module hits the same fake.
     """
-    with mock.patch("leverage.modules.auth.get_sso_access_token", return_value="testing-token") as m, mock.patch(
-        "leverage.modules.aws.get_sso_access_token", return_value="testing-token"
+    with mock.patch("leverage.modules.auth.get_sso_access_token", return_value="testing-token") as m, mock.patch.object(
+        aws_module, "get_sso_access_token", return_value="testing-token"
     ):
         yield m
 
@@ -106,9 +112,9 @@ mocked_updater.__getitem__.return_value = {
 
 @mock.patch("boto3.client")
 def test_configure_sso_profiles(mocked_boto, paths, mock_sso_token):
-    with mock.patch("leverage.modules.aws.ConfigUpdater.__new__", return_value=mocked_updater):
-        with mock.patch("leverage.modules.aws.get_account_roles", return_value=ACC_ROLES):
-            with mock.patch("leverage.modules.aws.add_sso_profile") as mocked_add_profile:
+    with mock.patch.object(aws_module.ConfigUpdater, "__new__", return_value=mocked_updater):
+        with mock.patch.object(aws_module, "get_account_roles", return_value=ACC_ROLES):
+            with mock.patch.object(aws_module, "add_sso_profile") as mocked_add_profile:
                 configure_sso_profiles(paths)
 
     # 2 profiles were added
@@ -254,7 +260,7 @@ b3_client.get_role_credentials = Mock(
 
 @mock.patch("leverage.modules.auth.get_profiles", new=Mock(return_value=("test-first-devops", ["test-first-profile"])))
 @mock.patch("leverage.modules.auth.get_or_create_section", new=Mock())
-@mock.patch("leverage.modules.aws.ConfigUpdater.update_file", new=Mock())
+@mock.patch.object(aws_module.ConfigUpdater, "update_file", new=Mock())
 @mock.patch("pathlib.Path.touch", new=Mock())
 @mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("configupdater.parser.open", side_effect=open_side_effect)
@@ -269,7 +275,7 @@ def test_refresh_layer_credentials_first_time(mock_open, mock_boto, paths, mock_
 
 @mock.patch("leverage.modules.auth.get_profiles", new=Mock(return_value=("test-valid-devops", ["test-valid-profile"])))
 @mock.patch("leverage.modules.auth.get_or_create_section", new=Mock())
-@mock.patch("leverage.modules.aws.ConfigUpdater.update_file", new=Mock())
+@mock.patch.object(aws_module.ConfigUpdater, "update_file", new=Mock())
 @mock.patch("time.time", new=Mock(return_value=NOW_EPOCH))
 @mock.patch("boto3.client", return_value=b3_client)
 @mock.patch("configupdater.parser.open", side_effect=open_side_effect)
@@ -600,7 +606,7 @@ expiration=170600900000
 def test_aws_sso_refresh_invokes_refresh_all_accounts(leverage_project, leverage_runner):
     """`leverage aws sso refresh` reaches refresh_all_accounts_credentials with force_refresh=False."""
     with leverage_runner(leverage_project) as runner:
-        with mock.patch("leverage.modules.aws.refresh_all_accounts_credentials") as mock_refresh:
+        with mock.patch.object(aws_module, "refresh_all_accounts_credentials") as mock_refresh:
             result = runner.invoke(leverage, ["aws", "sso", "refresh"])
 
     assert result.exit_code == 0, result.output + (str(result.exception) if result.exception else "")
@@ -611,7 +617,7 @@ def test_aws_sso_refresh_invokes_refresh_all_accounts(leverage_project, leverage
 def test_aws_sso_refresh_force_invokes_refresh_all_accounts(leverage_project, leverage_runner):
     """`leverage aws sso refresh --force` forwards force_refresh=True."""
     with leverage_runner(leverage_project) as runner:
-        with mock.patch("leverage.modules.aws.refresh_all_accounts_credentials") as mock_refresh:
+        with mock.patch.object(aws_module, "refresh_all_accounts_credentials") as mock_refresh:
             result = runner.invoke(leverage, ["aws", "sso", "refresh", "--force"])
 
     assert result.exit_code == 0, result.output + (str(result.exception) if result.exception else "")

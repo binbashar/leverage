@@ -179,6 +179,7 @@ def leverage_runner(monkeypatch):
     - get_root_path and get_working_path in both leverage.path and leverage.conf
     - Path.cwd() to return the working directory
     - check_sso_token and refresh_layer_credentials to skip authentication
+    - TFRunner binary discovery, so the suite does not require tofu to be installed
 
     Args:
         leverage_directory: Path to the root of the mock project
@@ -186,6 +187,16 @@ def leverage_runner(monkeypatch):
     """
     from contextlib import contextmanager
     from leverage.modules import tf, auth
+    from leverage.modules.tfrunner import TFRunner
+
+    def skip_binary_validation(tf_runner):
+        """Accept the binary as is, without looking it up in PATH nor checking its version.
+
+        Tests using this fixture mock the actual execution, and the binary is not necessarily
+        installed where the suite runs. `TFRunner` binary discovery is covered on its own in
+        tests/test_modules/test_tfrunner.py.
+        """
+        tf_runner.binary_path = str(tf_runner.binary_input)
 
     @contextmanager
     def runner(leverage_directory):
@@ -204,6 +215,9 @@ def leverage_runner(monkeypatch):
         # Also patch in conf module since it imports these functions directly
         monkeypatch.setattr(conf, "get_root_path", lambda: leverage_directory)
         monkeypatch.setattr(conf, "get_working_path", lambda: working_directory)
+
+        # Patch binary discovery so the tests do not depend on tofu being installed
+        monkeypatch.setattr(TFRunner, "_validate_binary", skip_binary_validation)
 
         # Patch authentication functions to avoid SSO/credential checks
         monkeypatch.setattr(auth, "check_sso_token", lambda *args, **kwargs: None)

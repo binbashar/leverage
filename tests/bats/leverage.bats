@@ -1,11 +1,12 @@
 setup_file(){
-    echo "$(tput bold)========================== bats tests session starts ===========================" >&3
+    # No `tput` here: it needs a terminal, and there is none when running on CI
+    echo "========================== bats tests session starts ===========================" >&3
 }
 
 setup(){
-    # Bats modules are installed globally
-    load "/bats-support/load.bash"
-    load "/bats-assert/load.bash"
+    # Resolved through BATS_LIB_PATH
+    bats_load_library bats-support
+    bats_load_library bats-assert
 
     # Store useful paths
     TESTS_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/.." >/dev/null 2>&1 && pwd )"
@@ -38,7 +39,7 @@ teardown(){
     run leverage run -l
 
     assert_line --partial "Tasks in build file \`build.py\`:"
-    assert_line --regexp "hello\s+Say hello."
+    assert_line --regexp "hello[[:space:]]+Say hello."
     assert_line --regexp "Powered by Leverage [0-9]+.[0-9]+.[0-9]+"
 }
 
@@ -52,7 +53,7 @@ teardown(){
     run leverage run -l
 
     assert_line --partial "Tasks in build file \`build.py\`:"
-    assert_line --regexp "hello\s+Say hello."
+    assert_line --regexp "hello[[:space:]]+Say hello."
     assert_line --regexp "Powered by Leverage [0-9]+.[0-9]+.[0-9]+"
 }
 
