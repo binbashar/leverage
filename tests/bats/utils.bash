@@ -7,8 +7,11 @@ _create_directory_structure(){
               └ account
         And print the root path
     "
-    ROOT_DIR=$(mktemp -d -t tmpXXXXXX)
-    printf "PROJECT=ts\nTERRAFORM_IMAGE_TAG=%s\n" "$LEVERAGE_IMAGE_TAG" > $ROOT_DIR/"build.env"
+    # An explicit template keeps the name free of dots on both GNU and BSD mktemp. `-t` yields
+    # `tmp.XXXX` on macOS, and the build script is imported under a module name derived from the
+    # directory, which a dot turns into a package lookup that fails.
+    ROOT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leverageXXXXXX")
+    printf "PROJECT=ts\n" > $ROOT_DIR/"build.env"
     mkdir -p "$ROOT_DIR/config"
     mkdir -p "$ROOT_DIR/account"
     echo $ROOT_DIR

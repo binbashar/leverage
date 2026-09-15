@@ -11,9 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Testing
 - `poetry run pytest` - Run unit tests
 - `poetry run pytest --verbose --cov=./ --cov-report=xml` - Run unit tests with coverage
-- `make test-unit` - Run unit tests in Docker (with coverage)
-- `make test-unit-no-cov` - Run unit tests in Docker (no coverage)
-- `make test-int` - Run integration tests using bats in Docker
+- `make test-unit` - Run unit tests (with coverage)
+- `make test-unit-no-cov` - Run unit tests (no coverage)
+- `make test-int` - Run integration tests using bats (requires bats, terraform and tofu)
 - `make tests` - Run full test suite (unit + integration)
 
 ### Code Quality
@@ -27,10 +27,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make check` - Check distributables with twine
 - `poetry build` - Build package using Poetry
 - `make clean` - Clean build artifacts
-
-### Docker
-- `make build-image` - Build Docker testing image
-- All test commands can run in Docker using the testing image
 
 ## Architecture
 

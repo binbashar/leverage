@@ -1,7 +1,39 @@
-import pytest
+import subprocess
+from pathlib import Path
 
+import pytest
+from click.testing import CliRunner
+
+from leverage import conf, leverage
+from leverage import path as lepath
 from leverage._utils import ExitError
 from leverage.modules.project import validate_config
+
+
+def test_project_commands_run_before_the_project_configuration_exists(tmp_path, monkeypatch):
+    """
+    Test that the project commands do not require an already configured project.
+
+    `project init` creates the git repository, so from that point on the configuration loads fine
+    but holds no project name yet. Building the paths there aborts `project create` with
+    "Project name has not been set", on what is a perfectly legitimate invocation.
+    """
+    root = tmp_path / "new-project"
+    root.mkdir()
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+
+    monkeypatch.setattr(lepath, "get_root_path", lambda: root)
+    monkeypatch.setattr(lepath, "get_working_path", lambda: root)
+    monkeypatch.setattr(conf, "get_root_path", lambda: root)
+    monkeypatch.setattr(conf, "get_working_path", lambda: root)
+    monkeypatch.setattr(Path, "cwd", lambda: root)
+
+    result = CliRunner().invoke(leverage, ["project", "create"])
+
+    # The command is reached, and reports the missing configuration file on its own terms, rather
+    # than the run being aborted earlier while building the project paths.
+    assert "Project name has not been set" not in result.output
+    assert "No configuration file found for the project" in result.output
 
 
 @pytest.mark.parametrize(

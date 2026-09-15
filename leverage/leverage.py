@@ -27,6 +27,13 @@ def leverage(context, state, verbose):
         state.config = conf.load()
     except NotARepositoryError:
         return
+
+    # The `project` commands bootstrap a project, so they run before its configuration exists.
+    # `project init` creates the git repository, so from that point on the config loads fine but
+    # still holds no project name, and building the paths would fail on a legitimate invocation.
+    if context.invoked_subcommand == project.name:
+        return
+
     state.paths = PathsHandler(state.config)
     state.environment = {
         "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),

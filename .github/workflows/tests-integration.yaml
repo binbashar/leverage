@@ -5,14 +5,43 @@ on: [pull_request, workflow_dispatch]
 jobs:
   integration_tests:
     runs-on: ubuntu-latest
+    env:
+      TERRAFORM_VERSION: 1.9.8
+      OPENTOFU_VERSION: 1.9.1
+      BATS_LIB_PATH: /usr/local/lib/bats
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: build_image
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Leverage CLI
         run: |
-          echo "[INFO] Building image"
-          make build-image
-        shell: bash
+          echo "[INFO] Installing the cli, the bats tests drive the installed command"
+          pip install -e .
+          leverage --version
+
+      - name: Install bats
+        run: |
+          echo "[INFO] Installing bats and its libraries"
+          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
+          sudo /tmp/bats-core/install.sh /usr/local
+          sudo mkdir -p "${BATS_LIB_PATH}"
+          sudo git clone --depth 1 https://github.com/bats-core/bats-support.git "${BATS_LIB_PATH}/bats-support"
+          sudo git clone --depth 1 https://github.com/bats-core/bats-assert.git "${BATS_LIB_PATH}/bats-assert"
+
+      - name: Install terraform and tofu
+        run: |
+          echo "[INFO] Installing terraform ${TERRAFORM_VERSION} and tofu ${OPENTOFU_VERSION}"
+          curl -fsSL -o /tmp/terraform.zip \
+            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -o /tmp/tofu.zip \
+            "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_amd64.zip"
+          sudo unzip -q -o /tmp/terraform.zip terraform -d /usr/local/bin
+          sudo unzip -q -o /tmp/tofu.zip tofu -d /usr/local/bin
+          terraform version
+          tofu version
 
       - name: run_integration_tests
         run: |
