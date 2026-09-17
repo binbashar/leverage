@@ -146,10 +146,10 @@ jobs:
           aws configure set output json --profile bb-apps-devstg-devops
           aws configure set role_arn arn:aws:iam::${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}:role/DeployMaster --profile bb-apps-devstg-devops
           aws configure set source_profile bb-deploymaster --profile bb-apps-devstg-devops
-          aws configure set region us-east-1 --profile bb-security-devops
-          aws configure set output json --profile bb-security-devops
-          aws configure set role_arn arn:aws:iam::${{ secrets.AWS_SECURITY_ACCOUNT_ID }}:role/DeployMaster --profile bb-security-devops
-          aws configure set source_profile bb-deploymaster --profile bb-security-devops
+          aws configure set region us-east-1 --profile bb-security-oaar
+          aws configure set output json --profile bb-security-oaar
+          aws configure set role_arn arn:aws:iam::${{ secrets.AWS_SECURITY_ACCOUNT_ID }}:role/DeployMaster --profile bb-security-oaar
+          aws configure set source_profile bb-deploymaster --profile bb-security-oaar
           cat << EOF > ~/.aws/credentials
           [bb-deploymaster]
           aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
