@@ -387,7 +387,7 @@ def _profile_is_configured(awscli: Runner, profile: str):
     Returns:
         bool: Whether the profile was already configured or not.
     """
-    exit_code, _, _ = awscli.exec("configure", "list", "--profile", profile)
+    exit_code, _, _ = awscli.exec("configure", "list", "--profile", profile, raises=False)
 
     return not exit_code
 
@@ -461,7 +461,7 @@ def configure_credentials(
     values = {"aws_access_key_id": key_id, "aws_secret_access_key": secret_key}
 
     for key, value in values.items():
-        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile, raises=False)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
@@ -482,7 +482,7 @@ def _credentials_are_valid(awscli: Runner, profile: str):
     Returns:
         bool: Whether the credentials are valid.
     """
-    error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile)
+    error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile, raises=False)
 
     return error_code != 255 and "InvalidClientTokenId" not in output
 
@@ -497,7 +497,9 @@ def _get_management_account_id(awscli: Runner, profile: str):
     Returns:
         str: Management account id.
     """
-    exit_code, caller_identity, _ = awscli.exec("sts", "get-caller-identity", "--output", "json", "--profile", profile)
+    exit_code, caller_identity, _ = awscli.exec(
+        "sts", "get-caller-identity", "--output", "json", "--profile", profile, raises=False
+    )
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {caller_identity}")
 
@@ -517,7 +519,7 @@ def _get_organization_accounts(awscli: Runner, profile: str, project_name: str):
         dict: Mapping of organization accounts names to ids.
     """
     exit_code, organization_accounts, _ = awscli.exec(
-        "organizations", "list-accounts", "--output", "json", "--profile", profile
+        "organizations", "list-accounts", "--output", "json", "--profile", profile, raises=False
     )
 
     if exit_code:
@@ -545,7 +547,9 @@ def _get_mfa_serial(awscli: Runner, profile: str):
     Returns:
         str: MFA device serial.
     """
-    exit_code, mfa_devices, _ = awscli.exec("iam", "list-mfa-devices", "--output", "json", "--profile", profile)
+    exit_code, mfa_devices, _ = awscli.exec(
+        "iam", "list-mfa-devices", "--output", "json", "--profile", profile, raises=False
+    )
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {mfa_devices}")
     mfa_devices = json.loads(mfa_devices)
@@ -573,7 +577,7 @@ def configure_profile(awscli: Runner, profile: str, values: dict):
     """
     logger.info(f"\tConfiguring profile [bold]{profile}[/bold]")
     for key, value in values.items():
-        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile, raises=False)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
