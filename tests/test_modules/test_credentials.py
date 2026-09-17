@@ -210,6 +210,28 @@ def test_configure_accounts_profiles(mocked_copy):
 
 @mock.patch.object(credentials_module, "_get_mfa_serial", new=Mock(return_value="mfa123"))
 @mock.patch.object(credentials_module.shutil, "copy")
+def test_configure_accounts_profiles_skips_backup_when_config_file_does_not_exist(mocked_copy):
+    """
+    Regression test: on a profile's first-ever assumable-roles setup, `~/.aws/<project>/config`
+    has never been written yet (only the credentials file has, via `aws configure set`), so
+    backing it up must be skipped instead of raising FileNotFoundError.
+    """
+    paths = Mock(aws_config_file=Mock(exists=Mock(return_value=False)))
+    with cli_context(paths=paths):
+        with mock.patch.object(credentials_module, "configure_profile"):
+            configure_accounts_profiles(
+                "test-management",
+                "us-test-1",
+                {"acc1": "12345"},
+                [{"name": "acc1"}],
+                fetch_mfa_device=False,
+            )
+
+    mocked_copy.assert_not_called()
+
+
+@mock.patch.object(credentials_module, "_get_mfa_serial", new=Mock(return_value="mfa123"))
+@mock.patch.object(credentials_module.shutil, "copy")
 def test_configure_accounts_profiles_mfa(mocked_copy):
     """
     Test that the expected jsons for the aws credentials are generated as expected.
