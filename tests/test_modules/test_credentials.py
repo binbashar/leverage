@@ -7,6 +7,8 @@ from unittest.mock import Mock
 import click
 import pytest
 
+from leverage import conf as conf_module
+from leverage import path as lepath
 from leverage._internals import State
 from leverage._utils import ExitError
 from leverage.modules.credentials import (
@@ -43,7 +45,7 @@ def cli_context(runner=None, paths=None, config=None, verbose=False):
     state.config = config
 
     with click.Context(command=click.Command("leverage"), obj=state):
-        yield
+        yield state
 
 
 def awscli_returning(exit_code, output):
@@ -92,6 +94,55 @@ def test_load_configs_for_credentials():
             "secondary_region": "us-test-2",
             "short_name": "test",
         }
+
+
+@mock.patch.object(credentials_module, "_load_project_yaml", Mock(return_value={"short_name": "abc"}))
+@mock.patch.object(credentials_module, "Runner", Mock())
+def test_credentials_group_bootstraps_paths_from_project_yaml_only(monkeypatch, tmp_path):
+    """
+    Test that `credentials configure` works right after `project init`, before `project create`:
+    only project.yaml exists (no build.env, no common.tfvars yet). Since the top-level `leverage`
+    group callback skips PathsHandler in that state (state.paths stays None), the `credentials`
+    group callback itself should write build.env from project.yaml's short_name and build real,
+    project-scoped paths.
+    """
+    monkeypatch.setattr(credentials_module, "PROJECT_ROOT", tmp_path)
+    home = tmp_path / "home"
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setattr(lepath, "get_root_path", lambda: str(tmp_path))
+    monkeypatch.setattr(lepath, "get_working_path", lambda: str(tmp_path))
+    monkeypatch.setattr(conf_module, "get_root_path", lambda: str(tmp_path))
+    monkeypatch.setattr(conf_module, "get_working_path", lambda: str(tmp_path))
+
+    with cli_context(config={}) as state:
+        credentials_module.credentials.callback()
+
+        build_env = tmp_path / "build.env"
+        assert build_env.read_text() == "PROJECT=abc\nTF_IMAGE_TAG=1.1.9"
+        assert state.paths is not None
+        assert state.paths.project == "abc"
+        assert state.environment["AWS_SHARED_CREDENTIALS_FILE"] == str(home / ".aws" / "abc" / "credentials")
+        assert state.environment["AWS_CONFIG_FILE"] == str(home / ".aws" / "abc" / "config")
+
+
+@mock.patch.object(credentials_module, "_load_project_yaml", Mock(return_value={"short_name": "abc"}))
+@mock.patch.object(credentials_module, "Runner", Mock())
+def test_credentials_group_does_not_rebuild_or_clobber_when_already_resolved(monkeypatch, tmp_path):
+    """
+    Test that once state.paths has already been resolved upstream (build.env/common.tfvars
+    already existed), the `credentials` group callback neither rewrites the existing build.env
+    nor reconstructs state.paths, even though project.yaml is still present on disk.
+    """
+    monkeypatch.setattr(credentials_module, "PROJECT_ROOT", tmp_path)
+    build_env = tmp_path / "build.env"
+    build_env.write_text("PROJECT=abc\nMFA_ENABLED=true\nTF_BINARY=/usr/bin/tofu\n")
+
+    existing_paths = Mock()
+    with cli_context(paths=existing_paths, config={"PROJECT": "abc"}) as state:
+        credentials_module.credentials.callback()
+
+        assert build_env.read_text() == "PROJECT=abc\nMFA_ENABLED=true\nTF_BINARY=/usr/bin/tofu\n"
+        assert state.paths is existing_paths
 
 
 @mock.patch.object(credentials_module, "_get_mfa_serial", new=Mock(return_value="mfa123"))

@@ -267,3 +267,25 @@ def get_project_root_or_current_dir_path() -> Path:
         root = Path.cwd()
 
     return root
+
+
+def is_project_yaml_only_bootstrap() -> bool:
+    """Whether only `project.yaml` exists yet: `project init` has run but `project create`
+    hasn't, so neither `build.env` nor `config/common.tfvars` exist. PathsHandler can't resolve
+    a project name in this state; callers should skip it and derive the name from project.yaml.
+    """
+    root = get_project_root_or_current_dir_path()
+    build_env = root / "build.env"
+    common_tfvars = Path(get_global_config_path()) / "common.tfvars"
+    return (root / "project.yaml").exists() and not build_env.exists() and not common_tfvars.exists()
+
+
+def build_paths_and_environment(config: dict) -> tuple[PathsHandler, dict]:
+    """Build a PathsHandler and the AWS cli environment variables derived from it. Shared by any
+    group callback that needs to resolve project paths from `state.config`."""
+    paths = PathsHandler(config)
+    environment = {
+        "AWS_SHARED_CREDENTIALS_FILE": str(paths.aws_credentials_file),
+        "AWS_CONFIG_FILE": str(paths.aws_config_file),
+    }
+    return paths, environment

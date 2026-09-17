@@ -6,7 +6,7 @@ import click
 
 from leverage import __version__, conf
 from leverage._internals import pass_state
-from leverage.path import NotARepositoryError, PathsHandler
+from leverage.path import NotARepositoryError, build_paths_and_environment, is_project_yaml_only_bootstrap
 from leverage.modules import aws, credentials, run, project, tofu, terraform, tfautomv, kubectl
 
 
@@ -34,11 +34,14 @@ def leverage(context, state, verbose):
     if context.invoked_subcommand == project.name:
         return
 
-    state.paths = PathsHandler(state.config)
-    state.environment = {
-        "AWS_SHARED_CREDENTIALS_FILE": str(state.paths.aws_credentials_file),
-        "AWS_CONFIG_FILE": str(state.paths.aws_config_file),
-    }
+    # `credentials configure` can legitimately run right after `project init` and before
+    # `project create`: only project.yaml exists, so no project name can be resolved yet and
+    # PathsHandler would abort. The `credentials` group callback derives the project name from
+    # project.yaml and builds state.paths itself in that case.
+    if context.invoked_subcommand == credentials.name and is_project_yaml_only_bootstrap():
+        return
+
+    state.paths, state.environment = build_paths_and_environment(state.config)
 
 
 # Add modules to leverage

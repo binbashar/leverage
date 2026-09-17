@@ -16,13 +16,14 @@ from ruamel.yaml import YAML
 from questionary import Choice
 from click.exceptions import Exit
 
-from leverage import logger
+from leverage import conf, logger
 from leverage._utils import ExitError
 from leverage.modules.runner import Runner
 from leverage._internals import State, pass_runner, pass_paths, pass_state
 from leverage.path import (
     NotARepositoryError,
     PathsHandler,
+    build_paths_and_environment,
     get_global_config_path,
     get_project_root_or_current_dir_path,
 )
@@ -265,6 +266,20 @@ def credentials(state):
         if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
+
+        if not build_env.exists():
+            # Completes this branch's own docstring promise, mirroring the common.tfvars branch
+            # below. Guarded so a mature project that still has project.yaml on disk never has
+            # its real build.env clobbered (project create never deletes project.yaml).
+            logger.info("Writing project short name to build.env.")
+            build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG=1.1.9")
+
+        if state.paths is None:
+            # Upstream (leverage.py) skipped PathsHandler because only project.yaml existed.
+            # build.env now has a project name (or already did) - reload config from disk and
+            # build real, project-scoped paths here instead of leaving state.paths/environment None.
+            state.config = conf.load()
+            state.paths, state.environment = build_paths_and_environment(state.config)
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist
