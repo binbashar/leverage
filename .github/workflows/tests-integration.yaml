@@ -51,6 +51,9 @@ jobs:
 
   integration_tests_cli_refarch:
     runs-on: ubuntu-latest
+    env:
+      TERRAFORM_VERSION: 1.9.8
+      OPENTOFU_VERSION: 1.9.1
     strategy:
       max-parallel: 1
       matrix:
@@ -78,6 +81,18 @@ jobs:
           export ENV POETRY_VIRTUALENVS_CREATE=false
           export PATH="${PATH}:${HOME}/.poetry/bin"
           poetry install --with=dev
+
+      - name: Install terraform and tofu
+        run: |
+          echo "[INFO] Installing terraform ${TERRAFORM_VERSION} and tofu ${OPENTOFU_VERSION}"
+          curl -fsSL -o /tmp/terraform.zip \
+            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSL -o /tmp/tofu.zip \
+            "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_amd64.zip"
+          sudo unzip -q -o /tmp/terraform.zip terraform -d /usr/local/bin
+          sudo unzip -q -o /tmp/tofu.zip tofu -d /usr/local/bin
+          terraform version
+          tofu version
 
       - name: Build Leverage CLI
         run: |
