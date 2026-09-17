@@ -183,11 +183,13 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
 
     @property
     def common_tfvars(self):
-        return f"{self.root_dir}/config/{self.COMMON_TF_VARS}"
+        # return f"{self.root_dir}/config/{self.COMMON_TF_VARS}"
+        return self.root_dir / "config" / self.COMMON_TF_VARS
 
     @property
     def account_tfvars(self):
-        return f"{self.account_dir}/config/{self.ACCOUNT_TF_VARS}"
+        # return f"{self.account_dir}/config/{self.ACCOUNT_TF_VARS}"
+        return self.account_dir / "config" / self.ACCOUNT_TF_VARS
 
     @property
     def backend_tfvars(self):
