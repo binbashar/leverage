@@ -140,6 +140,32 @@ def test_is_project_yaml_only_bootstrap_false_with_common_tfvars(monkeypatch, tm
     assert is_project_yaml_only_bootstrap() is False
 
 
+@pytest.mark.parametrize(
+    "mfa_enabled_value, expected",
+    [
+        ("true", True),
+        ("True", True),
+        ("TRUE", True),
+        ("false", False),
+        ("False", False),
+        (None, False),
+    ],
+)
+def test_mfa_enabled_is_cast_to_bool(mfa_enabled_value, expected):
+    """
+    Regression test: PathsHandler.mfa_enabled must be a real bool, not the raw string from
+    build.env - a non-empty string like "false" is truthy in Python, which would otherwise make
+    `elif paths.mfa_enabled:` (leverage/modules/auth.py) always fire regardless of its value.
+    """
+    env_conf = {"PROJECT": "test"}
+    if mfa_enabled_value is not None:
+        env_conf["MFA_ENABLED"] = mfa_enabled_value
+
+    paths = PathsHandler(env_conf)
+
+    assert paths.mfa_enabled is expected
+
+
 def test_check_for_cluster_layer(muted_click_context, propagate_logs):
     """
     Test that if we are not on a cluster layer, we raise an error.

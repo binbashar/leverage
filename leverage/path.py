@@ -157,7 +157,7 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
         self.backend_conf = hcl2.loads(backend_config.read_text()) if backend_config.exists() else {}
 
         # Get MFA enabled status
-        self.mfa_enabled = env_conf.get("MFA_ENABLED", "false")
+        self.mfa_enabled = str(env_conf.get("MFA_ENABLED", "false")).strip().lower() == "true"
 
         # Get project name
         self.project = self.common_conf.get("project", env_conf.get("PROJECT", False))
