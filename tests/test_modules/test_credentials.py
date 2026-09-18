@@ -7,6 +7,8 @@ from unittest.mock import Mock
 import click
 import pytest
 
+from leverage import conf as conf_module
+from leverage import path as lepath
 from leverage._internals import State
 from leverage._utils import ExitError
 from leverage.modules.credentials import (
@@ -15,6 +17,7 @@ from leverage.modules.credentials import (
     _extract_credentials,
     _get_mfa_serial,
     _get_organization_accounts,
+    _profile_is_configured,
     _replace_hcl_attribute,
     configure_credentials,
     _credentials_are_valid,
@@ -43,12 +46,22 @@ def cli_context(runner=None, paths=None, config=None, verbose=False):
     state.config = config
 
     with click.Context(command=click.Command("leverage"), obj=state):
-        yield
+        yield state
 
 
-def awscli_returning(exit_code, output):
-    """AWS cli runner double whose `exec` returns the given exit code and output."""
-    return Mock(exec=Mock(return_value=(exit_code, output, "")))
+def awscli_returning(exit_code, output, error=""):
+    """AWS cli runner double whose `exec` mimics Runner.exec's `raises=True` default: raises
+    ExitError on a nonzero exit_code unless the caller passed `raises=False`, exactly like the
+    real Runner.exec/Runner.run does. This lets a call site that forgets to pass `raises=False`
+    fail its own test the same way it would fail in production.
+    """
+
+    def fake_exec(*args, raises=True, **kwargs):
+        if raises and exit_code:
+            raise ExitError(exit_code, f"Command execution failed: {error or output}")
+        return (exit_code, output, error)
+
+    return Mock(exec=Mock(side_effect=fake_exec))
 
 
 PROJECT_YAML = {
@@ -94,6 +107,73 @@ def test_load_configs_for_credentials():
         }
 
 
+@mock.patch.object(credentials_module, "_load_project_yaml", Mock(return_value={"short_name": "abc"}))
+@mock.patch.object(credentials_module, "Runner", Mock())
+def test_credentials_group_bootstraps_paths_from_project_yaml_only(monkeypatch, tmp_path):
+    """
+    Test that `credentials configure` works right after `project init`, before `project create`:
+    only project.yaml exists (no build.env, no common.tfvars yet). Since the top-level `leverage`
+    group callback skips PathsHandler in that state (state.paths stays None), the `credentials`
+    group callback itself should write build.env from project.yaml's short_name and build real,
+    project-scoped paths.
+    """
+    monkeypatch.setattr(credentials_module, "PROJECT_ROOT", tmp_path)
+    home = tmp_path / "home"
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setattr(lepath, "get_root_path", lambda: str(tmp_path))
+    monkeypatch.setattr(lepath, "get_working_path", lambda: str(tmp_path))
+    monkeypatch.setattr(conf_module, "get_root_path", lambda: str(tmp_path))
+    monkeypatch.setattr(conf_module, "get_working_path", lambda: str(tmp_path))
+
+    with cli_context(config={}) as state:
+        credentials_module.credentials.callback()
+
+        build_env = tmp_path / "build.env"
+        assert build_env.read_text() == "PROJECT=abc\nTF_IMAGE_TAG=1.1.9"
+        assert state.paths is not None
+        assert state.paths.project == "abc"
+        assert state.environment["AWS_SHARED_CREDENTIALS_FILE"] == str(home / ".aws" / "abc" / "credentials")
+        assert state.environment["AWS_CONFIG_FILE"] == str(home / ".aws" / "abc" / "config")
+
+
+@mock.patch.object(credentials_module, "_load_project_yaml", Mock(return_value={"short_name": "abc"}))
+@mock.patch.object(credentials_module, "Runner", Mock())
+def test_credentials_group_does_not_rebuild_or_clobber_when_already_resolved(monkeypatch, tmp_path):
+    """
+    Test that once state.paths has already been resolved upstream (build.env/common.tfvars
+    already existed), the `credentials` group callback neither rewrites the existing build.env
+    nor reconstructs state.paths, even though project.yaml is still present on disk.
+    """
+    monkeypatch.setattr(credentials_module, "PROJECT_ROOT", tmp_path)
+    build_env = tmp_path / "build.env"
+    build_env.write_text("PROJECT=abc\nMFA_ENABLED=true\nTF_BINARY=/usr/bin/tofu\n")
+
+    existing_paths = Mock()
+    with cli_context(paths=existing_paths, config={"PROJECT": "abc"}) as state:
+        credentials_module.credentials.callback()
+
+        assert build_env.read_text() == "PROJECT=abc\nMFA_ENABLED=true\nTF_BINARY=/usr/bin/tofu\n"
+        assert state.paths is existing_paths
+
+
+def test_profile_is_configured():
+    """Test that an already-configured profile is reported as such."""
+    awscli = awscli_returning(0, "some output")
+    with cli_context(runner=awscli):
+        assert _profile_is_configured("foo")
+
+
+def test_profile_is_not_configured():
+    """
+    Regression test: a never-configured profile makes `aws configure list` exit 255
+    ("The config profile (...) could not be found"), which must be reported as False,
+    not raised - `_profile_is_configured` is meant to probe, not crash.
+    """
+    awscli = awscli_returning(255, "The config profile (foo) could not be found")
+    with cli_context(runner=awscli):
+        assert not _profile_is_configured("foo")
+
+
 @mock.patch.object(credentials_module, "_get_mfa_serial", new=Mock(return_value="mfa123"))
 @mock.patch.object(credentials_module.shutil, "copy")
 def test_configure_accounts_profiles(mocked_copy):
@@ -126,6 +206,28 @@ def test_configure_accounts_profiles(mocked_copy):
     }
 
     assert mocked_config.call_args_list[0][0][1] == expected
+
+
+@mock.patch.object(credentials_module, "_get_mfa_serial", new=Mock(return_value="mfa123"))
+@mock.patch.object(credentials_module.shutil, "copy")
+def test_configure_accounts_profiles_skips_backup_when_config_file_does_not_exist(mocked_copy):
+    """
+    Regression test: on a profile's first-ever assumable-roles setup, `~/.aws/<project>/config`
+    has never been written yet (only the credentials file has, via `aws configure set`), so
+    backing it up must be skipped instead of raising FileNotFoundError.
+    """
+    paths = Mock(aws_config_file=Mock(exists=Mock(return_value=False)))
+    with cli_context(paths=paths):
+        with mock.patch.object(credentials_module, "configure_profile"):
+            configure_accounts_profiles(
+                "test-management",
+                "us-test-1",
+                {"acc1": "12345"},
+                [{"name": "acc1"}],
+                fetch_mfa_device=False,
+            )
+
+    mocked_copy.assert_not_called()
 
 
 @mock.patch.object(credentials_module, "_get_mfa_serial", new=Mock(return_value="mfa123"))
@@ -278,8 +380,8 @@ def test_configure_profile():
         configure_profile("test-acc1-oaar-mfa", {"region": "us-test-1", "output": "json"})
 
     assert awscli.exec.call_args_list == [
-        mock.call("configure", "set", "region", "us-test-1", "--profile", "test-acc1-oaar-mfa"),
-        mock.call("configure", "set", "output", "json", "--profile", "test-acc1-oaar-mfa"),
+        mock.call("configure", "set", "region", "us-test-1", "--profile", "test-acc1-oaar-mfa", raises=False),
+        mock.call("configure", "set", "output", "json", "--profile", "test-acc1-oaar-mfa", raises=False),
     ]
 
 
