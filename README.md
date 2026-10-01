@@ -7,11 +7,9 @@
 
 Leverage CLI is the tool used to manage and interact with any Leverage project.
 
-It transparently handles the most complex and error prone tasks that arise from working with a state-of-the-art
-infrastructure definition like our Leverage Reference Architecture. Leverage CLI uses a dockerized approach to
-encapsulate the tools needed to perform such tasks and to free the user from having to deal with the configuration and
-management of said tools.
-Provides the means to interact with your Leverage project and allows you to define custom tasks to run.
+It transparently handles the most complex and error-prone tasks that arise from working with a state-of-the-art infrastructure definition like our Leverage Reference Architecture. It understands the structure of the Leverage Reference Architecture and assists the user in their day-to-day operation.
+
+Leverage CLI orchestrates a set of tools used to operate in a Leverage project. Usually this means OpenTofu/Terraform, but also aws-cli, kubectl and more. 
 
 Reviewing and implementing the [Binbash Leverage Landing Zone for AWS](https://leverage.binbash.co/try-leverage/) would
 be a very good place to start!
@@ -23,24 +21,13 @@ to [this page](https://leverage.binbash.co/user-guide/leverage-cli/installation/
 
 ### Note for migration from previous versions
 
-If you come from Leverage CLI version <1.8.0 and want to install Leverage CLI version >= 1.8.0 keep into account the
+If you come from Leverage CLI version <3.0.0 and want to use Leverage CLI version >= 3.0.0 keep into account the
 following.
 
-The `build.env` file format has changed. As an example, this is the old format:
-
-```
-# Project settings
-PROJECT=bb
-
-# General
-MFA_ENABLED=false
-
-# Terraform
-TERRAFORM_IMAGE_NAME=binbash/terraform-awscli-slim
-TERRAFORM_IMAGE_TAG=1.1.9
-```
-
-New version example:
+Leverage CLI no longer runs tools inside a Docker container; it executes the OpenTofu/Terraform binaries installed on
+your host. Because of this, the `TERRAFORM_IMAGE_NAME`/`TF_IMAGE_NAME` and `TERRAFORM_IMAGE_TAG`/`TF_IMAGE_TAG`
+parameters in the `build.env` file no longer exist. In their place, the optional `TF_BINARY` parameter specifies the path
+to the OpenTofu/Terraform binary to use. As an example, this is the old format:
 
 ```
 # Project settings
@@ -53,12 +40,28 @@ MFA_ENABLED=false
 TF_IMAGE_TAG=1.5.0-0.2.0
 ```
 
-So, if you have created a project with version <1.8.0 and want to use it with version >=1.8.0 you should:
+New version example:
 
-- remove TERRAFORM_IMAGE_NAME line
-- update TF_IMAGE_TAG from this form '9.9.9' to this one '9.9.9-9.9.9'.
+```
+# Project settings
+PROJECT=bb
 
-For the second item you can check the version [here](https://hub.docker.com/r/binbash/leverage-toolbox/tags).
+# General
+MFA_ENABLED=false
+
+# OpenTofu/Terraform binary
+TF_BINARY=/usr/local/bin/tofu
+```
+
+So, if you have created a project with version <3.0.0 and want to use it with version >=3.0.0 you should:
+
+- remove the `TERRAFORM_IMAGE_NAME`/`TF_IMAGE_NAME` and `TERRAFORM_IMAGE_TAG`/`TF_IMAGE_TAG` lines
+- install [OpenTofu](https://opentofu.org/docs/intro/install/) or [Terraform](https://developer.hashicorp.com/terraform/install)
+  on your host
+- optionally, set `TF_BINARY` to the path of the binary. This is useful when you have multiple versions of
+  OpenTofu/Terraform installed, or when the binary lives in an unconventional location. It can be an absolute path, a path starting with `~`, or a path
+  relative to the project root. If not set, the `tofu` or `terraform` binary is looked up in your `PATH`. Keep in mind
+  the binary must match the command you use: `leverage tofu` expects OpenTofu and `leverage terraform` expects Terraform.
 
 ## System requirements
 

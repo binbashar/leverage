@@ -174,7 +174,7 @@ def get_tasks_logger():
 
 def _raw_logger():
     """
-    Provide a raw logger, in case we need to print stuff that already comes formatted (like some container logs).
+    Provide a raw logger, in case we need to print stuff that already comes formatted.
     """
     logger = logging.getLogger("raw")
     logger.setLevel(logging.INFO)

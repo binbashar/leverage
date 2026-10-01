@@ -253,7 +253,6 @@ def credentials(state):
             raise an exception
 
     If we reached the only common.tfvars scenario, we have no project name nor TF_IMAGE_TAG.
-    So the best chance is to read the common.tfvars directly without a container, e.g. with sed or grep
     """
     project_config = _load_project_yaml()
     build_env = Path(f"{PROJECT_ROOT}/build.env")

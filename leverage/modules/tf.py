@@ -23,8 +23,8 @@ REGION = r"(global|([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 @pass_state
 def tofu(state):
     """Run OpenTofu commands in the context of the current project.
-    All tofu subcommands that receive extra args will pass the given strings as is to their corresponding OpenTofu
-    counterparts in the container. For example as in `leverage tofu apply -auto-approve` or
+    All tofu subcommands that receive extra args will pass the given strings as is to the OpenTofu binary.
+    For example as in `leverage tofu apply -auto-approve` or
     `leverage tofu init -reconfigure`
     """
     state.runner = TFRunner(binary=state.paths.tf_binary, env_vars=state.environment)
@@ -34,8 +34,8 @@ def tofu(state):
 @pass_state
 def terraform(state):
     """Run Terraform commands in the context of the current project.
-    All terraform subcommands that receive extra args will pass the given strings as is to their corresponding Terraform
-    counterparts in the container. For example as in `leverage terraform apply -auto-approve` or
+    All terraform subcommands that receive extra args will pass the given strings as is to the Terraform binary.
+    For example as in `leverage terraform apply -auto-approve` or
     `leverage terraform init -reconfigure`
     """
     state.runner = TFRunner(binary=state.paths.tf_binary, terraform=True, env_vars=state.environment)
