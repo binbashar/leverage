@@ -12,7 +12,7 @@ from leverage.modules.auth import authenticate
 @authenticate
 @pass_state
 def tfautomv(state, args):
-    """Run TFAutomv commands in the context of the current project.`"""
+    """Run TFAutomv commands in the context of the current project."""
     tf_default_args_string = " ".join(tf_default_args())
     state.environment["TF_CLI_ARGS_init"] = tf_default_args_string
     state.environment["TF_CLI_ARGS_plan"] = tf_default_args_string
