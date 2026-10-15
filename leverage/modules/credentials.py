@@ -16,13 +16,14 @@ from ruamel.yaml import YAML
 from questionary import Choice
 from click.exceptions import Exit
 
-from leverage import logger
+from leverage import conf, logger
 from leverage._utils import ExitError
 from leverage.modules.runner import Runner
 from leverage._internals import State, pass_runner, pass_paths, pass_state
 from leverage.path import (
     NotARepositoryError,
     PathsHandler,
+    build_paths_and_environment,
     get_global_config_path,
     get_project_root_or_current_dir_path,
 )
@@ -265,6 +266,20 @@ def credentials(state):
         if short_name is None or not re.match("^[a-z]{2,4}$", short_name):
             logger.error("Invalid or missing project short name in project.yaml file.")
             raise Exit(1)
+
+        if not build_env.exists():
+            # Completes this branch's own docstring promise, mirroring the common.tfvars branch
+            # below. Guarded so a mature project that still has project.yaml on disk never has
+            # its real build.env clobbered (project create never deletes project.yaml).
+            logger.info("Writing project short name to build.env.")
+            build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG=1.1.9")
+
+        if state.paths is None:
+            # Upstream (leverage.py) skipped PathsHandler because only project.yaml existed.
+            # build.env now has a project name (or already did) - reload config from disk and
+            # build real, project-scoped paths here instead of leaving state.paths/environment None.
+            state.config = conf.load()
+            state.paths, state.environment = build_paths_and_environment(state.config)
     elif not build_env.exists():
         # project_config is not empty
         # and build.env does not exist
@@ -372,7 +387,7 @@ def _profile_is_configured(awscli: Runner, profile: str):
     Returns:
         bool: Whether the profile was already configured or not.
     """
-    exit_code, _, _ = awscli.exec("configure", "list", "--profile", profile)
+    exit_code, _, _ = awscli.exec("configure", "list", "--profile", profile, raises=False)
 
     return not exit_code
 
@@ -446,7 +461,7 @@ def configure_credentials(
     values = {"aws_access_key_id": key_id, "aws_secret_access_key": secret_key}
 
     for key, value in values.items():
-        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile, raises=False)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
@@ -467,7 +482,7 @@ def _credentials_are_valid(awscli: Runner, profile: str):
     Returns:
         bool: Whether the credentials are valid.
     """
-    error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile)
+    error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile, raises=False)
 
     return error_code != 255 and "InvalidClientTokenId" not in output
 
@@ -482,7 +497,9 @@ def _get_management_account_id(awscli: Runner, profile: str):
     Returns:
         str: Management account id.
     """
-    exit_code, caller_identity, _ = awscli.exec("sts", "get-caller-identity", "--output", "json", "--profile", profile)
+    exit_code, caller_identity, _ = awscli.exec(
+        "sts", "get-caller-identity", "--output", "json", "--profile", profile, raises=False
+    )
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {caller_identity}")
 
@@ -502,7 +519,7 @@ def _get_organization_accounts(awscli: Runner, profile: str, project_name: str):
         dict: Mapping of organization accounts names to ids.
     """
     exit_code, organization_accounts, _ = awscli.exec(
-        "organizations", "list-accounts", "--output", "json", "--profile", profile
+        "organizations", "list-accounts", "--output", "json", "--profile", profile, raises=False
     )
 
     if exit_code:
@@ -530,7 +547,9 @@ def _get_mfa_serial(awscli: Runner, profile: str):
     Returns:
         str: MFA device serial.
     """
-    exit_code, mfa_devices, _ = awscli.exec("iam", "list-mfa-devices", "--output", "json", "--profile", profile)
+    exit_code, mfa_devices, _ = awscli.exec(
+        "iam", "list-mfa-devices", "--output", "json", "--profile", profile, raises=False
+    )
     if exit_code:
         raise ExitError(exit_code, f"AWS CLI error: {mfa_devices}")
     mfa_devices = json.loads(mfa_devices)
@@ -558,7 +577,7 @@ def configure_profile(awscli: Runner, profile: str, values: dict):
     """
     logger.info(f"\tConfiguring profile [bold]{profile}[/bold]")
     for key, value in values.items():
-        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile)
+        exit_code, output, _ = awscli.exec("configure", "set", key, value, "--profile", profile, raises=False)
         if exit_code:
             raise ExitError(exit_code, f"AWS CLI error: {output}")
 
@@ -613,8 +632,9 @@ def configure_accounts_profiles(
         # A profile identifier looks like `le-security-oaar`
         account_profiles[f"{short_name}-{account_name}-{PROFILES[_type]['profile_role']}-mfa"] = account_profile
 
-    logger.info("Backing up account profiles file.")
-    shutil.copy(paths.aws_config_file, paths.aws_config_file.with_suffix(".bkp"))
+    if paths.aws_config_file.exists():
+        logger.info("Backing up account profiles file.")
+        shutil.copy(paths.aws_config_file, paths.aws_config_file.with_suffix(".bkp"))
 
     for profile_identifier, profile_values in account_profiles.items():
         configure_profile(profile_identifier, profile_values)

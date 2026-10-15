@@ -14,6 +14,7 @@ from leverage.path import (
     get_build_script_path,
     get_account_path,
     get_project_root_or_current_dir_path,
+    is_project_yaml_only_bootstrap,
     NotARepositoryError,
 )
 
@@ -107,6 +108,62 @@ def test_get_build_script_path(dir_structure, build_script_location):
 
 def test_get_build_script_path_no_build_script(dir_structure):
     assert get_build_script_path() is None
+
+
+def test_is_project_yaml_only_bootstrap_true(monkeypatch, tmp_path):
+    monkeypatch.setattr(lepath, "get_root_path", lambda: str(tmp_path))
+    (tmp_path / "project.yaml").touch()
+
+    assert is_project_yaml_only_bootstrap() is True
+
+
+def test_is_project_yaml_only_bootstrap_false_without_project_yaml(monkeypatch, tmp_path):
+    monkeypatch.setattr(lepath, "get_root_path", lambda: str(tmp_path))
+
+    assert is_project_yaml_only_bootstrap() is False
+
+
+def test_is_project_yaml_only_bootstrap_false_with_build_env(monkeypatch, tmp_path):
+    monkeypatch.setattr(lepath, "get_root_path", lambda: str(tmp_path))
+    (tmp_path / "project.yaml").touch()
+    (tmp_path / "build.env").touch()
+
+    assert is_project_yaml_only_bootstrap() is False
+
+
+def test_is_project_yaml_only_bootstrap_false_with_common_tfvars(monkeypatch, tmp_path):
+    monkeypatch.setattr(lepath, "get_root_path", lambda: str(tmp_path))
+    (tmp_path / "project.yaml").touch()
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "common.tfvars").touch()
+
+    assert is_project_yaml_only_bootstrap() is False
+
+
+@pytest.mark.parametrize(
+    "mfa_enabled_value, expected",
+    [
+        ("true", True),
+        ("True", True),
+        ("TRUE", True),
+        ("false", False),
+        ("False", False),
+        (None, False),
+    ],
+)
+def test_mfa_enabled_is_cast_to_bool(mfa_enabled_value, expected):
+    """
+    Regression test: PathsHandler.mfa_enabled must be a real bool, not the raw string from
+    build.env - a non-empty string like "false" is truthy in Python, which would otherwise make
+    `elif paths.mfa_enabled:` (leverage/modules/auth.py) always fire regardless of its value.
+    """
+    env_conf = {"PROJECT": "test"}
+    if mfa_enabled_value is not None:
+        env_conf["MFA_ENABLED"] = mfa_enabled_value
+
+    paths = PathsHandler(env_conf)
+
+    assert paths.mfa_enabled is expected
 
 
 def test_check_for_cluster_layer(muted_click_context, propagate_logs):

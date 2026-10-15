@@ -1,9 +1,15 @@
+from pathlib import Path
 from unittest.mock import patch
 
+import click
 import pytest
 
+from leverage import conf
 from leverage import leverage
-from leverage.modules.tf import has_a_plan_file
+from leverage import path as lepath
+from leverage._internals import State
+from leverage.path import PathsHandler
+from leverage.modules.tf import _validate_layout, has_a_plan_file
 
 
 @pytest.mark.parametrize(
@@ -56,6 +62,34 @@ def test_init_with_args(leverage_project, leverage_runner):
     assert called_args[0] == "init"
     assert called_args[-2] == "-migrate-state"
     assert called_args[-1] == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
+
+
+def test_validate_layout_checks_the_given_layer_not_cwd(leverage_project, monkeypatch):
+    """
+    Regression test: `_validate_layout` must validate the *layer* it was given, not `paths.cwd`.
+    Otherwise `leverage tf init --layers a,b` run from an account-level "layers-group" directory
+    (e.g. account/us-east-1) always fails with "This command can only run at layer level.",
+    since cwd itself - the layers-group - has no .tf files of its own, only its layer
+    subdirectories do.
+    """
+    layers_group = leverage_project / "account" / "us-east-1"
+    layer = layers_group / "security-base"
+
+    monkeypatch.setattr(Path, "cwd", lambda: layers_group)
+    monkeypatch.setattr(lepath, "get_working_path", lambda: layers_group)
+    monkeypatch.setattr(lepath, "get_root_path", lambda: leverage_project)
+    monkeypatch.setattr(conf, "get_root_path", lambda: leverage_project)
+    monkeypatch.setattr(conf, "get_working_path", lambda: layers_group)
+
+    state = State()
+    state.verbosity = False
+    state.config = conf.load()
+    state.paths = PathsHandler(state.config)
+
+    with click.Context(command=click.Command("leverage"), obj=state):
+        # Must not raise ExitError("This command can only run at layer level."), which it would
+        # if check_for_layer_location() fell back to checking cwd (the layers-group) instead.
+        _validate_layout(layer)
 
 
 @pytest.mark.parametrize(

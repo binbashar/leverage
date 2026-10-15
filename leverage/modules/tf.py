@@ -485,7 +485,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
 
 @pass_paths
 def _validate_layout(paths, layer: str):
-    paths.check_for_layer_location()
+    paths.check_for_layer_location(Path(layer))
 
     # Check for `environment = <account name>` in account.tfvars
     account_name = paths.account_conf.get("environment")
