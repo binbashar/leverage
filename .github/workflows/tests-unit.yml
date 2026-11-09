@@ -6,6 +6,9 @@ on:
   # Called by the release workflow, to gate the publication on the tagged commit
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   unit_tests:
     runs-on: ubuntu-latest
