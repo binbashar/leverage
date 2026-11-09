@@ -76,9 +76,14 @@ endif
 	@$(SED) -i 's/__version__ = "$(CURRENT_VERSION)"/__version__ = "$(RELEASE_VERSION)"/' $(INIT_FILE)
 	@$(SED) -i 's/version = "$(CURRENT_VERSION)"/version = "$(RELEASE_VERSION)"/' $(PYPROJECT_FILE)
 
-bump-version-ci: ## Fetch latest tag, update versions in __init__.py and pyproject.toml
+bump-version-ci: ## Update versions in __init__.py and pyproject.toml to RELEASE_TAG, or to the latest tag if not given
+ifeq ($(strip $(RELEASE_TAG)),)
 	@echo "[INFO] Get latest tag"
 	$(eval RELEASE_VERSION=$(shell git fetch --all --tags && git tag --sort=version:refname | tail -1 | sed 's/v//'))
+else
+	@echo "[INFO] Use given tag $(RELEASE_TAG)"
+	$(eval RELEASE_VERSION=$(shell echo "$(RELEASE_TAG)" | sed 's/^v//'))
+endif
 	@echo $(RELEASE_VERSION)
 
 	@echo "[INFO] Write version to __init__.py"

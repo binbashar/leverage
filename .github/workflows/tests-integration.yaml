@@ -1,6 +1,19 @@
 name: Tests | Integration
 
-on: [pull_request, workflow_dispatch]
+on:
+  pull_request:
+  workflow_dispatch:
+  # Called by the release workflow, to test the very package it is about to publish
+  workflow_call:
+    inputs:
+      dist-artifact:
+        description: Name of an artifact holding the built distributables. When given, the wheel in it is tested instead of the checkout.
+        type: string
+        default: ""
+      expected-version:
+        description: Version the installed cli must report. Only checked when dist-artifact is given.
+        type: string
+        default: ""
 
 jobs:
   integration_tests:
@@ -16,11 +29,36 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Download distributables
+        if: inputs.dist-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.dist-artifact }}
+          path: dist
+
       - name: Install Leverage CLI
+        env:
+          DIST_ARTIFACT: ${{ inputs.dist-artifact }}
+          EXPECTED_VERSION: ${{ inputs.expected-version }}
         run: |
-          echo "[INFO] Installing the cli, the bats tests drive the installed command"
-          pip install -e .
-          leverage --version
+          if [[ -z "${DIST_ARTIFACT}" ]]; then
+            echo "[INFO] Installing the cli from the checkout, the bats tests drive the installed command"
+            pip install -e .
+            leverage --version
+            exit 0
+          fi
+
+          echo "[INFO] Installing the cli from the built wheel, the bats tests drive the installed command"
+          pip install dist/*.whl
+          # Run from outside the checkout, so the package can only be imported from the installed wheel
+          cd "${RUNNER_TEMP}"
+          python -c "import leverage, sys; sys.exit(0 if 'site-packages' in leverage.__file__ else 'not the installed wheel: ' + leverage.__file__)"
+          INSTALLED_VERSION="$(leverage --version)"
+          echo "[INFO] ${INSTALLED_VERSION}"
+          if [[ -n "${EXPECTED_VERSION}" && "${INSTALLED_VERSION}" != "leverage, version ${EXPECTED_VERSION}" ]]; then
+            echo "[ERROR] Expected version ${EXPECTED_VERSION}"
+            exit 1
+          fi
 
       - name: Install bats
         run: |
@@ -50,6 +88,8 @@ jobs:
         shell: bash
 
   integration_tests_cli_refarch:
+    # Not part of the release gate, see #330
+    if: inputs.dist-artifact == ''
     runs-on: ubuntu-latest
     env:
       TERRAFORM_VERSION: 1.9.8

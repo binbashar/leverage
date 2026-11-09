@@ -4,13 +4,23 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
+# The package reaches PyPI only if the tagged commit passes the unit tests, and the wheel built
+# from it installs cleanly, reports the released version and passes the integration tests.
+#
+#   build ──┬──> integration_tests (the built wheel) ──┬──> publish
+#           └──> unit_tests (the tagged commit) ────────┘
+
 jobs:
-  build_push:
-    runs-on: ubuntu-latest 
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
+      # On a release event this checks out the released tag, not whatever master points to now
       - uses: actions/checkout@v4
-        with:
-          ref: master
 
       - uses: actions/setup-python@v5
         with:
@@ -31,8 +41,12 @@ jobs:
           poetry install --with=dev
 
       - name: bump_version
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          make bump-version-ci
+          make bump-version-ci RELEASE_TAG="${RELEASE_TAG}"
+          echo "version=${RELEASE_TAG#v}" >> "${GITHUB_OUTPUT}"
 
       - name: clean
         run: |
@@ -43,24 +57,57 @@ jobs:
           make build
 
       - name: check
-        run:
+        run: |
           make check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  unit_tests:
+    uses: ./.github/workflows/tests-unit.yml
+
+  integration_tests:
+    needs: build
+    uses: ./.github/workflows/tests-integration.yaml
+    with:
+      dist-artifact: dist
+      expected-version: ${{ needs.build.outputs.version }}
+
+  publish:
+    needs: [build, unit_tests, integration_tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The very same distributables that were tested, not a rebuild
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
 
       - name: upload
         run: |
-          make push-ci
+          pip install twine==6.1.0
+          twine check dist/*
+          twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
-      - name: commit_push
-        run: |
-          git push
-
+  notify:
+    needs: [build, unit_tests, integration_tests, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
       - uses: act10ns/slack@v1
-        if: always()
-        with: 
-          status: ${{ job.status }}
+        with:
+          # The publication is reported as failed if anything before it failed or was skipped
+          status: ${{ needs.publish.result == 'success' && 'success' || 'failure' }}
           channel: $SLACK_CI_CHANNEL
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
