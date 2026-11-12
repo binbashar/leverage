@@ -34,10 +34,7 @@ USERNAME = r"[a-zA-Z0-9\+,=\.@\-_]{1,64}"  # https://docs.aws.amazon.com/IAM/lat
 # https://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateUser.html#API_CreateUser_RequestParameters
 KEY_ID = r"[A-Z0-9]{20}"
 SECRET_KEY = r"[a-zA-Z0-9/\+]{40}"
-REGION = (
-    r"[a-z]{2}-[gov-]?"
-    r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-3]"
-)
+REGION = r"(([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 
@@ -483,7 +480,7 @@ def _credentials_are_valid(awscli: Runner, profile: str):
     """
     error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile, raises=False)
 
-    return error_code != 255 and "InvalidClientTokenId" not in output
+    return error_code == 0
 
 
 @pass_runner
