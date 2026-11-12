@@ -10,8 +10,53 @@ from configupdater import ConfigUpdater
 
 from leverage import leverage
 from leverage._utils import ExitError
-from leverage.modules.auth import refresh_layer_credentials, get_layer_profile, SkipProfile
+from leverage.path import PathsHandler
+from leverage.modules.auth import (
+    refresh_layer_credentials,
+    get_layer_profile,
+    SkipProfile,
+    refresh_all_accounts_credentials,
+)
 from leverage.modules.aws import get_account_roles, add_sso_profile, configure_sso_profiles
+
+# `leverage.modules.aws` resolves to the click Group of the same name, since it is re-exported
+# in `leverage/modules/__init__.py`. Patching by string would target that Group instead of the
+# module, so the module itself is imported and patched by object.
+aws_module = import_module("leverage.modules.aws")
+
+
+@pytest.fixture
+def paths(with_click_context, propagate_logs):
+    """
+    Mock PathsHandler used by auth.py functions.
+
+    Backed by a MagicMock(spec=PathsHandler) so unexpected attribute access fails loudly. Path-like
+    attributes are real PosixPath instances so the patched `pathlib.Path.read_text` and
+    `configupdater.parser.open` side effects in the tests can resolve files via `data_dict`.
+    """
+    mocked = MagicMock(spec=PathsHandler)
+    mocked.project = "test"
+    mocked.project_long = "binbash-test"
+    mocked.aws_config_file = PosixPath("~/.aws/test/config")
+    mocked.aws_credentials_file = PosixPath("~/.aws/test/credentials")
+    mocked.backend_tfvars = PosixPath("~/config/backend.tfvars")
+    mocked.cwd = PosixPath("~/some/layer")
+    mocked.sso_cache = PosixPath("~/.aws/test/sso/cache")
+    mocked.sso_token_file = PosixPath("~/.aws/test/sso/cache/token")
+    return mocked
+
+
+@pytest.fixture
+def mock_sso_token():
+    """Mock get_sso_access_token() to return a fixed token without touching disk.
+
+    Patches both bindings (auth.py defines it, aws.py imports it) so any caller in either
+    module hits the same fake.
+    """
+    with mock.patch("leverage.modules.auth.get_sso_access_token", return_value="testing-token") as m, mock.patch.object(
+        aws_module, "get_sso_access_token", return_value="testing-token"
+    ):
+        yield m
 
 
 ACC_ROLES = {
@@ -66,11 +111,11 @@ mocked_updater.__getitem__.return_value = {
 
 
 @mock.patch("boto3.client")
-def test_configure_sso_profiles(mocked_boto, leverage_state):
-    with mock.patch("leverage.modules.aws.ConfigUpdater.__new__", return_value=mocked_updater):
-        with mock.patch("leverage.modules.aws.get_account_roles", return_value=ACC_ROLES):
-            with mock.patch("leverage.modules.aws.add_sso_profile") as mocked_add_profile:
-                configure_sso_profiles()
+def test_configure_sso_profiles(mocked_boto, paths, mock_sso_token):
+    with mock.patch.object(aws_module.ConfigUpdater, "__new__", return_value=mocked_updater):
+        with mock.patch.object(aws_module, "get_account_roles", return_value=ACC_ROLES):
+            with mock.patch.object(aws_module, "add_sso_profile") as mocked_add_profile:
+                configure_sso_profiles(paths)
 
     # 2 profiles were added
     assert mocked_add_profile.call_args_list[0].args[1:] == (

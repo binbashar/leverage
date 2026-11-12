@@ -186,7 +186,17 @@ def leverage_runner(monkeypatch):
         working_directory: Optional working directory (defaults to account/us-east-1/security-base)
     """
     from contextlib import contextmanager
-    from leverage.modules import auth
+    from leverage.modules import tf, auth
+    from leverage.modules.tfrunner import TFRunner
+
+    def skip_binary_validation(tf_runner):
+        """Accept the binary as is, without looking it up in PATH nor checking its version.
+
+        Tests using this fixture mock the actual execution, and the binary is not necessarily
+        installed where the suite runs. `TFRunner` binary discovery is covered on its own in
+        tests/test_modules/test_tfrunner.py.
+        """
+        tf_runner.binary_path = str(tf_runner.binary_input)
 
     @contextmanager
     def runner(leverage_directory):
@@ -222,33 +232,23 @@ def leverage_runner(monkeypatch):
 
 
 @pytest.fixture
-def leverage_state(monkeypatch):
-    from contextlib import contextmanager
-    from leverage.modules import auth
+def leverage_context(leverage_project, monkeypatch):
+    def context(verbose=True, build_script_name="build.py"):
+        # Set current working directory to security-base layer
+        working_dir = leverage_project / "account" / "us-east-1" / "security-base"
 
-    @contextmanager
-    def state(leverage_directory, verbose=True):
-        # Determine working directory
-        working_directory = Path(leverage_directory) / "account" / "us-east-1" / "security-base"
+        # Mock Path.cwd() to return the working directory
+        monkeypatch.setattr(Path, "cwd", lambda: working_dir)
 
-        # Ensure paths are Path objects
-        leverage_directory = Path(leverage_directory)
-        working_directory = Path(working_directory)
-
-        # Apply patches to leverage.path module
-        monkeypatch.setattr(lepath, "get_root_path", lambda: leverage_directory)
-        monkeypatch.setattr(lepath, "get_working_path", lambda: working_directory)
-        monkeypatch.setattr(Path, "cwd", lambda: working_directory)
-
-        # Also patch in conf module since it imports these functions directly
-        monkeypatch.setattr(conf, "get_root_path", lambda: leverage_directory)
-        monkeypatch.setattr(conf, "get_working_path", lambda: working_directory)
+        # Update get_working_path to return the security-base directory
+        monkeypatch.setattr(lepath, "get_working_path", lambda: working_dir)
 
         state = State()
         state.verbosity = verbose
+        state.module = Module(name=build_script_name)
         state.config = conf.load()
-        state.paths = PathsHandler(state.config)
+        state.paths = PathsHandler()
 
-        return state
+        return click.Context(command=click.Command("leverage"), obj=state)
 
-    return state
+    return context
