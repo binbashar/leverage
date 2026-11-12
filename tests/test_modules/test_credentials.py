@@ -311,6 +311,22 @@ def test_get_organization_accounts_error():
         assert _get_organization_accounts("foo", "bar") == {}
 
 
+def test_get_organization_accounts_standalone_account(propagate_logs, caplog):
+    """
+    Test that a standalone account (not member of an AWS Organization) is reported clearly and an empty dict returned.
+    """
+    awscli = awscli_returning(
+        254,
+        "",
+        "An error occurred (AWSOrganizationsNotInUseException) when calling the ListAccounts operation: "
+        "Your account is not a member of an organization.",
+    )
+    with cli_context(runner=awscli):
+        assert _get_organization_accounts("foo", "bar") == {}
+
+    assert "not a member of an AWS Organization" in caplog.text
+
+
 def test_get_mfa_serial():
     """
     Test that we fetch the mfa devices from the profile and return the serial number of the first one that is valid.

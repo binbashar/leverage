@@ -517,11 +517,19 @@ def _get_organization_accounts(awscli: Runner, profile: str, project_name: str):
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    exit_code, organization_accounts, _ = awscli.exec(
+    exit_code, organization_accounts, error = awscli.exec(
         "organizations", "list-accounts", "--output", "json", "--profile", profile, raises=False
     )
 
     if exit_code:
+        if "AWSOrganizationsNotInUseException" in error:
+            logger.warning(
+                "The account is not a member of an AWS Organization (standalone account). "
+                "Accounts ids will not be fetched from the organization; only the ones already set in the "
+                "project configuration will be used."
+            )
+        else:
+            logger.warning(f"Unable to fetch organization accounts: {error or organization_accounts}")
         return {}
 
     organization_accounts = json.loads(organization_accounts)["Accounts"]
