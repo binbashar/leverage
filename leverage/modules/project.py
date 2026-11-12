@@ -2,6 +2,7 @@
     Module for managing Leverage projects.
 """
 
+import ipaddress
 import re
 from pathlib import Path
 from shutil import copy2
@@ -35,6 +36,19 @@ PROJECT_ROOT = get_project_root_or_current_dir_path()
 PROJECT_CONFIG = PROJECT_ROOT / PROJECT_CONFIG_FILE
 
 CONFIG_DIRECTORY = "config"
+
+# project.yaml validation
+EMAIL = r"^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$"
+HCL_IDENTIFIER = r"^[a-zA-Z_][a-zA-Z0-9_-]*$"
+SCP_POLICY = r"^aws_organizations_policy\.[a-zA-Z_][a-zA-Z0-9_-]*$"
+NETWORK_FIELDS = (
+    "cidr_block",
+    "availability_zones",
+    "private_subnets_cidr",
+    "private_subnets",
+    "public_subnets_cidr",
+    "public_subnets",
+)
 
 # TODO: Keep this structure in the project's directory
 PROJECT_STRUCTURE = {
@@ -186,7 +200,7 @@ JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()), 
 JINJA_ENV.filters["value"] = value
 
 
-def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=PROJECT_ROOT):
+def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=None):
     """Render the given templates using the given configuration values.
 
     Args:
@@ -194,15 +208,19 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
             templates to render.
         config (dict): Values to replace in the templates.
         source (Path, optional): Source directory of the templates. Defaults to TEMPLATE_DIR.
-        destination (Path, optional): Destination where to render the templates. Defaults to PROJECT_ROOT.
+        destination (Path, optional): Destination where to render the templates. Defaults to PROJECT_ROOT,
+            resolved at call time so it always matches the project root the rest of the module is using.
     """
+    if destination is None:
+        destination = PROJECT_ROOT
+
+    # Optional, an empty value makes the CLI look for `tofu`/`terraform` in PATH
+    config.setdefault("tf_binary", "")
+
     for template_file in template_files:
         template_location = template_file.relative_to(TEMPLATES_REPO_DIR)
 
         template = JINJA_ENV.get_template(template_location.as_posix())
-        if "terraform_image_tag" not in config:
-            config["terraform_image_tag"] = ""
-
         rendered_template = template.render(config)
 
         rendered_location = template_file.relative_to(source)
@@ -223,14 +241,13 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=P
         rendered_location.write_text(rendered_template)
 
 
-def _render_account_templates(account, config, source=TEMPLATE_DIR):
-    account_name = account["name"]
+def _render_account_templates(account_name, config, source=TEMPLATE_DIR):
     logger.info(f"Account: Setting up [bold]{account_name}[/bold].")
     account_dir = source / account_name
 
     layers = [CONFIG_DIRECTORY]
-    for account_name, account_layers in PROJECT_STRUCTURE[account_name].items():
-        layers = layers + [f"{account_name}/{layer}" for layer in account_layers]
+    for location, location_layers in PROJECT_STRUCTURE[account_name].items():
+        layers = layers + [f"{location}/{layer}" for layer in location_layers]
 
     for layer in layers:
         logger.info(f"\tLayer: Setting up [bold]{layer.split('/')[-1]}[/bold].")
@@ -250,8 +267,8 @@ def _render_project_template(config, source=TEMPLATE_DIR):
     _render_templates(template_files=template_files, config=config, source=source)
 
     # Render each account's templates
-    for account in config["organization"]["accounts"]:
-        _render_account_templates(account=account, config=config, source=source)
+    for account_name in PROJECT_STRUCTURE:
+        _render_account_templates(account_name=account_name, config=config, source=source)
 
     logger.info("Project configuration finished.")
 
@@ -294,7 +311,148 @@ def validate_config(config: dict):
             "Project short name is not valid. Only lowercase alphabetic characters are allowed. It must be between 2 and 4 characters long.",
         )
 
+    tf_binary = config.get("tf_binary")
+    if tf_binary is not None and not isinstance(tf_binary, str):
+        raise ExitError(1, "[bold]tf_binary[/bold] must be the path to the OpenTofu/Terraform binary.")
+
+    _validate_organization_accounts(config)
+    _validate_organizational_units(config)
+    _validate_shared_network(config)
+
     return True
+
+
+def _validate_organization_accounts(config: dict):
+    """
+    The accounts of the organization must be exactly the ones the project structure is able to create.
+    """
+    accounts = (config.get("organization") or {}).get("accounts") or []
+    if not isinstance(accounts, list) or not all(isinstance(account, dict) for account in accounts):
+        raise ExitError(1, "[bold]organization.accounts[/bold] must be a list of accounts with a name and an email.")
+
+    names = [account.get("name") for account in accounts]
+    unknown = [str(name) for name in names if name not in PROJECT_STRUCTURE]
+    missing = [name for name in PROJECT_STRUCTURE if name not in names]
+    duplicated = sorted({str(name) for name in names if names.count(name) > 1})
+
+    if unknown or missing or duplicated:
+        raise ExitError(
+            1,
+            f"The [bold]organization.accounts[/bold] must be exactly: {', '.join(PROJECT_STRUCTURE)}.\n"
+            + (f"  Unknown: {', '.join(unknown)}\n" if unknown else "")
+            + (f"  Missing: {', '.join(missing)}\n" if missing else "")
+            + (f"  Duplicated: {', '.join(duplicated)}\n" if duplicated else "")
+            + "Additional accounts can be added once the project has been created.",
+        )
+
+    for account in accounts:
+        if not re.match(EMAIL, str(account.get("email") or "")):
+            raise ExitError(1, f"Invalid or missing email for account [bold]{account['name']}[/bold].")
+
+
+def _validate_organizational_units(config: dict):
+    """
+    Every member account (all but management) must belong to exactly one organizational unit, since the
+    organizations layer creates each of them under its parent unit.
+    """
+    organizational_units = (config.get("organization") or {}).get("organizational_units") or []
+    if not isinstance(organizational_units, list) or not all(isinstance(unit, dict) for unit in organizational_units):
+        raise ExitError(
+            1,
+            "[bold]organization.organizational_units[/bold] must be a list of units with a name, policy and accounts.",
+        )
+
+    parents = {account: [] for account in PROJECT_STRUCTURE if account != "management"}
+    unit_names = []
+    for unit in organizational_units:
+        name = unit.get("name")
+        if not isinstance(name, str) or not re.match(HCL_IDENTIFIER, name):
+            raise ExitError(1, f"Invalid organizational unit name [bold]{name}[/bold].")
+        unit_names.append(name)
+
+        # The organizations layer attaches a single policy per unit
+        policies = unit.get("policy")
+        if (
+            not isinstance(policies, list)
+            or len(policies) != 1
+            or not isinstance(policies[0], str)
+            or not re.match(SCP_POLICY, policies[0])
+        ):
+            raise ExitError(
+                1,
+                f"Organizational unit [bold]{name}[/bold] must have a [bold]policy[/bold] list with exactly one "
+                "organization policy, e.g. [aws_organizations_policy.default].",
+            )
+
+        unit_accounts = unit.get("accounts") or []
+        if not isinstance(unit_accounts, list):
+            raise ExitError(1, f"The accounts of organizational unit [bold]{name}[/bold] must be a list.")
+
+        for account in unit_accounts:
+            if account == "management":
+                raise ExitError(1, "The management account can not be part of an organizational unit.")
+            if account not in parents:
+                raise ExitError(
+                    1,
+                    f"Organizational unit [bold]{name}[/bold] references unknown account [bold]{account}[/bold]. "
+                    f"Valid accounts are: {', '.join(parents)}.",
+                )
+            parents[account].append(name)
+
+    duplicated = sorted({name for name in unit_names if unit_names.count(name) > 1})
+    if duplicated:
+        raise ExitError(1, f"Duplicated organizational units: {', '.join(duplicated)}.")
+
+    orphans = [account for account, units in parents.items() if not units]
+    multiple = [account for account, units in parents.items() if len(units) > 1]
+    if orphans or multiple:
+        raise ExitError(
+            1,
+            "Each account other than management must belong to exactly one organizational unit.\n"
+            + (f"  Without unit: {', '.join(orphans)}\n" if orphans else "")
+            + (f"  In more than one unit: {', '.join(multiple)}\n" if multiple else ""),
+        )
+
+
+def _validate_shared_network(config: dict):
+    """
+    Only the network of the shared account can be configured, and it is required by its base-network layer.
+    """
+    accounts = config.get("accounts") or {}
+    if not isinstance(accounts, dict):
+        raise ExitError(1, "[bold]accounts[/bold] must be a mapping containing the [bold]shared[/bold] account.")
+
+    unknown = [str(account) for account in accounts if account != "shared"]
+    if unknown:
+        raise ExitError(
+            1,
+            f"Only the [bold]shared[/bold] account can be configured under [bold]accounts[/bold]. Found: {', '.join(unknown)}.",
+        )
+
+    networks = (accounts.get("shared") or {}).get("networks")
+    if not isinstance(networks, list) or not networks or not isinstance(networks[0], dict):
+        raise ExitError(1, "[bold]accounts.shared.networks[/bold] must define at least one network.")
+
+    network = networks[0]
+    missing = [field for field in NETWORK_FIELDS if not network.get(field)]
+    if missing:
+        raise ExitError(1, f"The shared account network is missing: {', '.join(missing)}.")
+
+    zones = network["availability_zones"]
+    if not isinstance(zones, list) or not all(isinstance(zone, str) and re.match(r"^[a-z]$", zone) for zone in zones):
+        raise ExitError(1, "[bold]availability_zones[/bold] must be a list of zone letters, e.g. [a, b].")
+
+    cidrs = [network["cidr_block"], network["private_subnets_cidr"], network["public_subnets_cidr"]]
+    for subnets_field in ("private_subnets", "public_subnets"):
+        if not isinstance(network[subnets_field], list):
+            raise ExitError(1, f"[bold]{subnets_field}[/bold] must be a list of CIDR blocks.")
+        cidrs.extend(network[subnets_field])
+
+    for cidr in cidrs:
+        try:
+            ipaddress.ip_network(str(cidr))
+        except ValueError:
+            raise ExitError(1, f"Invalid CIDR block [bold]{cidr}[/bold] in the shared account network.")
 
 
 @project.command()
@@ -314,6 +472,12 @@ def create():
         return
 
     validate_config(config)
+
+    # Keep the rendered accounts in the same order as the project structure
+    account_order = list(PROJECT_STRUCTURE)
+    config["organization"]["accounts"] = sorted(
+        config["organization"]["accounts"], key=lambda account: account_order.index(account["name"])
+    )
 
     # Make project structure
     _copy_project_template(config=config)
