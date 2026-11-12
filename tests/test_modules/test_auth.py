@@ -67,7 +67,6 @@ mocked_updater.__getitem__.return_value = {
 
 @mock.patch("boto3.client")
 def test_configure_sso_profiles(mocked_boto, leverage_state):
-    
     with mock.patch("leverage.modules.aws.ConfigUpdater.__new__", return_value=mocked_updater):
         with mock.patch("leverage.modules.aws.get_account_roles", return_value=ACC_ROLES):
             with mock.patch("leverage.modules.aws.add_sso_profile") as mocked_add_profile:
