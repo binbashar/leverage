@@ -34,10 +34,7 @@ USERNAME = r"[a-zA-Z0-9\+,=\.@\-_]{1,64}"  # https://docs.aws.amazon.com/IAM/lat
 # https://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateUser.html#API_CreateUser_RequestParameters
 KEY_ID = r"[A-Z0-9]{20}"
 SECRET_KEY = r"[a-zA-Z0-9/\+]{40}"
-REGION = (
-    r"[a-z]{2}-[gov-]?"
-    r"(?:central|north|south|east|west|northeast|northwest|southeast|southwest|secret|topsecret)-[1-3]"
-)
+REGION = r"(([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 
@@ -483,7 +480,7 @@ def _credentials_are_valid(awscli: Runner, profile: str):
     """
     error_code, output, _ = awscli.exec("sts", "get-caller-identity", "--profile", profile, raises=False)
 
-    return error_code != 255 and "InvalidClientTokenId" not in output
+    return error_code == 0
 
 
 @pass_runner
@@ -517,11 +514,19 @@ def _get_organization_accounts(awscli: Runner, profile: str, project_name: str):
     Returns:
         dict: Mapping of organization accounts names to ids.
     """
-    exit_code, organization_accounts, _ = awscli.exec(
+    exit_code, organization_accounts, error = awscli.exec(
         "organizations", "list-accounts", "--output", "json", "--profile", profile, raises=False
     )
 
     if exit_code:
+        if "AWSOrganizationsNotInUseException" in error:
+            logger.warning(
+                "The account is not a member of an AWS Organization (standalone account). "
+                "Accounts ids will not be fetched from the organization; only the ones already set in the "
+                "project configuration will be used."
+            )
+        else:
+            logger.warning(f"Unable to fetch organization accounts: {error or organization_accounts}")
         return {}
 
     organization_accounts = json.loads(organization_accounts)["Accounts"]

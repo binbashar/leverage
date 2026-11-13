@@ -168,5 +168,8 @@ def get_backend_key(config_file: Union[str, Path]) -> Optional[str]:
             f"Possible invalid expression in [bold]config.tf[/bold] near line {error.line}, column {error.column}\n"
             f"{error.get_context(config_content)}",
         )
+    except ExitError:
+        # Let our own, more specific errors (e.g. missing backend block) through untouched
+        raise
     except Exception:
         raise ExitError(1, f"Malformed [bold]config.tf[/bold] file. Unable to parse.")
