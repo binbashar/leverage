@@ -8,7 +8,8 @@ permissions:
   contents: read
 
 # The package reaches PyPI only if the tagged commit passes the unit tests, and the wheel built
-# from it installs cleanly, reports the released version and passes the integration tests.
+# from it installs cleanly, reports the released version and passes the integration tests,
+# including the end to end test against the reference architecture.
 #
 #   build ──┬──> integration_tests (the built wheel) ──┬──> publish
 #           └──> unit_tests (the tagged commit) ────────┘
@@ -72,9 +73,20 @@ jobs:
   integration_tests:
     needs: build
     uses: ./.github/workflows/tests-integration.yaml
+    # A called workflow cannot be granted more than its caller grants it. pull-requests is only
+    # used on pull requests, to decide whether to run the ref-arch test.
+    permissions:
+      contents: read
+      pull-requests: read
     with:
       dist-artifact: dist
       expected-version: ${{ needs.build.outputs.version }}
+    # The ref-arch test applies real infrastructure in AWS
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEVSTG_ACCOUNT_ID: ${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}
+      AWS_SECURITY_ACCOUNT_ID: ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
 
   publish:
     needs: [build, unit_tests, integration_tests]

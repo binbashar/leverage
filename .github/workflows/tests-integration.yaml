@@ -14,6 +14,16 @@ on:
         description: Version the installed cli must report. Only checked when dist-artifact is given.
         type: string
         default: ""
+    # Used by the ref-arch test
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_DEVSTG_ACCOUNT_ID:
+        required: true
+      AWS_SECURITY_ACCOUNT_ID:
+        required: true
 
 permissions:
   contents: read
@@ -23,45 +33,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TERRAFORM_VERSION: 1.9.8
-      OPENTOFU_VERSION: 1.9.1
+      OPENTOFU_VERSION: 1.13.2
       BATS_LIB_PATH: /usr/local/lib/bats
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
-      - name: Download distributables
-        if: inputs.dist-artifact != ''
-        uses: actions/download-artifact@v4
+      # The bats tests drive the installed command
+      - uses: ./.github/actions/install-leverage
         with:
-          name: ${{ inputs.dist-artifact }}
-          path: dist
-
-      - name: Install Leverage CLI
-        env:
-          DIST_ARTIFACT: ${{ inputs.dist-artifact }}
-          EXPECTED_VERSION: ${{ inputs.expected-version }}
-        run: |
-          if [[ -z "${DIST_ARTIFACT}" ]]; then
-            echo "[INFO] Installing the cli from the checkout, the bats tests drive the installed command"
-            pip install -e .
-            leverage --version
-            exit 0
-          fi
-
-          echo "[INFO] Installing the cli from the built wheel, the bats tests drive the installed command"
-          pip install dist/*.whl
-          # Run from outside the checkout, so the package can only be imported from the installed wheel
-          cd "${RUNNER_TEMP}"
-          python -c "import leverage, sys; sys.exit(0 if 'site-packages' in leverage.__file__ else 'not the installed wheel: ' + leverage.__file__)"
-          INSTALLED_VERSION="$(leverage --version)"
-          echo "[INFO] ${INSTALLED_VERSION}"
-          if [[ -n "${EXPECTED_VERSION}" && "${INSTALLED_VERSION}" != "leverage, version ${EXPECTED_VERSION}" ]]; then
-            echo "[ERROR] Expected version ${EXPECTED_VERSION}"
-            exit 1
-          fi
+          dist-artifact: ${{ inputs.dist-artifact }}
+          expected-version: ${{ inputs.expected-version }}
 
       - name: Install bats
         run: |
@@ -90,120 +77,141 @@ jobs:
           make test-int
         shell: bash
 
-  integration_tests_cli_refarch:
-    # Not part of the release gate, see #330
-    if: inputs.dist-artifact == ''
+  # The ref-arch test applies real infrastructure in AWS, so on pull requests it only runs when it
+  # can test something: the cli, or the way it is installed, changed and the AWS credentials are
+  # available (they are not to pull requests from forks, nor to Dependabot's).
+  # It always runs when dispatched by hand or called by the release workflow.
+  # This is decided in a job, rather than with `paths` under `on:`, so the workflow always runs and
+  # integration_tests, a required check, never stays pending.
+  refarch_changes:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - name: Decide whether to run the ref-arch test
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HAS_AWS_CREDENTIALS: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        run: |
+          set -euo pipefail
+          run=true
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            if [[ "${HEAD_REPO}" != "${REPO}" ]]; then
+              echo "::notice::Skipping the ref-arch test: pull requests from forks have no access to the AWS credentials"
+              run=false
+            elif [[ "${HAS_AWS_CREDENTIALS}" != "true" ]]; then
+              echo "::notice::Skipping the ref-arch test: no AWS credentials available to this run"
+              run=false
+            else
+              changed_files="$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
+              relevant='^(leverage/|pyproject\.toml$|poetry\.lock$|\.github/workflows/tests-integration\.yaml$|\.github/actions/)'
+              if ! grep -qE "${relevant}" <<< "${changed_files}"; then
+                echo "::notice::Skipping the ref-arch test: no changes to the cli nor to how it is installed"
+                run=false
+              fi
+            fi
+          fi
+          echo "[INFO] Run the ref-arch test: ${run}"
+          echo "run=${run}" >> "${GITHUB_OUTPUT}"
+
+  # Tests the cli end to end against the reference architecture: creates a project, then applies
+  # and destroys a layer of le-tf-infra-aws in the apps-devstg account.
+  integration_tests_cli_refarch:
+    needs: refarch_changes
+    if: needs.refarch_changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
-      TERRAFORM_VERSION: 1.9.8
-      OPENTOFU_VERSION: 1.9.1
+      # The version the reference architecture runs
+      OPENTOFU_VERSION: 1.13.2
+      LEVERAGE_INTERACTIVE: 0
+    defaults:
+      run:
+        shell: bash
     strategy:
+      # Every job applies and destroys the same layer in the same account, so they must not overlap
       max-parallel: 1
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
-        toolbox-image-tag: ['1.3.5-0.2.3', '1.5.0-0.2.3', '1.6.0-0.2.3']
+        # The oldest and newest supported versions; the unit tests cover every one of them
+        python-version: ['3.9', '3.13']
     steps:
-      - name: Checkout base branch
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Poetry
-        run: |
-          echo "[INFO] Installing Poetry..."
-          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
-          echo "[INFO] Configuring Poetry..."
-          poetry config virtualenvs.create false  # This prevents poetry from creating a virtual environment
+      - uses: ./.github/actions/install-leverage
+        with:
+          dist-artifact: ${{ inputs.dist-artifact }}
+          expected-version: ${{ inputs.expected-version }}
 
-      - name: Install dependencies using Poetry
-        run: |
-          echo "[INFO] Installing dependencies..."
-          export ENV POETRY_VIRTUALENVS_CREATE=false
-          export PATH="${PATH}:${HOME}/.poetry/bin"
-          poetry install --with=dev
-
-      - name: Install terraform and tofu
-        run: |
-          echo "[INFO] Installing terraform ${TERRAFORM_VERSION} and tofu ${OPENTOFU_VERSION}"
-          curl -fsSL -o /tmp/terraform.zip \
-            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-          curl -fsSL -o /tmp/tofu.zip \
-            "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_amd64.zip"
-          sudo unzip -q -o /tmp/terraform.zip terraform -d /usr/local/bin
-          sudo unzip -q -o /tmp/tofu.zip tofu -d /usr/local/bin
-          terraform version
-          tofu version
-
-      - name: Build Leverage CLI
-        run: |
-          echo "[INFO] Building Leverage CLI"
-          echo "[INFO] Working with python version $(python --version)"
-          make build
-          pip install -e .
-
-      - name: Create directories
-        run: |
-          mkdir -p ../theadamproject
-          # These are later mounted in the container
-          mkdir ~/.ssh
+      # Without the wrapper, so tofu exit codes and output reach the cli untouched
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.OPENTOFU_VERSION }}
+          tofu_wrapper: false
 
       - name: Project Init
         run: |
-          printf "[INFO] Project Init\n"
+          set -euo pipefail
+          mkdir -p ../theadamproject
+          cd ../theadamproject
           leverage project init
-          if [[ -f project.yaml ]];
-          then
-              printf "[INFO]    OK \n"
-          else
-              printf "[ERROR]    Fail \n"
-              exit 1
-          fi
-        working-directory: ../theadamproject
+          [[ -f project.yaml ]] || { echo "::error::project init did not create project.yaml"; exit 1; }
 
       - name: Set project file and create
-        run: |
-          printf "[INFO] Setting Project file\n"
-          sed 's/<project name>/the-adam-project/' -i project.yaml
-          sed 's/<short project name>/bb/' -i project.yaml
-          sed 's/<management email address>/bb@domainmgmt/' -i project.yaml
-          sed 's/<security email address>/bb@domainsec/' -i project.yaml
-          sed 's/<shared email address>/bb@domainshared/' -i project.yaml
-          sed 's/<user.name>/bbuser/' -i project.yaml
-          printf "[INFO] Creating Project"
-          leverage project create
-          printf "[INFO] Checking Project"
-          for i in config management security shared; do if [[ ! -d $i ]]; then echo '[ERROR] Fail' && exit 1; fi ;done
-
         working-directory: ../theadamproject
+        run: |
+          set -euo pipefail
+          sed -i 's/<project name>/the-adam-project/' project.yaml
+          sed -i 's/<short project name>/bb/' project.yaml
+          sed -i 's/<management email address>/bb@domainmgmt/' project.yaml
+          sed -i 's/<security email address>/bb@domainsec/' project.yaml
+          sed -i 's/<shared email address>/bb@domainshared/' project.yaml
+          sed -i 's/<user.name>/bbuser/' project.yaml
+          leverage project create
+          for account in config management security shared; do
+            [[ -d "${account}" ]] || { echo "::error::project create did not create ${account}"; exit 1; }
+          done
 
       - name: Set up credentials
+        env:
+          DEPLOYMASTER_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          DEPLOYMASTER_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DEVSTG_ACCOUNT_ID: ${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}
+          SECURITY_ACCOUNT_ID: ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
         run: |
-          printf "[INFO] Setting up credentials\n"
-          mkdir -p  ~/.aws/bb
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} --profile bb-deploymaster
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }} --profile bb-deploymaster
+          set -euo pipefail
+          aws configure set aws_access_key_id "${DEPLOYMASTER_ACCESS_KEY_ID}" --profile bb-deploymaster
+          aws configure set aws_secret_access_key "${DEPLOYMASTER_SECRET_ACCESS_KEY}" --profile bb-deploymaster
           aws configure set region us-east-1 --profile bb-apps-devstg-devops
           aws configure set output json --profile bb-apps-devstg-devops
-          aws configure set role_arn arn:aws:iam::${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}:role/DeployMaster --profile bb-apps-devstg-devops
+          aws configure set role_arn "arn:aws:iam::${DEVSTG_ACCOUNT_ID}:role/DeployMaster" --profile bb-apps-devstg-devops
           aws configure set source_profile bb-deploymaster --profile bb-apps-devstg-devops
           aws configure set region us-east-1 --profile bb-security-oaar
           aws configure set output json --profile bb-security-oaar
-          aws configure set role_arn arn:aws:iam::${{ secrets.AWS_SECURITY_ACCOUNT_ID }}:role/DeployMaster --profile bb-security-oaar
+          aws configure set role_arn "arn:aws:iam::${SECURITY_ACCOUNT_ID}:role/DeployMaster" --profile bb-security-oaar
           aws configure set source_profile bb-deploymaster --profile bb-security-oaar
-          cat << EOF > ~/.aws/credentials
-          [bb-deploymaster]
-          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
-          cp ~/.aws/credentials ~/.aws/bb/
-          cp ~/.aws/config ~/.aws/bb/
+          # The cli reads the credentials of project bb from ~/.aws/bb
+          mkdir -p ~/.aws/bb
+          cp ~/.aws/credentials ~/.aws/config ~/.aws/bb/
 
       - name: Configure Reference Architecture
+        working-directory: ../theadamproject
+        env:
+          SECURITY_ACCOUNT_ID: ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
         run: |
-          echo "[INFO] Configure Reference Architecture\n"
+          set -euo pipefail
           cat << EOF > ./config/common.tfvars
           project = "bb"
           project_long = "binbash"
@@ -217,56 +225,34 @@ jobs:
 
           accounts = {
             security = {
-              id = ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
+              id = ${SECURITY_ACCOUNT_ID}
             }
           }
           EOF
-          echo "[INFO] Disable MFA\n"
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
-        working-directory: ../theadamproject
 
-      - name: Test Terraform
-        env:
-          LEVERAGE_INTERACTIVE: 0
-        run: |
-          printf "[INFO] Testing terraform\n"
-
-          printf "[INFO]     Initializing layer\n"
-          leverage terraform init --skip-validation
-
+      - name: Test tofu
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
+        run: leverage tofu init --skip-validation
 
       - name: Test AWS
-        run: |
-          printf "[INFO] Testing AWS\n"
-
-          printf "[INFO]     Getting identity\n"
-          ID=$(leverage aws sts get-caller-identity --profile bb-apps-devstg-devops | grep Account | sed -E 's/^.*("Account.+")[0-9]{12}".*$/\1************"/')
-          if [[ "$ID" == "\"Account\": \"************\"" ]];
-          then
-              printf "[INFO]    OK \n"
-          else
-              printf "[ERROR]    Fail \n"
-              exit 1
-          fi
-
         working-directory: ../theadamproject/security/us-east-1/base-tf-backend
-
+        env:
+          DEVSTG_ACCOUNT_ID: ${{ secrets.AWS_DEVSTG_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          account="$(leverage aws sts get-caller-identity --profile bb-apps-devstg-devops --query Account --output text)"
+          [[ "${account}" == "${DEVSTG_ACCOUNT_ID}" ]] || { echo "::error::the profile did not assume a role in the apps-devstg account"; exit 1; }
 
       - name: Clone Testing Reference Architecture repo
-        run: |
-          printf "[INFO] Cloning repo...\n"
-          git clone https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
-
-      - name: Set Toolbox Image Tag for the cloned ref arch repo
-        run: |
-          echo "Updating Terraform Image Tag to ${{ matrix.toolbox-image-tag }}"
-          sed -E -i 's/^TERRAFORM_IMAGE_TAG=.+$/TERRAFORM_IMAGE_TAG=${{ matrix.toolbox-image-tag }}/' build.env
-        working-directory: ../theblairwitchproject
+        run: git clone --depth 1 https://github.com/binbashar/le-tf-infra-aws.git ../theblairwitchproject
 
       - name: Configure Testing Reference Architecture
+        working-directory: ../theblairwitchproject
+        env:
+          SECURITY_ACCOUNT_ID: ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
         run: |
-          echo "[INFO] Configure Reference Architecture\n"
+          set -euo pipefail
           cat << EOF > ./config/common.tfvars
           project = "bb"
           project_long = "binbash"
@@ -280,33 +266,45 @@ jobs:
 
           accounts = {
             security = {
-              id = ${{ secrets.AWS_SECURITY_ACCOUNT_ID }}
+              id = ${SECURITY_ACCOUNT_ID}
             }
           }
           EOF
-          echo "[INFO] Disable MFA\n"
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
-        working-directory: ../theblairwitchproject
 
-      - name: Test Testing Reference Architecture
-        env:
-          LEVERAGE_INTERACTIVE: 0
-        run: |
+          # The reference architecture keeps this layer unprovisioned. Provision it here, so the test
+          # actually creates and destroys resources. If the reference architecture provisions it,
+          # refuse to go on: the test would destroy resources it expects to exist.
+          locals_file=apps-devstg/global/cli-test-layer/locals.tf
+          grep -qE '^\s*provisioned\s*=\s*false\s*$' "${locals_file}" || {
+            echo "::error::cli-test-layer is not unprovisioned (provisioned = false) in le-tf-infra-aws, refusing to apply and destroy it"
+            exit 1
+          }
+          sed -i -E 's/^(\s*provisioned\s*=\s*)false\s*$/\1true/' "${locals_file}"
 
-          printf "[INFO] Initializing layer\n"
-          leverage terraform init --layers cli-test-layer,base-identities
-
-          printf "[INFO] Generating plan\n"
-          leverage terraform plan --layers cli-test-layer
-
-          printf "[INFO] Applying changes\n"
-          leverage terraform apply -auto-approve --layers cli-test-layer
-
-          printf "[INFO] Checking if all changes were applied\n"
-          leverage terraform plan -detailed-exitcode --layers cli-test-layer
-          [[ $? -eq 2 ]] && printf "[WARN] There are still remaining changes\n"
-          [[ $? -eq 0 ]] && printf "[INFO] Apply checks out\n"
-
-          printf "[INFO] Destroying all generated created resources\n"
-          leverage terraform destroy -auto-approve --layers cli-test-layer
+      - name: Init the ref-arch layers
+        id: refarch_init
         working-directory: ../theblairwitchproject/apps-devstg/global
+        run: leverage tofu init --layers cli-test-layer,base-identities
+
+      - name: Plan and apply the test layer
+        working-directory: ../theblairwitchproject/apps-devstg/global
+        run: |
+          set -euo pipefail
+          # The layer must start empty, so the apply creates its resources and the destroy removes them
+          rc=0; leverage tofu plan -detailed-exitcode --layers cli-test-layer || rc=$?
+          [[ ${rc} -eq 2 ]] || { echo "::error::expected a plan with changes on the empty layer (rc=${rc})"; exit 1; }
+          leverage tofu apply -auto-approve --layers cli-test-layer
+
+      - name: Check the apply converged
+        working-directory: ../theblairwitchproject/apps-devstg/global
+        run: |
+          set -euo pipefail
+          rc=0; leverage tofu plan -detailed-exitcode --layers cli-test-layer || rc=$?
+          [[ ${rc} -eq 0 ]] || { echo "::error::post-apply plan not empty (rc=${rc})"; exit 1; }
+
+      # Cleans up whenever the layer was initialized, even if a previous step failed or the run was cancelled
+      - name: Destroy the test layer
+        if: always() && steps.refarch_init.outcome == 'success'
+        working-directory: ../theblairwitchproject/apps-devstg/global
+        run: leverage tofu destroy -auto-approve --layers cli-test-layer

@@ -1,0 +1,50 @@
+name: Install Leverage CLI
+description: >-
+  Install the cli from the checkout, or from a built wheel when an artifact holding the
+  distributables is given, and check the installed command is the one under test.
+
+inputs:
+  dist-artifact:
+    description: Name of an artifact holding the built distributables. When given, its wheel is installed instead of the checkout.
+    required: false
+    default: ""
+  expected-version:
+    description: Version the installed cli must report. Only checked when dist-artifact is given.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Download distributables
+      if: inputs.dist-artifact != ''
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.dist-artifact }}
+        path: dist
+
+    - name: Install Leverage CLI
+      shell: bash
+      env:
+        DIST_ARTIFACT: ${{ inputs.dist-artifact }}
+        EXPECTED_VERSION: ${{ inputs.expected-version }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${DIST_ARTIFACT}" ]]; then
+          echo "[INFO] Installing the cli from the checkout"
+          pip install -e .
+          leverage --version
+          exit 0
+        fi
+
+        echo "[INFO] Installing the cli from the built wheel"
+        pip install dist/*.whl
+        # Run from outside the checkout, so the package can only be imported from the installed wheel
+        cd "${RUNNER_TEMP}"
+        python -c "import leverage, sys; sys.exit(0 if 'site-packages' in leverage.__file__ else 'not the installed wheel: ' + leverage.__file__)"
+        INSTALLED_VERSION="$(leverage --version)"
+        echo "[INFO] ${INSTALLED_VERSION}"
+        if [[ -n "${EXPECTED_VERSION}" && "${INSTALLED_VERSION}" != "leverage, version ${EXPECTED_VERSION}" ]]; then
+          echo "[ERROR] Expected version ${EXPECTED_VERSION}"
+          exit 1
+        fi
