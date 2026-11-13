@@ -19,6 +19,9 @@ be a very good place to start!
 For installation instructions and all documentation regarding Leverage CLI, please refer
 to [this page](https://leverage.binbash.co/user-guide/leverage-cli/installation/).
 
+A proposal for ordering layer applies and running them from CI is in
+[docs/ordered-apply.md](docs/ordered-apply.md).
+
 ### Note for migration from previous versions
 
 If you come from Leverage CLI version <3.0.0 and want to use Leverage CLI version >= 3.0.0 keep into account the
