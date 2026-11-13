@@ -119,3 +119,73 @@ def test_validate_layout_checks_the_given_layer_not_cwd(leverage_project, monkey
 )
 def test_apply_arguments_have_plan_file(args, expected_output):
     assert has_a_plan_file(tuple(args)) == expected_output
+
+
+# ###########################################################################
+# EXIT CODE PROPAGATION
+# ###########################################################################
+# The CLI must exit with the same code as the underlying binary, so it can be relied upon in
+# scripts and CI pipelines (e.g. `plan -detailed-exitcode` returns 2 when there are changes).
+
+
+@pytest.mark.parametrize("binary_exit_code", [0, 1, 2])
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["init"],
+        ["plan"],
+        ["plan", "-detailed-exitcode"],
+        ["apply", "-auto-approve"],
+        ["output"],
+        ["destroy", "-auto-approve"],
+        ["version"],
+        ["format"],
+        ["force-unlock", "LOCK_ID"],
+        ["validate"],
+        ["import", "aws_s3_bucket.example", "example-id"],
+    ],
+)
+@pytest.mark.parametrize("group", ["tofu", "terraform"])
+def test_exit_code_is_propagated(leverage_project, leverage_runner, group, command, binary_exit_code):
+    with leverage_runner(leverage_project) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=binary_exit_code) as mocked_run:
+            result = runner.invoke(leverage, [group, *command])
+
+    mocked_run.assert_called_once()
+    assert result.exit_code == binary_exit_code, result.output
+
+
+# Only init validates the layout by default; the mock project layers are not meant to pass it
+_LAYERS_ARGS = {
+    command: ["--layers", "security-base,base-tf-backend", *(["--skip-validation"] if command == "init" else [])]
+    for command in ("init", "plan", "apply", "output", "destroy")
+}
+
+
+@pytest.mark.parametrize("command", _LAYERS_ARGS)
+def test_layers_stop_at_the_first_failing_layer(leverage_project, leverage_runner, command):
+    layers_group = leverage_project / "account" / "us-east-1"
+
+    with leverage_runner(leverage_project, working_directory=layers_group) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", side_effect=[1, 0]) as mocked_run:
+            result = runner.invoke(leverage, ["tofu", command, *_LAYERS_ARGS[command]])
+
+    assert result.exit_code == 1, result.output
+    # The second layer is never reached
+    mocked_run.assert_called_once()
+    assert mocked_run.call_args.kwargs["working_dir"] == layers_group / "security-base"
+
+
+@pytest.mark.parametrize("command", _LAYERS_ARGS)
+def test_layers_run_all_layers_when_none_fails(leverage_project, leverage_runner, command):
+    layers_group = leverage_project / "account" / "us-east-1"
+
+    with leverage_runner(leverage_project, working_directory=layers_group) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
+            result = runner.invoke(leverage, ["tofu", command, *_LAYERS_ARGS[command]])
+
+    assert result.exit_code == 0, result.output
+    assert [call.kwargs["working_dir"] for call in mocked_run.call_args_list] == [
+        layers_group / "security-base",
+        layers_group / "base-tf-backend",
+    ]
