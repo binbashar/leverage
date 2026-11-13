@@ -146,7 +146,8 @@ def tf_default_args(paths: PathsHandler) -> tuple:
 @pass_runner
 def version(tf):
     """Print version."""
-    tf.run("version")
+    if exit_code := tf.run("version"):
+        raise Exit(exit_code)
 
 
 @click.command("format", context_settings=CONTEXT_SETTINGS)
@@ -155,7 +156,8 @@ def version(tf):
 def _format(tf, args):
     """Check if all files meet the canonical format and rewrite them accordingly."""
     args = args if "-recursive" in args else (*args, "-recursive")
-    tf.run("fmt", *args)
+    if exit_code := tf.run("fmt", *args):
+        raise Exit(exit_code)
 
 
 @click.command("force-unlock")
@@ -165,7 +167,8 @@ def _format(tf, args):
 @pass_runner
 def force_unlock(tf, paths: PathsHandler, lock_id):
     """Force unlock the state file."""
-    tf.run("force-unlock", lock_id)
+    if exit_code := tf.run("force-unlock", lock_id):
+        raise Exit(exit_code)
 
 
 @click.command()
@@ -174,7 +177,8 @@ def force_unlock(tf, paths: PathsHandler, lock_id):
 @pass_runner
 def validate(tf, paths: PathsHandler):
     """Validate code of the current directory. Previous initialization might be needed."""
-    tf.run("validate", *tf_default_args())
+    if exit_code := tf.run("validate", *tf_default_args()):
+        raise Exit(exit_code)
 
 
 @click.command("validate-layout")
@@ -190,7 +194,8 @@ def validate_layout(paths):
 @pass_runner
 def _import(tf, address, _id):
     """Import a resource."""
-    tf.run("import", *tf_default_args(), address, _id)
+    if exit_code := tf.run("import", *tf_default_args(), address, _id):
+        raise Exit(exit_code)
 
 
 @click.command("refresh-credentials")
@@ -275,12 +280,11 @@ def invoke_for_all_commands(paths, layers, command, *args: Sequence[str], skip_v
             backend_key = backend_key_base.replace("/base-", "/").replace("/tools-", "/")
             set_backend_key(layer / "config.tf", backend_key)
 
-    # check layers existence
     for layer in layers:
         if len(layers) > 1:
             logger.info(f"Invoking command for layer {layer}...")
 
-        # execute the actual command
+        # execute the actual command; a failing layer raises Exit and stops the remaining ones
         command(args, working_dir=layer)
 
     return layers
@@ -320,7 +324,8 @@ def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
     )
     init_args = (*filtered_args, f"-backend-config={paths.backend_tfvars}")
 
-    tf.run("init", *tf_default_args(), *init_args, working_dir=working_dir)
+    if exit_code := tf.run("init", *tf_default_args(), *init_args, working_dir=working_dir):
+        raise Exit(exit_code)
 
 
 @authenticate
@@ -328,7 +333,8 @@ def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
 @pass_runner
 def _plan(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Generate an execution plan for this layer."""
-    tf.run("plan", *tf_default_args(), *args, working_dir=working_dir)
+    if exit_code := tf.run("plan", *tf_default_args(), *args, working_dir=working_dir):
+        raise Exit(exit_code)
 
 
 def has_a_plan_file(args: Sequence[str]) -> bool:
@@ -393,7 +399,9 @@ def _apply(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: 
     default_args = () if has_a_plan_file(args) else tf_default_args()
     logger.debug(f"Default args passed to apply command: {default_args}")
 
-    tf.run("apply", *default_args, *args, working_dir=working_dir)
+    if exit_code := tf.run("apply", *default_args, *args, working_dir=working_dir):
+        logger.error(f"Command execution failed with exit code: {exit_code}")
+        raise Exit(exit_code)
 
 
 @authenticate
@@ -401,7 +409,8 @@ def _apply(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: 
 @pass_runner
 def _output(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Show all output variables of this layer."""
-    tf.run("output", *args, working_dir=working_dir)
+    if exit_code := tf.run("output", *args, working_dir=working_dir):
+        raise Exit(exit_code)
 
 
 @authenticate
@@ -409,7 +418,8 @@ def _output(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir:
 @pass_runner
 def _destroy(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: Path):
     """Destroy infrastructure in this layer."""
-    tf.run("destroy", *tf_default_args(), *args, working_dir=working_dir)
+    if exit_code := tf.run("destroy", *tf_default_args(), *args, working_dir=working_dir):
+        raise Exit(exit_code)
 
 
 # ###########################################################################

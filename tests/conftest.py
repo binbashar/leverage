@@ -199,9 +199,10 @@ def leverage_runner(monkeypatch):
         tf_runner.binary_path = str(tf_runner.binary_input)
 
     @contextmanager
-    def runner(leverage_directory):
+    def runner(leverage_directory, working_directory=None):
         # Determine working directory
-        working_directory = Path(leverage_directory) / "account" / "us-east-1" / "security-base"
+        if working_directory is None:
+            working_directory = Path(leverage_directory) / "account" / "us-east-1" / "security-base"
 
         # Ensure paths are Path objects
         leverage_directory = Path(leverage_directory)
