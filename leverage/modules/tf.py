@@ -139,7 +139,7 @@ def tf_default_args(paths: PathsHandler) -> tuple:
     account_config_files = tuple(
         f"-var-file={account_file.as_posix()}" for account_file in paths.account_config_dir.glob("*.tfvars")
     )
-    return common_config_files + account_config_files
+    return ()
 
 
 @click.command()
@@ -322,7 +322,7 @@ def _init(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir: P
         for index, arg in list(enumerate(args))
         if not str(arg).startswith("-backend-config") or not arg[index - 1] == "-backend-config"
     )
-    init_args = (*filtered_args, f"-backend-config={paths.backend_tfvars}")
+    init_args = tuple(filtered_args)
 
     if exit_code := tf.run("init", *tf_default_args(), *init_args, working_dir=working_dir):
         raise Exit(exit_code)
