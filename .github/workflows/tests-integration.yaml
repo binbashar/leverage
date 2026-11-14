@@ -272,39 +272,41 @@ jobs:
           EOF
           sed -i "s/^\(MFA_ENABLED=\)true/\1false/" build.env
 
-          # The reference architecture keeps this layer unprovisioned. Provision it here, so the test
-          # actually creates and destroys resources. If the reference architecture provisions it,
-          # refuse to go on: the test would destroy resources it expects to exist.
-          locals_file=apps-devstg/global/cli-test-layer/locals.tf
-          grep -qE '^\s*provisioned\s*=\s*false\s*$' "${locals_file}" || {
-            echo "::error::cli-test-layer is not unprovisioned (provisioned = false) in le-tf-infra-aws, refusing to apply and destroy it"
-            exit 1
-          }
-          sed -i -E 's/^(\s*provisioned\s*=\s*)false\s*$/\1true/' "${locals_file}"
-
+      # The reference architecture keeps cli-test-layer unprovisioned (its `provisioned` variable
+      # defaults to false), so every command below passes -var=provisioned=true: the test creates
+      # the layer's resources and destroys them within this run.
       - name: Init the ref-arch layers
-        id: refarch_init
         working-directory: ../theblairwitchproject/apps-devstg/global
         run: leverage tofu init --layers cli-test-layer,base-identities
 
-      - name: Plan and apply the test layer
+      # Only an empty layer may be applied and destroyed. Resources that already exist belong to
+      # someone else, e.g. a /tofu apply test in le-tf-infra-aws, and must not be destroyed.
+      - name: Check the test layer is empty
+        id: layer_empty
         working-directory: ../theblairwitchproject/apps-devstg/global
         run: |
           set -euo pipefail
-          # The layer must start empty, so the apply creates its resources and the destroy removes them
-          rc=0; leverage tofu plan -detailed-exitcode --layers cli-test-layer || rc=$?
-          [[ ${rc} -eq 2 ]] || { echo "::error::expected a plan with changes on the empty layer (rc=${rc})"; exit 1; }
-          leverage tofu apply -auto-approve --layers cli-test-layer
+          rc=0; leverage tofu plan -detailed-exitcode -var=provisioned=true --layers cli-test-layer || rc=$?
+          if [[ ${rc} -eq 0 ]]; then
+            echo "::error::cli-test-layer already has its resources (provisioned by le-tf-infra-aws, or left over by a failed run), refusing to apply and destroy it"
+            exit 1
+          fi
+          [[ ${rc} -eq 2 ]] || { echo "::error::plan failed (rc=${rc})"; exit 1; }
+
+      - name: Apply the test layer
+        working-directory: ../theblairwitchproject/apps-devstg/global
+        run: leverage tofu apply -auto-approve -var=provisioned=true --layers cli-test-layer
 
       - name: Check the apply converged
         working-directory: ../theblairwitchproject/apps-devstg/global
         run: |
           set -euo pipefail
-          rc=0; leverage tofu plan -detailed-exitcode --layers cli-test-layer || rc=$?
+          rc=0; leverage tofu plan -detailed-exitcode -var=provisioned=true --layers cli-test-layer || rc=$?
           [[ ${rc} -eq 0 ]] || { echo "::error::post-apply plan not empty (rc=${rc})"; exit 1; }
 
-      # Cleans up whenever the layer was initialized, even if a previous step failed or the run was cancelled
+      # Cleans up whatever this run created, even if a previous step failed or the run was cancelled.
+      # Never runs when the layer was not empty, so it only destroys what this run created.
       - name: Destroy the test layer
-        if: always() && steps.refarch_init.outcome == 'success'
+        if: always() && steps.layer_empty.outcome == 'success'
         working-directory: ../theblairwitchproject/apps-devstg/global
-        run: leverage tofu destroy -auto-approve --layers cli-test-layer
+        run: leverage tofu destroy -auto-approve -var=provisioned=true --layers cli-test-layer
