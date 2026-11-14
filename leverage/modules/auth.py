@@ -181,8 +181,9 @@ def check_sso_token(paths: PathsHandler):
         )
 
     token = json.loads(paths.sso_token_file.read_text())
-    expiry = datetime.strptime(token.get("expiresAt"), "%Y-%m-%dT%H:%M:%SZ")
-    renewal = datetime.now()
+    # expiresAt is in UTC: compare it with the current time in UTC, not in the local timezone
+    expiry = datetime.strptime(token.get("expiresAt"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=tzutc())
+    renewal = datetime.now(tzutc())
 
     if expiry < renewal:
         raise ExitError(
@@ -519,27 +520,24 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 break
 
             except ClientError as error:
-                if "invalid MFA" in error.response["Error"]["Message"]:
+                code = error.response["Error"]["Code"]
+                message = error.response["Error"]["Message"]
+                # STS answers a wrong MFA code with AccessDenied too: tell them apart by the message
+                if "invalid MFA" in message:
                     logger.error("Unable to get valid credentials. Please try again.")
                     continue
-                elif error.response["Error"]["Code"] == "AccessDeniedException":
+                elif code in ("AccessDenied", "AccessDeniedException"):
                     raise ExitError(
                         40,
                         f"User does not have permission to assume role [bold]{role_arn}[/bold]"
                         " in this account.\nPlease check with your administrator or try"
                         " checking your credentials configuration.",
                     )
-                elif error.response["Error"]["Code"] == "ExpiredToken":
-                    logger.error("Token has expired. Please try again.")
-                    continue
-                elif (
-                    error.response["Error"]["Code"] == "ValidationError"
-                    and "Invalid length for parameter TokenCode" in error.response["Error"]["Message"]
-                ):
+                elif code == "ValidationError" and "Invalid length for parameter TokenCode" in message:
                     logger.error("Invalid token length, it must be 6 digits long. Please try again.")
                     continue
-                elif "An error occurred" in error.response["Error"]["Message"]:
-                    raise ExitError(50, f"Error assuming role: {error}")
+                # Anything else (e.g. the source profile's session expired) won't be fixed by another code
+                raise ExitError(50, f"Error assuming role: {error}")
 
         if credentials is None:
             raise ExitError(60, "Failed to get credentials after 3 attempts. Please try again later.")
