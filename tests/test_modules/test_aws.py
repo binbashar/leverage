@@ -339,6 +339,52 @@ def test_logout_revokes_the_token_and_wipes_credentials(cli, aws_dir, stubs):
     assert set(read_ini(aws_dir / "config")) == {"profile bb-sso", "profile bb-sso-account"}
 
 
+def test_logout_without_a_session_still_wipes_credentials(cli, aws_dir, stubs):
+    # Never logged in, or the token was removed: no token and no SSO call (the Stubber rejects
+    # any call it has no response queued for), but whatever credentials are left go away
+    aws_dir.mkdir(parents=True)
+    (aws_dir / "credentials").write_text("[bb-account-devops]\naws_access_key_id = AKIAEXAMPLE\n")
+
+    result = cli("aws", "sso", "logout")
+
+    assert result.exit_code == 0, result.output
+    assert "No active AWS SSO session found" in result.output
+    assert not (aws_dir / "credentials").exists()
+
+
+def test_logout_twice_succeeds(cli, aws_dir, stubs):
+    cache = aws_dir / "sso" / "cache"
+    cache.mkdir(parents=True)
+    (cache / "token").write_text(json.dumps({"accessToken": ACCESS_TOKEN}))
+    stubs["sso"].add_response("logout", {}, {"accessToken": ACCESS_TOKEN})
+
+    first = cli("aws", "sso", "logout")
+    second = cli("aws", "sso", "logout")
+
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+
+
+def test_logout_with_an_expired_token_still_wipes_credentials(cli, aws_dir, stubs):
+    cache = aws_dir / "sso" / "cache"
+    cache.mkdir(parents=True)
+    (cache / "token").write_text(json.dumps({"accessToken": ACCESS_TOKEN}))
+    (aws_dir / "credentials").write_text("[bb-account-devops]\naws_access_key_id = AKIAEXAMPLE\n")
+    stubs["sso"].add_client_error(
+        "logout",
+        service_error_code="UnauthorizedException",
+        http_status_code=401,
+        expected_params={"accessToken": ACCESS_TOKEN},
+    )
+
+    result = cli("aws", "sso", "logout")
+
+    assert result.exit_code == 0, result.output
+    assert "Could not end the AWS SSO session" in result.output
+    assert list(cache.iterdir()) == []
+    assert not (aws_dir / "credentials").exists()
+
+
 # ###########################################################################
 # configure sso
 # ###########################################################################
@@ -423,8 +469,13 @@ def test_configure_sso_finds_accounts_under_organizational_units(cli, project, a
             None,
             "Missing account configuration for account in global config file",
         ),
+        (
+            COMMON_TFVARS.replace('project_long = "binbash"\n', ""),
+            None,
+            "Missing project_long in global config file",
+        ),
     ],
-    ids=["no-sso-settings", "no-sso-role", "account-not-in-organization"],
+    ids=["no-sso-settings", "no-sso-role", "account-not-in-organization", "no-project-long"],
 )
 def test_configure_sso_reports_missing_configuration(cli, project, browser, common_tfvars, account_tfvars, message):
     if common_tfvars is not None:
