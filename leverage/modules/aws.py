@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple
 
 import boto3
 import click
+from botocore.exceptions import ClientError
 from dateutil.tz import tzutc
 from configupdater import ConfigUpdater
 
@@ -148,6 +149,10 @@ def _sso(context: click.Context, awscli: Runner, paths: PathsHandler) -> None:
 
     if not all(sso_key in paths.common_conf for sso_key in ("sso_start_url", "sso_region")):
         raise ExitError(1, "Missing configuration values for SSO in global config file.")
+
+    # Needed to name the account profiles once logged in: check it before sending the user to log in
+    if not paths.project_long:
+        raise ExitError(1, "Missing project_long in global config file (or PROJECT_LONG in build.env).")
 
     sso_role = paths.account_conf.get("sso_role")
     if not sso_role:
@@ -331,11 +336,19 @@ def refresh(paths: PathsHandler, force: bool) -> None:
 @pass_paths
 def logout(paths: PathsHandler) -> None:
     """Logout"""
-    region = paths.common_conf.get("sso_region")
-    sso_client = boto3.client("sso", region_name=region)
+    # Idempotent: whatever the state of the session, end with no local tokens nor credentials
+    if paths.sso_token_file.exists():
+        region = paths.common_conf.get("sso_region")
+        sso_client = boto3.client("sso", region_name=region)
 
-    logger.debug("Logging out of AWS SSO...")
-    sso_client.logout(accessToken=get_sso_access_token(paths.sso_token_file))
+        logger.debug("Logging out of AWS SSO...")
+        try:
+            sso_client.logout(accessToken=get_sso_access_token(paths.sso_token_file))
+        except ClientError as error:
+            # e.g. the token already expired, so there is no session left to end
+            logger.warning(f"Could not end the AWS SSO session ({error}). Removing the local credentials anyway.")
+    else:
+        logger.info("No active AWS SSO session found. Removing the local credentials.")
 
     logger.debug("Removing SSO Tokens...")
     if paths.sso_cache.exists():
@@ -343,15 +356,6 @@ def logout(paths: PathsHandler) -> None:
             file.unlink()
 
     logger.debug("Wiping current SSO credentials...")
-    updater = ConfigUpdater()
-    updater.read(paths.aws_credentials_file)
-
-    sections = updater.sections()
-    for section in sections:
-        if section not in ("default", f"{paths.project}-sso"):
-            updater.remove_section(section)
-    updater.update_file()
-
     paths.aws_credentials_file.unlink(missing_ok=True)
 
     logger.debug("All SSO credentials wiped!.")
