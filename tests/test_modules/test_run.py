@@ -1,11 +1,8 @@
-import sys
 import pytest
 
 from click.exceptions import Exit
 
 from leverage.tasks import _load_build_script
-from leverage.logger import _leverage_logger
-from leverage.logger import _configure_logger
 from leverage.modules.run import _prepare_tasks_to_run
 from leverage.modules.run import TaskNotFoundError
 from leverage.modules.run import MalformedTaskArgumentError

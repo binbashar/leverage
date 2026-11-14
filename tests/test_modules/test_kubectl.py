@@ -1,7 +1,7 @@
 from importlib import import_module
 from pathlib import Path, PosixPath
 from unittest import mock
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from click.testing import CliRunner
 
@@ -55,4 +55,5 @@ def test_discover(leverage_project):
                 with patch.object(kubectl_module, "_configure") as mkd_configure:
                     cli_runner.invoke(leverage, ["kubectl", "discover"])
 
+    mkd_scan_clusters.assert_called_once()
     assert isinstance(mkd_configure.call_args_list[0][0][1], ClusterInfo)

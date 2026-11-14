@@ -10,7 +10,6 @@ import simple_term_menu
 from leverage import logger
 from leverage.path import PathsHandler
 from leverage._utils import ExitError
-from leverage.modules.aws import aws
 from leverage.modules.runner import Runner
 from leverage.modules.tfrunner import TFRunner
 from leverage.modules.utils import _handle_subcommand
@@ -46,8 +45,8 @@ def kubectl(context, state, args):
     state.runner = Runner(
         binary="kubectl",
         error_message=(
-            f"Kubectl not found on system. "
-            f"Please install it following the instructions at: https://kubernetes.io/docs/tasks/tools/#kubectl"
+            "Kubectl not found on system. "
+            "Please install it following the instructions at: https://kubernetes.io/docs/tasks/tools/#kubectl"
         ),
         env_vars=state.environment,
     )
@@ -72,7 +71,7 @@ def _configure(environment: dict, ci: ClusterInfo = None, layer_path: Path = Non
     try:
         exit_code, _, _ = Runner(binary="aws", env_vars=environment).exec(*cmd)
     except ExitError as e:
-        raise ExitError(e.exit_code, f"Could not locate AWS cli binary.")
+        raise ExitError(e.exit_code, "Could not locate AWS cli binary.")
     if exit_code:
         raise ExitError(exit_code, f"Failed to configure kubectl context: {exit_code}")
 
@@ -88,7 +87,7 @@ def _get_eks_kube_config(paths: PathsHandler, environment: dict, layer_path: Pat
         try:
             tfrunner = TFRunner(binary=paths.tf_binary, terraform=True, env_vars=environment)
         except ExitError:
-            raise ExitError(e.exit_code, f"Could not locate TF binary.")
+            raise ExitError(e.exit_code, "Could not locate TF binary.")
 
     perform_authentication(paths)
     exit_code, output, error = tfrunner.exec("output", "-no-color", working_dir=layer_path)

@@ -2,7 +2,6 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional
 
-from click.exceptions import Exit
 
 from leverage._utils import ExitError
 from leverage.modules.runner import Runner
