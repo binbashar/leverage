@@ -19,6 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Code Quality
 - `poetry run black .` - Format code with Black (line length: 120)
 - `poetry run ruff check .` - Run linting (rules in `[tool.ruff]` in `pyproject.toml`)
+- `poetry run mypy` - Type check `leverage/` (config in `[tool.mypy]` in `pyproject.toml`, runs in the `unit_tests` CI job)
 - `poetry run pre-commit install` - Install pre-commit hooks
 - `poetry run pre-commit run --all-files` - Run pre-commit checks manually
 

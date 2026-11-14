@@ -39,6 +39,12 @@ jobs:
           export PATH="${PATH}:${HOME}/.poetry/bin"
           poetry install --with=dev
 
+      # Needs the dependencies installed, so it runs here and not in the lint job. Config in [tool.mypy]
+      # in pyproject.toml; it checks for Python 3.9 whatever the runtime, so once is enough.
+      - name: Type check (mypy)
+        if: matrix.python-version == '3.13'
+        run: poetry run mypy
+
       - name: Run unit tests
         run: |
           echo "[INFO] Running unit tests and generate coverage report"
