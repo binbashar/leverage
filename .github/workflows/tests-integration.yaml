@@ -29,11 +29,36 @@ permissions:
   contents: read
 
 jobs:
+  # The first entry is the required check, so its name must stay exactly `integration_tests`.
+  # The others check compatibility: older and newer tofu/terraform releases, and macOS, which most
+  # of the team uses (BSD userland, /var -> /private/var symlinks). Public repo: standard runners
+  # cost nothing, but macOS ones are slower and capped at 5 concurrent jobs across the org.
   integration_tests:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: integration_tests
+            os: ubuntu-latest
+            opentofu: 1.13.2
+            terraform: 1.9.8
+          - name: integration_tests_compat (ubuntu, older tofu and terraform)
+            os: ubuntu-latest
+            opentofu: 1.10.10
+            terraform: 1.12.2
+          - name: integration_tests_compat (ubuntu, latest tofu and terraform)
+            os: ubuntu-latest
+            opentofu: 1.13.9
+            terraform: 1.17.2
+          - name: integration_tests_compat (macos, latest tofu and terraform)
+            os: macos-latest
+            opentofu: 1.13.9
+            terraform: 1.17.2
     env:
-      TERRAFORM_VERSION: 1.9.8
-      OPENTOFU_VERSION: 1.13.2
+      TERRAFORM_VERSION: ${{ matrix.terraform }}
+      OPENTOFU_VERSION: ${{ matrix.opentofu }}
       BATS_LIB_PATH: /usr/local/lib/bats
     steps:
       - uses: actions/checkout@v4
@@ -61,11 +86,18 @@ jobs:
 
       - name: Install terraform and tofu
         run: |
-          echo "[INFO] Installing terraform ${TERRAFORM_VERSION} and tofu ${OPENTOFU_VERSION}"
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          case "$(uname -m)" in
+            x86_64) arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "[ERROR] Unsupported architecture $(uname -m)"; exit 1 ;;
+          esac
+          echo "[INFO] Installing terraform ${TERRAFORM_VERSION} and tofu ${OPENTOFU_VERSION} for ${os}_${arch}"
           curl -fsSL -o /tmp/terraform.zip \
-            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${os}_${arch}.zip"
           curl -fsSL -o /tmp/tofu.zip \
-            "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_amd64.zip"
+            "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_${os}_${arch}.zip"
           sudo unzip -q -o /tmp/terraform.zip terraform -d /usr/local/bin
           sudo unzip -q -o /tmp/tofu.zip tofu -d /usr/local/bin
           terraform version
