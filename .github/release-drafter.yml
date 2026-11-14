@@ -6,7 +6,7 @@ categories:
       - 'feature'
       - 'enhancement'
   - title: '💣 Breaking Change'
-    label:
+    labels:
       - 'breakingchange'
       - 'breaking'
   - title: '🐛 Bug Fixes'
@@ -15,19 +15,41 @@ categories:
       - 'bugfix'
       - 'bug'
   - title: '📝 Documentation'
-    label:
+    labels:
       - 'doc'
       - 'documentation'
   - title: '🔨 Maintenance'
-    label:
+    labels:
       - 'chore'
       - 'maintenance'
+# Labels PRs from their title, e.g. "Fix | ...", "fix: ...", "Enhancement | ...", "feat(cli): ...".
+# Runs on pull_request events (see release-management-github.yml); it only adds labels.
+autolabeler:
+  - label: 'fix'
+    title:
+      - '/^\s*(fix|bug|bugfix|hotfix)\b/i'
+  - label: 'enhancement'
+    title:
+      - '/^\s*(feat|feature|enhancement)\b/i'
+  - label: 'documentation'
+    title:
+      - '/^\s*docs?\b/i'
+  - label: 'minor'
+    title:
+      - '/^\s*(feat|feature|enhancement)\b/i'
+  - label: 'patch'
+    title:
+      - '/^\s*(fix|bug|bugfix|hotfix|docs?|chore)\b/i'
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+# The next version is the highest bump among the merged PRs' labels: major, minor or patch.
+# The autolabeler above sets a default from the PR title; change the label on the PR to override it.
 version-resolver:
   major:
     labels:
       - 'major'
+      - 'breaking'
+      - 'breakingchange'
   minor:
     labels:
       - 'minor'
