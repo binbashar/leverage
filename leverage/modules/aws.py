@@ -166,7 +166,8 @@ def _sso(context: click.Context, awscli: Runner, paths: PathsHandler) -> None:
             try:
                 # this is for accounts with no org unit on top of it
                 found = False
-                for ou in paths.common_conf.get("organization").get("organizational_units"):
+                # an organization may have no organizational units at all
+                for ou in paths.common_conf.get("organization").get("organizational_units") or {}:
                     if current_account in paths.common_conf.get("organization").get("organizational_units").get(ou).get(
                         "accounts"
                     ):
@@ -227,7 +228,10 @@ def sso(context: click.Context, awscli: Runner, args: Tuple[str, ...]) -> None:
 @pass_runner
 def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
     """Login"""
-    exit_code, region, _ = awscli.exec("configure", "get", "sso_region", "--profile", f"{paths.project}-sso")
+    # raises=False: a missing profile is reported below, with a hint on how to configure it
+    exit_code, region, _ = awscli.exec(
+        "configure", "get", "sso_region", "--profile", f"{paths.project}-sso", raises=False
+    )
     if exit_code:
         raise ExitError(
             exit_code,
