@@ -156,8 +156,13 @@ def sleeps(monkeypatch):
 
 
 @pytest.fixture
-def cli(project, leverage_runner, home, fake_aws_cli):
-    """Invoke `leverage <args>` from the security-base layer, or from `working_dir`."""
+def cli(project, leverage_runner, home, fake_aws_cli, stubs, browser, sleeps):
+    """Invoke `leverage <args>` from the security-base layer, or from `working_dir`.
+
+    Always under the AWS stubs, the browser and sleep fakes: a call a test did not expect fails at
+    once (the Stubber has no response queued for it), instead of reaching AWS, opening a browser
+    tab or polling forever.
+    """
 
     def invoke(*args, working_dir=None):
         with leverage_runner(project, working_dir) as runner:
