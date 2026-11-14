@@ -51,7 +51,7 @@ def get_root_path():
     except CalledProcessError as exc:
         if "fatal: not a git repository" in exc.stderr:
             raise NotARepositoryError("Not running in a git repository.")
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         raise NotARepositoryError("Not running in a git repository.")
     else:
         return root.strip()

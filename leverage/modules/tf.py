@@ -385,7 +385,7 @@ def has_a_plan_file(args: Sequence[str]) -> bool:
     if len(args) > 1:
         second_last = args[-2]
         if second_last.startswith("-"):
-            if not "=" in second_last and second_last not in tf_flags:
+            if "=" not in second_last and second_last not in tf_flags:
                 return False
 
     return True

@@ -83,7 +83,7 @@ def configure_sso_profiles(paths: PathsHandler) -> None:
     # then set a profile for each account
     access_token = get_sso_access_token(paths.sso_token_file)
 
-    logger.info(f"Fetching accounts and roles...")
+    logger.info("Fetching accounts and roles...")
     client = boto3.client("sso", region_name=region)
     account_roles = get_account_roles(client, access_token)
     for acc_name, values in account_roles.items():
@@ -106,8 +106,8 @@ def aws(context: click.Context, state: Any, args: Tuple[str, ...]) -> None:
     state.runner = Runner(
         binary="aws",
         error_message=(
-            f"AWS CLI not found on system. "
-            f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            "AWS CLI not found on system. "
+            "Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
         ),
         env_vars=state.environment,
     )
@@ -246,10 +246,10 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
 
     paths.sso_cache.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Logging in...")
+    logger.info("Logging in...")
     sso_oidc_client = boto3.client("sso-oidc", region_name=region)
 
-    logger.debug(f"Registering client...")
+    logger.debug("Registering client...")
     sso_oidc_client_creds = sso_oidc_client.register_client(
         clientName=f"leverage-{datetime.datetime.now().timestamp()}",
         clientType="public",
@@ -271,7 +271,7 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
         f"{paths.common_conf.get('sso_start_url')}/#/device?user_code={device_authorization['userCode']}"
     )
 
-    logger.debug(f"Attempting to create authorization token...")
+    logger.debug("Attempting to create authorization token...")
     _wait_interval = device_authorization["interval"]
     token = None
     while not token:
@@ -309,11 +309,11 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
             )
 
     logger.debug(f"Token expires at: {token['expiresAt']}")
-    logger.debug(f"Caching token.")
+    logger.debug("Caching token.")
     token_file = paths.sso_cache / "token"
     token_file.write_text(json.dumps(token))
 
-    logger.info(f"Successfully logged in!.")
+    logger.info("Successfully logged in!.")
 
     if refresh_all:
         refresh_all_accounts_credentials(paths, force_refresh=False)

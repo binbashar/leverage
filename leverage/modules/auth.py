@@ -558,4 +558,4 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 "aws_session_token": credentials["SessionToken"],
             },
         )
-        logger.info(f"Credentials written successfully.")
+        logger.info("Credentials written successfully.")

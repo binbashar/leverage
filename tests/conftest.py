@@ -186,7 +186,7 @@ def leverage_runner(monkeypatch):
         working_directory: Optional working directory (defaults to account/us-east-1/security-base)
     """
     from contextlib import contextmanager
-    from leverage.modules import tf, auth
+    from leverage.modules import auth
     from leverage.modules.tfrunner import TFRunner
 
     def skip_binary_validation(tf_runner):

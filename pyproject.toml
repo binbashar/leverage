@@ -43,11 +43,11 @@ simple-term-menu = "1.6.4"
 python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
-pylint = "2.8.3"
 pytest = "8.3.3"
 pytest-cov = "6.0.0"
 twine = "6.1.0"
 black = "23.3.0"
+ruff = "0.17.5"
 pre-commit = "3.5.0"
 pytest-mock = "^3.15.1"
 
@@ -65,3 +65,19 @@ extend-exclude = """
 simple_build_bad_syntax.py
 """
 
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+# Deliberately broken: tests/test_tasks.py checks how a build script with a syntax error is reported
+extend-exclude = ["tests/build_scripts/simple_build_bad_syntax.py"]
+
+[tool.ruff.lint]
+# pyflakes (F) and the pycodestyle errors (E4, E7, E9): mistakes, not style. black owns the formatting.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# The package's public names, imported to be re-exported
+"leverage/__init__.py" = ["F401"]
+"leverage/modules/__init__.py" = ["F401"]
+# TODO: drop once #333 is merged; fixing these f-strings now would conflict with it
+"leverage/_backend_config.py" = ["F541"]

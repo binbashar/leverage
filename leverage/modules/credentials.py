@@ -305,8 +305,8 @@ def credentials(state):
     state.runner = Runner(
         binary="aws",
         error_message=(
-            f"AWS CLI not found on system. "
-            f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            "AWS CLI not found on system. "
+            "Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
         ),
         env_vars=state.environment,
     )
@@ -345,7 +345,7 @@ def _load_configs_for_credentials(paths: PathsHandler, state: State):
     # region_primary was added in ref-arch v1
     # for v2 it was replaced by region at project level
     region_primary = "region_primary"
-    if not "region_primary" in project_config and not "region_primary" in terraform_config:
+    if "region_primary" not in project_config and "region_primary" not in terraform_config:
         region_primary = "region"
     config_values["primary_region"] = (
         project_config.get(region_primary) or terraform_config.get(region_primary) or _ask_for_region()

@@ -171,7 +171,7 @@ poetry shell
 
 ## Pre-commit hooks
 
-In order to run black automatically on every commit, you should install `pre-commit` first:
+In order to run black and ruff automatically on every commit, you should install `pre-commit` first:
 
 https://pre-commit.com/#installation
 

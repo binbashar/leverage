@@ -1,13 +1,26 @@
-name: Tests | Lint w/ Black
+name: Tests | Lint (black, ruff)
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
+  # `lint` is a required check: keep the job name
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - uses: psf/black@stable
         with:
           options: "--check --verbose"
           version: "23.3.0"
+
+      # Rules and exclusions come from [tool.ruff] in pyproject.toml. Keep the version in sync
+      # with the dev dependency and the pre-commit hook.
+      - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
+        with:
+          version: "0.17.5"
