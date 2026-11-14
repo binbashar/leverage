@@ -6,6 +6,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import PIPE
 from subprocess import run
+from typing import Optional
 
 import hcl2
 
@@ -238,7 +239,7 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
         if self.root_dir == self.account_dir == self.common_config_dir == self.account_config_dir == self.cwd:
             raise ExitError(1, "Not running in a Leverage project. Exiting.")
 
-    def check_for_layer_location(self, path: Path = None):
+    def check_for_layer_location(self, path: Optional[Path] = None):
         """Make sure the command is being run at layer level. If not, bail."""
         path = path or self.cwd
         if path in (self.common_config_dir, self.account_config_dir):
@@ -253,7 +254,7 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
         if not list(path.glob("*.tf")):
             raise ExitError(1, "This command can only run at [bold]layer[/bold] level.")
 
-    def check_for_cluster_layer(self, path: Path = None):
+    def check_for_cluster_layer(self, path: Optional[Path] = None):
         path = path or self.cwd
         self.check_for_layer_location(path)
         # assuming the "cluster" layer will contain the expected EKS outputs

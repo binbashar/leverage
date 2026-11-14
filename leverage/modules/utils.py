@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, Callable
 
+from click.core import Group
 from click.exceptions import Exit
 from click.core import Context
 
@@ -32,18 +33,20 @@ def _handle_subcommand(
     except ValueError:
         caller_pos = 0
 
+    # Only called from groups, which hold the wrapped subcommands
+    assert isinstance(context.command, Group)
     # Find if one of the wrapped subcommand was invoked
     wrapped_subcommands = context.command.commands.keys()
-    subcommand = next((arg for arg in args[caller_pos:] if arg in wrapped_subcommands), None)
+    subcommand_name = next((arg for arg in args[caller_pos:] if arg in wrapped_subcommands), None)
 
-    if subcommand is None:
+    if subcommand_name is None:
         # Run the command directly
         if pre_invocation_callback:
             pre_invocation_callback()
         exit_code = runner.run(*args)
         raise Exit(exit_code)
 
-    subcommand = context.command.commands.get(subcommand)
+    subcommand = context.command.commands[subcommand_name]
     # Build the subcommand's own context from its slice of the CLI args and invoke it through that
     # context. We can't use context.invoke / context.forward here: invoke ignores user-supplied
     # options (everything falls back to defaults) and forward copies the parent group's params
