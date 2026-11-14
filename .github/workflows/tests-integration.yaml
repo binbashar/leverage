@@ -93,7 +93,9 @@ jobs:
   integration_tests_cli_refarch:
     # Not part of the release gate, see #330
     if: inputs.dist-artifact == ''
-    runs-on: ubuntu-latest
+    # Python 3.9 is not available on Ubuntu 26.04, which ubuntu-latest points to since 2026-11.
+    # Move back to ubuntu-latest once 3.9 support is dropped.
+    runs-on: ubuntu-24.04
     env:
       TERRAFORM_VERSION: 1.9.8
       OPENTOFU_VERSION: 1.9.1
