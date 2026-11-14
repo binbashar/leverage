@@ -11,7 +11,9 @@ permissions:
 
 jobs:
   unit_tests:
-    runs-on: ubuntu-latest
+    # Python 3.9 is not available on Ubuntu 26.04, which ubuntu-latest points to since 2026-11.
+    # Move back to ubuntu-latest once 3.9 support is dropped.
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
