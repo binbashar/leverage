@@ -245,12 +245,21 @@ def test_login_caches_the_token_after_the_user_authorizes(cli, aws_dir, stubs, b
 
 def test_login_backs_off_when_asked_to_slow_down(cli, aws_dir, stubs, browser, sleeps):
     write_aws_config(aws_dir, {"profile bb-sso": {"sso_region": REGION}})
-    stub_device_login(stubs["sso-oidc"], pending=["SlowDownException", "AuthorizationPendingException"])
+    stub_device_login(
+        stubs["sso-oidc"],
+        pending=[
+            "SlowDownException",
+            "AuthorizationPendingException",
+            "SlowDownException",
+            "AuthorizationPendingException",
+        ],
+    )
 
     result = cli("aws", "sso", "login")
 
     assert result.exit_code == 0, result.output
-    assert sleeps == [5 + 5, 5]
+    # RFC 8628 (3.5): each slow_down adds 5 seconds to that wait and to every later one
+    assert sleeps == [10, 10, 15, 15]
 
 
 def test_login_aborts_on_any_other_error(cli, aws_dir, stubs, browser, sleeps):

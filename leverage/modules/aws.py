@@ -292,8 +292,9 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
             }
 
         except sso_oidc_client.exceptions.SlowDownException:
-            # Polling too frequently.
-            time.sleep(_wait_interval + 5)
+            # Polling too frequently: per RFC 8628 (3.5), add 5 seconds to this and every later wait
+            _wait_interval += 5
+            time.sleep(_wait_interval)
         except sso_oidc_client.exceptions.AuthorizationPendingException:
             # User hasn't finished logging in.
             time.sleep(_wait_interval)
