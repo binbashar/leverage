@@ -514,3 +514,21 @@ def test_other_commands_go_to_the_aws_cli(cli, fake_aws_cli, monkeypatch, exit_c
 
     assert result.exit_code == exit_code
     assert fake_aws_cli.read_text() == "sts get-caller-identity --output json\n"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("configure", "list"),
+        ("configure", "export-credentials", "--format", "env"),
+        ("configure", "list-profiles"),
+        ("sso", "list-accounts", "--access-token", "token"),
+    ],
+    ids=["configure-list", "configure-export-credentials", "configure-list-profiles", "sso-list-accounts"],
+)
+def test_other_configure_and_sso_commands_go_to_the_aws_cli(cli, fake_aws_cli, args):
+    # `configure` and `sso` wrap some subcommands; the rest go to the aws cli, with the group's name
+    result = cli("aws", *args)
+
+    assert result.exit_code == 0, result.output
+    assert fake_aws_cli.read_text() == " ".join(args) + "\n"
