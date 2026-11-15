@@ -48,6 +48,11 @@ jobs:
             make bump-test-version
           else
             echo "Version input provided: $VERSION"
+            # make expands RELEASE_VERSION too ($(shell ...) would run), so only a well-formed version reaches it
+            if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+              echo "[ERROR] Invalid format for version input. Expected format: 9.9.9-rc9" >&2
+              exit 1
+            fi
             make bump-test-version RELEASE_VERSION="$VERSION"
           fi
         shell: bash
