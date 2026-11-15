@@ -28,7 +28,8 @@ categories:
         - 'chore'
         - 'maintenance'
   # The next version is the highest bump among the merged PRs' labels: major, minor or patch.
-  # The autolabeler below sets a default from the PR title; change the label on the PR to override it.
+  # The autolabeler below sets minor or patch from the PR title. To override it, change the title, or
+  # add 'major'/'breaking', which the autolabeler doesn't manage (it removes its own labels, see below).
   - type: 'version-resolver'
     semver-increment: 'major'
     when:
@@ -45,7 +46,10 @@ categories:
     when:
       label: 'patch'
 # Labels PRs from their title, e.g. "Fix | ...", "fix: ...", "Enhancement | ...", "feat(cli): ...".
-# Runs on pull_request events, with the autolabeler action (see release-management-github.yml); it only adds labels.
+# Runs on pull_request events, with the autolabeler action (see release-management-github.yml).
+# sync-labels: the labels below follow the title, so a PR retitled from "feat" to "fix" loses 'minor'
+# and 'enhancement'. Only these labels are removed; any other (bug, test, major, ...) is left alone.
+sync-labels: true
 autolabeler:
   - labels: ['fix', 'patch']
     title:

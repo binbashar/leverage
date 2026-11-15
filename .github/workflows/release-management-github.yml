@@ -6,8 +6,9 @@ on:
       - master
   # Only for the autolabeler
   pull_request:
-    # edited: so a title change relabels the PR
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+    # edited: so a title change relabels the PR. Not on labeled/unlabeled: label changes can't change
+    # what the title matches, and rerunning there would only fight the maintainer's edits.
+    types: [opened, reopened, synchronize, edited]
 
 permissions:
   contents: read
