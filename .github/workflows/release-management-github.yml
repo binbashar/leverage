@@ -6,8 +6,9 @@ on:
       - master
   # Only for the autolabeler
   pull_request:
-    # edited: so a title change relabels the PR
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+    # edited: so a title change relabels the PR. Not on labeled/unlabeled: label changes can't change
+    # what the title matches, and rerunning there would only fight the maintainer's edits.
+    types: [opened, reopened, synchronize, edited]
 
 permissions:
   contents: read
@@ -27,14 +28,11 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
-      - uses: release-drafter/release-drafter@b1476f6e6eb133afa41ed8589daba6dc69b4d3f5 # v6.1.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          disable-autolabeler: true
+      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
 
-  # Labels the PR from its title (see autolabeler in .github/release-drafter.yml). It must not
-  # touch the drafts: concurrent PR events created duplicate drafts targeting the PR branch.
+  # Labels the PR from its title (see autolabeler in .github/release-drafter.yml). Since v7 the
+  # autolabeler is its own action and never touches the drafts (concurrent PR events used to create
+  # duplicate drafts targeting the PR branch).
   autolabel:
     if: github.event_name == 'pull_request'
     # Only the latest event of a PR matters
@@ -47,8 +45,4 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - uses: release-drafter/release-drafter@b1476f6e6eb133afa41ed8589daba6dc69b4d3f5 # v6.1.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          disable-releaser: true
+      - uses: release-drafter/release-drafter/autolabeler@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
