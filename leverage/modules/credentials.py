@@ -45,7 +45,8 @@ MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 PROJECT_ROOT = get_project_root_or_current_dir_path()
 try:
     PROJECT_COMMON_TFVARS = Path(get_global_config_path())
-except NotARepositoryError:
+except (NotARepositoryError, ExitError):
+    # Evaluated on import: the command reports a git error when it loads the configuration
     PROJECT_COMMON_TFVARS = Path.cwd()
 
 PROJECT_COMMON_TFVARS_FILE = "common.tfvars"
@@ -273,7 +274,7 @@ def credentials(state):
             logger.info("Writing project short name to build.env.")
             build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG=1.1.9")
 
-        if state.paths is None:
+        if not state.has_paths:
             # Upstream (leverage.py) skipped PathsHandler because only project.yaml existed.
             # build.env now has a project name (or already did) - reload config from disk and
             # build real, project-scoped paths here instead of leaving state.paths/environment None.

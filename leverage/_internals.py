@@ -6,6 +6,7 @@ from functools import wraps
 
 import click
 
+from leverage._utils import ExitError
 from leverage.logger import get_verbosity
 
 
@@ -28,9 +29,24 @@ class State:
         self._verbosity = None
         self.module = Module()
         self.config = None
-        self.paths = None
+        self._paths = None
         self.runner = None
         self.environment = None
+
+    @property
+    def paths(self):
+        # Unset outside a project: the leverage callback leaves it so, for the commands that work anywhere
+        if self._paths is None:
+            raise ExitError(1, "Out of Leverage project context. Please cd into a Leverage project directory first.")
+        return self._paths
+
+    @paths.setter
+    def paths(self, paths):
+        self._paths = paths
+
+    @property
+    def has_paths(self):
+        return self._paths is not None
 
     @property
     def verbosity(self):

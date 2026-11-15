@@ -34,6 +34,7 @@ def leverage(context, state, verbose):
     try:
         state.config = conf.load()
     except NotARepositoryError:
+        # Commands that need the project paths fail when they ask for them (see State.paths)
         return
 
     # The `project` commands bootstrap a project, so they run before its configuration exists.
