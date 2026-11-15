@@ -29,19 +29,19 @@ packages = [
 # No cap on the minor version: with one, pip installs an old release that had none on every new Python (#341).
 # CI tests the versions in tests-unit.yml. The <4.0 is required by simple-term-menu.
 python = ">=3.11,<4.0"
-click = "8.0.1"
-yaenv = "1.5.3post1"
-"ruamel.yaml" = "0.17.10"
+click = "8.5.1"
+yaenv = "1.6.5"
+"ruamel.yaml" = "0.19.1"
 jinja2 = "3.1.6"
 questionary = "2.1.1"
-prompt-toolkit = "3.0.51"
+prompt-toolkit = "3.0.53"
 python-hcl2 = "7.3.1"
 boto3 = "1.44.3"
 configupdater = "4.1.1"
-docutils = "0.17.1"
+docutils = "0.23"
 rich = "14.1.0"
 requests = "2.34.2"
-simple-term-menu = "1.6.4"
+simple-term-menu = "1.6.6"
 python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
