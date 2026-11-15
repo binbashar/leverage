@@ -10,6 +10,10 @@ on:
         default: ""
         required: false
 
+# Read-only GITHUB_TOKEN: the job only checks out and uploads to PyPI with PYPI_TOKEN
+permissions:
+  contents: read
+
 jobs:
   build_push:
     runs-on: ubuntu-latest 
@@ -35,13 +39,16 @@ jobs:
           poetry install --with=dev
 
       - name: bump_test_version
+        # The input goes through an env var, not ${{ }} in the script, so it can't inject shell code
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ -z "${{ github.event.inputs.version }}" ]; then
+          if [ -z "$VERSION" ]; then
             echo "No version input provided, running without RELEASE_VERSION."
             make bump-test-version
           else
-            echo "Version input provided: ${{ github.event.inputs.version }}"
-            make bump-test-version RELEASE_VERSION=${{ github.event.inputs.version }}
+            echo "Version input provided: $VERSION"
+            make bump-test-version RELEASE_VERSION="$VERSION"
           fi
         shell: bash
 
