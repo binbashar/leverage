@@ -66,7 +66,7 @@ Key modules include:
 - `shell` - Interactive shell access
 
 ### Version Management
-- Supports Python 3.11-3.13
+- Supports Python 3.11 and newer (CI tests 3.11-3.15)
 - Version defined in `leverage/__init__.py`
 - Binary version validation on initialization (for TFRunner)
 
@@ -218,7 +218,7 @@ For full functionality, ensure the following binaries are installed and availabl
 **Required**:
 - `terraform` or `tofu` - For Terraform/OpenTofu operations
 - `aws` - AWS CLI for SSO authentication (via boto3)
-- Python 3.11-3.13
+- Python 3.11 or newer
 
 **Optional**:
 - `kubectl` - For Kubernetes operations
