@@ -7,3 +7,6 @@ skip_covered = True
 # Typing-only stubs, never executed
 exclude_also =
     @overload
+
+# Raise it as coverage grows (#346)
+fail_under = 75
