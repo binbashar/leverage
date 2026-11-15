@@ -138,52 +138,8 @@ def test_run_without_env_vars(mocker):
     assert mock_subprocess.call_args[1]["text"] is False
 
 
-def test_run_with_instance_env_vars_only(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    instance_env = {"TF_VAR_region": "us-east-1", "TF_LOG": "DEBUG"}
-    expected_env = os.environ.copy()
-    expected_env.update(instance_env)
-
-    runner = TFRunner(binary="", env_vars=instance_env)
-    result = runner.run("apply", "-auto-approve")
-
-    assert result == 0
-    # Check the last call (the actual run)
-    assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "apply", "-auto-approve"]
-    assert mock_subprocess.call_args[1]["env"] == expected_env
-    assert mock_subprocess.call_args[1]["cwd"] is None
-    assert mock_subprocess.call_args[1]["capture_output"] is False
-    assert mock_subprocess.call_args[1]["text"] is False
-
-
-def test_run_with_run_env_vars_only(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    run_env = {"TF_VAR_environment": "production"}
-    expected_env = os.environ.copy()
-    expected_env.update(run_env)
-
-    runner = TFRunner(binary="")
-    result = runner.run("plan", env_vars=run_env)
-
-    assert result == 0
-    # Check the last call
-    assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "plan"]
-    assert mock_subprocess.call_args[1]["env"] == expected_env
-    assert mock_subprocess.call_args[1]["cwd"] is None
-    assert mock_subprocess.call_args[1]["capture_output"] is False
-    assert mock_subprocess.call_args[1]["text"] is False
-
-
 def test_run_merges_instance_and_run_env_vars(mocker):
-    """Test that TFRunner properly merges env_vars through the parent class"""
+    """TFRunner passes env_vars on to Runner, which merges them: the merge itself is tested in test_runner.py"""
     mocker.patch("shutil.which", return_value="/usr/bin/tofu")
     mock_subprocess = mocker.patch("subprocess.run")
     mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
@@ -202,31 +158,6 @@ def test_run_merges_instance_and_run_env_vars(mocker):
     assert result == 0
     # Check the last call
     assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "apply"]
-    assert mock_subprocess.call_args[1]["env"] == expected_env
-    assert mock_subprocess.call_args[1]["cwd"] is None
-    assert mock_subprocess.call_args[1]["capture_output"] is False
-    assert mock_subprocess.call_args[1]["text"] is False
-
-
-def test_run_env_vars_override_instance_env_vars(mocker):
-    """Test that run-time env_vars override instance env_vars through parent class"""
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    instance_env = {"TF_VAR_region": "us-east-1", "TF_LOG": "DEBUG"}
-    run_env = {"TF_VAR_region": "us-west-2"}  # Override region
-
-    expected_env = os.environ.copy()
-    expected_env.update({"TF_VAR_region": "us-west-2", "TF_LOG": "DEBUG"})
-
-    runner = TFRunner(binary="", env_vars=instance_env)
-    result = runner.run("plan", env_vars=run_env)
-
-    assert result == 0
-    # Check the last call
-    assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "plan"]
     assert mock_subprocess.call_args[1]["env"] == expected_env
     assert mock_subprocess.call_args[1]["cwd"] is None
     assert mock_subprocess.call_args[1]["capture_output"] is False
@@ -255,74 +186,3 @@ def test_run_with_multiple_args(mocker):
     assert mock_subprocess.call_args[1]["cwd"] is None
     assert mock_subprocess.call_args[1]["capture_output"] is False
     assert mock_subprocess.call_args[1]["text"] is False
-
-
-def test_run_preserves_instance_env_vars_across_multiple_calls(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    instance_env = {"TF_VAR_region": "us-east-1"}
-    expected_env = os.environ.copy()
-    expected_env.update(instance_env)
-
-    runner = TFRunner(binary="", env_vars=instance_env)
-
-    # First call (after --version check)
-    runner.run("init")
-    # Second call - instance env vars should still be present
-    runner.run("plan")
-
-    # Check that we have 3 calls total (1 --version + 2 actual commands)
-    assert mock_subprocess.call_count == 3
-    # Verify the last call has the right env vars
-    assert mock_subprocess.call_args[1]["env"] == expected_env
-
-
-def test_run_does_not_modify_instance_env_vars(mocker):
-    """Test that instance_env_vars are preserved (handled by parent class)"""
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    instance_env = {"TF_VAR_region": "us-east-1"}
-    run_env = {"TF_VAR_environment": "production"}
-
-    runner = TFRunner(binary="", env_vars=instance_env)
-    runner.run("plan", env_vars=run_env)
-
-    # Instance env vars should remain unchanged (verified in parent class)
-    assert runner.instance_env_vars == {"TF_VAR_region": "us-east-1"}
-
-
-def test_empty_dict_for_none_env_vars_on_run(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    runner = TFRunner(binary="")
-    runner.run("plan", env_vars=None)
-
-    # Should not raise an error - check we have 2 calls (--version + actual run)
-    assert mock_subprocess.call_count == 2
-
-
-def test_env_vars_converted_to_strings_in_run(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    instance_env = {"TF_VAR_count": 5, "TF_VAR_enabled": True}
-    run_env = {"TF_VAR_timeout": 3.14}
-
-    runner = TFRunner(binary="", env_vars=instance_env)
-    runner.run("plan", env_vars=run_env)
-
-    called_env = mock_subprocess.call_args[1]["env"]
-    assert called_env["TF_VAR_count"] == "5"
-    assert called_env["TF_VAR_enabled"] == "True"
-    assert called_env["TF_VAR_timeout"] == "3.14"
