@@ -69,7 +69,10 @@ class ExitError(ClickException):
     """
 
     def __init__(self, exit_code: int, error_description: str):
-        self.exit_code = exit_code
+        # Newer click releases declare exit_code as a class variable (1 for every ClickException), but click reads
+        # it from the instance when exiting: setting it here gives each error its own code. `unused-ignore` keeps
+        # mypy quiet on the click releases that don't declare it so.
+        self.exit_code = exit_code  # type: ignore[misc, unused-ignore]
         super(ExitError, self).__init__(message=error_description)
 
     def show(self):
