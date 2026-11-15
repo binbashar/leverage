@@ -107,14 +107,15 @@ exec "$SHELL"
 
 3. Installing python versions:
 
-Once pyenv is installed, you can install any supported Python version by following these steps:
+Once pyenv is installed, you can install any supported Python version by following these steps. Given only the minor
+version, `pyenv` installs its latest patch release, which carries the latest security fixes:
 
 ```bash
-pyenv install 3.11.8
-pyenv install 3.12.7
-pyenv install 3.13.6
-pyenv install 3.14.8
-pyenv install 3.15.0
+pyenv install 3.11
+pyenv install 3.12
+pyenv install 3.13
+pyenv install 3.14
+pyenv install 3.15
 ```
 
 4. Create a virtual environment for the leverage project:
@@ -122,7 +123,7 @@ pyenv install 3.15.0
 Create a virtual environment for your project using Python 3.13.x:
 
 ```bash
-pyenv virtualenv 3.13.6 leverage_py_313_venv
+pyenv virtualenv "$(pyenv latest 3.13)" leverage_py_313_venv
 ```
 
 5. Set your virtual environment to be used in the project:
