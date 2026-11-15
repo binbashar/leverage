@@ -43,6 +43,10 @@ def _handle_subcommand(
         # Run the command directly
         if pre_invocation_callback:
             pre_invocation_callback()
+        # From a subcommand callback (e.g. `aws configure list`), `args` no longer holds the caller's own name:
+        # put it back, or the binary would get `list` alone
+        if caller_name is not None and caller_name not in args:
+            args = (caller_name, *args)
         exit_code = runner.run(*args)
         raise Exit(exit_code)
 
