@@ -14,8 +14,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13"
@@ -26,7 +24,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.9 || ~3.10 || ~3.11 || ~3.12 || ~3.13"
+python = "~3.11 || ~3.12 || ~3.13"
 click = "8.0.1"
 yaenv = "1.5.3post1"
 "ruamel.yaml" = "0.17.10"
@@ -69,8 +67,7 @@ simple_build_bad_syntax.py
 
 [tool.mypy]
 # Gradual typing: checks the annotated code only. Tighten module by module (e.g. check_untyped_defs).
-# mypy 1.19 is the last release that runs on, and checks for, Python 3.9.
-python_version = "3.9"
+python_version = "3.11"
 files = ["leverage"]
 warn_unused_ignores = true
 warn_redundant_casts = true
@@ -82,7 +79,7 @@ ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py311"
 # Deliberately broken: tests/test_tasks.py checks how a build script with a syntax error is reported
 extend-exclude = ["tests/build_scripts/simple_build_bad_syntax.py"]
 
