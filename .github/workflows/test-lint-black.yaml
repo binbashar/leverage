@@ -17,7 +17,7 @@ jobs:
       - uses: psf/black@stable
         with:
           options: "--check --verbose"
-          version: "23.3.0"
+          version: "26.10.1"
 
       # Rules and exclusions come from [tool.ruff] in pyproject.toml. Keep the version in sync
       # with the dev dependency and the pre-commit hook.

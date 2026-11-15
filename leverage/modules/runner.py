@@ -67,8 +67,7 @@ class Runner:
         working_dir: Optional[Path] = None,
         interactive: Literal[True] = True,
         raises: bool = False,
-    ) -> int:
-        ...
+    ) -> int: ...
 
     @overload
     def run(
@@ -78,8 +77,7 @@ class Runner:
         working_dir: Optional[Path] = None,
         interactive: Literal[False],
         raises: bool = False,
-    ) -> Tuple[int, str, str]:
-        ...
+    ) -> Tuple[int, str, str]: ...
 
     @overload
     def run(
@@ -89,8 +87,7 @@ class Runner:
         working_dir: Optional[Path] = None,
         interactive: bool = True,
         raises: bool = False,
-    ) -> Union[int, Tuple[int, str, str]]:
-        ...
+    ) -> Union[int, Tuple[int, str, str]]: ...
 
     def run(
         self,

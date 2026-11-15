@@ -1,5 +1,5 @@
 """
-    Logging utilities.
+Logging utilities.
 """
 
 import logging
@@ -8,7 +8,6 @@ from functools import wraps
 from rich.console import Console
 from rich.logging import RichHandler
 from click import get_current_context
-
 
 _RAW_LOGGING_FORMAT = "%(message)s"
 _TASK_LOGGING_FORMAT = (

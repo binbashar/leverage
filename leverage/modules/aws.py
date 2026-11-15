@@ -19,7 +19,6 @@ from leverage._internals import pass_state, pass_runner, pass_paths
 from leverage.modules.auth import get_sso_access_token, refresh_all_accounts_credentials
 from leverage.modules.auth import _perform_authentication as perform_authentication
 
-
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 
 

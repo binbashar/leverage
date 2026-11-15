@@ -1,5 +1,5 @@
 """
-	Definitions for internal use of the cli.
+Definitions for internal use of the cli.
 """
 
 from functools import wraps

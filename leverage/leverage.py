@@ -1,5 +1,5 @@
 """
-    Binbash Leverage Command-line tool.
+Binbash Leverage Command-line tool.
 """
 
 import click
