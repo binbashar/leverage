@@ -27,6 +27,10 @@ categories:
       labels:
         - 'chore'
         - 'maintenance'
+  - title: '📦 Dependencies'
+    when:
+      labels:
+        - 'dependencies'
   # The next version is the highest bump among the merged PRs' labels: major, minor or patch.
   # The autolabeler below sets minor or patch from the PR title. To override it, change the title, or
   # add 'major'/'breaking', which the autolabeler doesn't manage (it removes its own labels, see below).
@@ -60,7 +64,7 @@ autolabeler:
   - labels: ['documentation', 'patch']
     title:
       - '/^\s*docs?\b/i'
-  - labels: ['patch']
+  - labels: ['maintenance', 'patch']
     title:
       - '/^\s*chore\b/i'
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
