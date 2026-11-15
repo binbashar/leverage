@@ -183,8 +183,7 @@ poetry run pre-commit install
 
 ## Running Tests
 
-To run unit tests, pytest is the tool of choice, and the required dependencies are available in the
-corresponding `dev-requirements.txt`.
+To run unit tests, pytest is the tool of choice. It comes with the dev dependencies (`poetry install --with=dev`).
 
 Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/). They drive the installed
 `leverage` command, and work on temporary directories of their own, so they can be run directly on your machine.
@@ -222,19 +221,30 @@ BATS_LIB_PATH=/opt/homebrew/lib bats -r tests/bats
 
 Alternatively, `make tests` runs both suites, and `make test-unit` or `make test-int` runs one of them.
 
+Besides the tests, CI type checks `leverage/` with mypy (`poetry run mypy`), lints with ruff (`poetry run ruff check .`)
+and fails when unit test coverage drops below 75% (`make test-unit` reports it).
+
 ## Release Process
 
-* On every PR, a Github Action workflow is triggered to create/update a release draft.
-* The version number is determined by the labels of those PRs (major, minor, fix).
+* Every PR gets labels from its title prefix:
+    * `Fix |`, `fix:`, `Bug`, `Hotfix` → `fix` + `patch`
+    * `Feat`, `Feature`, `Enhancement` → `enhancement` + `minor`
+    * `Docs` → `documentation` + `patch`
+    * `Chore` → `maintenance` + `patch`
+* Add `major` (or `breaking`) by hand to a PR that breaks compatibility; the title never sets it.
+* Dependabot PRs are labeled `dependencies` and count as a patch.
+* Every merge to `master` updates the release draft: its notes, grouped by label, and its version, the highest bump
+  among the merged PRs.
 * The release draft has to be manually published. This allows for any number of PR (features, fixes) to make the cut.
 * Once a release is published, another workflow is triggered to create and push the package to PyPi.
 
 ## Release Candidate Process
 
-* There is an Action called "Test Build Package and Push".
-* This Action can be called manually on any branch specifying the version to release to test.
-    * The version is a Release Candidate following the Semver: e.g. if the next release is 1.2.3, the test version
-      should be 1.2.3rc.1
+* There is a workflow called "Release | PyPi Build Test Package and Push".
+* It can be run manually on any branch, optionally specifying the version to publish.
+    * The version is a Release Candidate with the format `9.9.9-rc9`: e.g. if the next release is 1.2.3, the test
+      version should be `1.2.3-rc1`. Any other format is rejected.
+    * Without a version, the next patch of the latest version on PyPI is used, as `rc1`.
 * The package will be published to [PyPi](https://pypi.org/project/leverage/).
 
 ## Contributors/Contributing
