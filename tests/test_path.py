@@ -33,8 +33,7 @@ def test_get_root_path(pytester):
     # Make a git repository
     pytester.run("git", "init")
     # The test itself
-    test_file = pytester.makepyfile(
-        """
+    test_file = pytester.makepyfile("""
         import pytest
         from pathlib import Path
 
@@ -44,8 +43,7 @@ def test_get_root_path(pytester):
             root_path = get_root_path()
 
             assert root_path == Path.cwd().as_posix()
-        """
-    )
+        """)
     result = pytester.runpytest(test_file)
     assert result.ret == 0
 
@@ -54,8 +52,7 @@ def test_get_root_path_not_in_a_git_repository(pytester):
     # Allow importing from leverage
     pytester.syspathinsert(Path().cwd().parent)
     # The test itself
-    test_file = pytester.makepyfile(
-        """
+    test_file = pytester.makepyfile("""
         import pytest
 
         from leverage.path import get_root_path
@@ -64,8 +61,7 @@ def test_get_root_path_not_in_a_git_repository(pytester):
         def test_get_root_path():
             with pytest.raises(NotARepositoryError):
                 get_root_path()
-        """
-    )
+        """)
     result = pytester.runpytest(test_file)
     assert result.ret == 0
 

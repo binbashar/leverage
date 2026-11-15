@@ -1,5 +1,5 @@
 """
-    Utilities to obtain relevant files' and directories' locations
+Utilities to obtain relevant files' and directories' locations
 """
 
 import os

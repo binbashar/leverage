@@ -1,5 +1,5 @@
 """
-    Credentials managing module.
+Credentials managing module.
 """
 
 import re

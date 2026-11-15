@@ -1,5 +1,5 @@
 """
-    Task loading, Task object definition and task creation decorator.
+Task loading, Task object definition and task creation decorator.
 """
 
 import sys

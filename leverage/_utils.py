@@ -1,5 +1,5 @@
 """
-    General use utilities.
+General use utilities.
 """
 
 from configparser import NoOptionError

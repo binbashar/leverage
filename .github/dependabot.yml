@@ -1,0 +1,28 @@
+# Weekly update pull requests, grouped to keep their number low. Security updates are opened
+# as soon as an alert shows up, independently of this schedule.
+# Dependabot pull requests get no AWS credentials, so the ref-arch E2E test skips them: run it by
+# hand (Actions → Tests | Integration → Run workflow) before merging one that touches boto3.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Minor and patch updates together, one pull request for each kind of dependency;
+      # major updates come one per pull request
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

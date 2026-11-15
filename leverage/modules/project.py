@@ -1,5 +1,5 @@
 """
-    Module for managing Leverage projects.
+Module for managing Leverage projects.
 """
 
 import re
