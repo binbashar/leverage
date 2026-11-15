@@ -61,11 +61,11 @@ jobs:
       OPENTOFU_VERSION: ${{ matrix.opentofu }}
       BATS_LIB_PATH: /usr/local/lib/bats
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
@@ -182,11 +182,11 @@ jobs:
         # The oldest and newest supported versions; the unit tests cover every one of them
         python-version: ['3.11', '3.15']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
