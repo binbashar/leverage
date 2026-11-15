@@ -11,12 +11,10 @@ permissions:
 
 jobs:
   unit_tests:
-    # Python 3.9 is not available on Ubuntu 26.04, which ubuntu-latest points to since 2026-11.
-    # Move back to ubuntu-latest once 3.9 support is dropped.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +38,7 @@ jobs:
           poetry install --with=dev
 
       # Needs the dependencies installed, so it runs here and not in the lint job. Config in [tool.mypy]
-      # in pyproject.toml; it checks for Python 3.9 whatever the runtime, so once is enough.
+      # in pyproject.toml; it checks for Python 3.11 whatever the runtime, so once is enough.
       - name: Type check (mypy)
         if: matrix.python-version == '3.13'
         run: poetry run mypy

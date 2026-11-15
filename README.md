@@ -69,8 +69,6 @@ So, if you have created a project with version <3.0.0 and want to use it with ve
 
 Leverage CLI explicitly supports the following Python versions:
 
-- Python 3.9.x
-- Python 3.10.x
 - Python 3.11.x
 - Python 3.12.x
 - Python 3.13.x
@@ -111,8 +109,6 @@ exec "$SHELL"
 Once pyenv is installed, you can install any supported Python version by following these steps:
 
 ```bash
-pyenv install 3.9.7
-pyenv install 3.10.1
 pyenv install 3.11.8
 pyenv install 3.12.7
 pyenv install 3.13.6

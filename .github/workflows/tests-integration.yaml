@@ -158,9 +158,7 @@ jobs:
   integration_tests_cli_refarch:
     needs: refarch_changes
     if: needs.refarch_changes.outputs.run == 'true'
-    # Python 3.9 is not available on Ubuntu 26.04, which ubuntu-latest points to since 2026-11.
-    # Move back to ubuntu-latest once 3.9 support is dropped.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     # Every run applies and destroys the same layer, with the same resource names, in the same
     # account, so no two of them may overlap: neither the jobs of one run (max-parallel below) nor
@@ -182,7 +180,7 @@ jobs:
       max-parallel: 1
       matrix:
         # The oldest and newest supported versions; the unit tests cover every one of them
-        python-version: ['3.9', '3.13']
+        python-version: ['3.11', '3.13']
     steps:
       - uses: actions/checkout@v4
         with:
