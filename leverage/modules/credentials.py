@@ -726,18 +726,18 @@ def _update_account_ids(paths: PathsHandler, config: dict):
     for account in config["organization"]["accounts"]:
         acc_name, acc_email, acc_id = account.values()
 
-        acc = [f'\n    email = "{acc_email}"']
+        fields = [f'\n    email = "{acc_email}"']
         if acc_id:
-            acc.append(f'    id = "{acc_id}"')
-        acc = ",\n".join(acc)
+            fields.append(f'    id = "{acc_id}"')
+        acc = ",\n".join(fields)
 
         accs.append(f"\n  {acc_name} = {{{acc}\n  }}")
 
-    accs = ",".join(accs)
-    accs = f"{{{accs}\n}}"
+    accounts = ",".join(accs)
+    accounts = f"{{{accounts}\n}}"
 
     common_tfvars = paths.common_tfvars.read_text()
-    common_tfvars = _replace_hcl_attribute(common_tfvars, "accounts", accs)
+    common_tfvars = _replace_hcl_attribute(common_tfvars, "accounts", accounts)
     paths.common_tfvars.write_text(common_tfvars)
 
 

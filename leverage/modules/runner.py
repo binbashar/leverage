@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Literal, Optional, Tuple, Union, overload
 from leverage import logger
 from leverage._utils import ExitError
 
@@ -22,7 +22,8 @@ class Runner:
             env_vars: Environment variables to set for all executions
         """
         self.binary_input = binary
-        self.binary_path = None
+        # Set by _validate_binary, which fails if the binary is not found
+        self.binary_path = ""
         self.error_message = error_message
         self.instance_env_vars = env_vars or {}
 
@@ -38,7 +39,7 @@ class Runner:
             self.binary_path = binary_path.resolve().as_posix()
         else:
             # Try to find binary in PATH
-            self.binary_path = shutil.which(str(self.binary_input))
+            self.binary_path = shutil.which(str(self.binary_input)) or ""
 
         if not self.binary_path:
             if self.error_message:
@@ -57,6 +58,39 @@ class Runner:
         Base implementation does nothing - validation is optional.
         """
         pass
+
+    @overload
+    def run(
+        self,
+        *args: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        working_dir: Optional[Path] = None,
+        interactive: Literal[True] = True,
+        raises: bool = False,
+    ) -> int:
+        ...
+
+    @overload
+    def run(
+        self,
+        *args: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        working_dir: Optional[Path] = None,
+        interactive: Literal[False],
+        raises: bool = False,
+    ) -> Tuple[int, str, str]:
+        ...
+
+    @overload
+    def run(
+        self,
+        *args: str,
+        env_vars: Optional[Dict[str, str]] = None,
+        working_dir: Optional[Path] = None,
+        interactive: bool = True,
+        raises: bool = False,
+    ) -> Union[int, Tuple[int, str, str]]:
+        ...
 
     def run(
         self,

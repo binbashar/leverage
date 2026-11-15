@@ -2,6 +2,7 @@
     General use utilities.
 """
 
+from configparser import NoOptionError
 from pathlib import Path
 from subprocess import PIPE, run
 from typing import List, Optional
@@ -116,6 +117,14 @@ def key_finder(d: dict, target: str, avoid: Optional[str] = None) -> List[str]:
             return [value]  # return it as an 1-item array to avoid .extend() to split the string
 
     return values
+
+
+def get_option_value(updater: ConfigUpdater, section_name: str, option: str) -> str:
+    """Value of an option, which must have one: an option with no value (no `=`) counts as missing."""
+    value = updater.get(section_name, option).value
+    if value is None:
+        raise NoOptionError(option, section_name)
+    return value
 
 
 def get_or_create_section(updater: ConfigUpdater, section_name: str):

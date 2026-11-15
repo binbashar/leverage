@@ -14,7 +14,7 @@ from leverage import logger
 from leverage.path import PathsHandler
 from leverage.modules.runner import Runner
 from leverage.modules.utils import _handle_subcommand
-from leverage._utils import get_or_create_section, ExitError
+from leverage._utils import get_option_value, get_or_create_section, ExitError
 from leverage._internals import pass_state, pass_runner, pass_paths
 from leverage.modules.auth import get_sso_access_token, refresh_all_accounts_credentials
 from leverage.modules.auth import _perform_authentication as perform_authentication
@@ -76,9 +76,8 @@ def configure_sso_profiles(paths: PathsHandler) -> None:
 
     # get values from the default profile first
     default_sso_profile_name = f"profile {paths.project}-sso"
-    default_profile = updater[default_sso_profile_name]
-    region = default_profile["sso_region"].value
-    start_url = default_profile["sso_start_url"].value
+    region = get_option_value(updater, default_sso_profile_name, "sso_region")
+    start_url = get_option_value(updater, default_sso_profile_name, "sso_start_url")
 
     # then set a profile for each account
     access_token = get_sso_access_token(paths.sso_token_file)
@@ -159,25 +158,27 @@ def _sso(context: click.Context, awscli: Runner, paths: PathsHandler) -> None:
         raise ExitError(1, "Missing SSO role in account config file.")
 
     current_account = paths.account_conf.get("environment")
+    # Nested HCL data: a missing level shows up as an AttributeError on None
+    common_conf: Any = paths.common_conf
     try:
         # this is for ref-arch v1
-        account_id = paths.common_conf.get("accounts").get(current_account).get("id")
+        account_id = common_conf.get("accounts").get(current_account).get("id")
     except AttributeError:
         # this is for ref-arch v2
         try:
             # this is for accounts with no org unit on top of it
-            account_id = paths.common_conf.get("organization").get("accounts").get(current_account).get("id")
+            account_id = common_conf.get("organization").get("accounts").get(current_account).get("id")
         except AttributeError:
             try:
                 # this is for accounts with no org unit on top of it
                 found = False
                 # an organization may have no organizational units at all
-                for ou in paths.common_conf.get("organization").get("organizational_units") or {}:
-                    if current_account in paths.common_conf.get("organization").get("organizational_units").get(ou).get(
+                for ou in common_conf.get("organization").get("organizational_units") or {}:
+                    if current_account in common_conf.get("organization").get("organizational_units").get(ou).get(
                         "accounts"
                     ):
                         account_id = (
-                            paths.common_conf.get("organization")
+                            common_conf.get("organization")
                             .get("organizational_units")
                             .get(ou)
                             .get("accounts")

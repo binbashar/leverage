@@ -2,6 +2,7 @@ import os
 from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Optional
 
 import click
 import ruamel.yaml
@@ -55,7 +56,7 @@ def kubectl(context, state, args):
     _handle_subcommand(context=context, runner=state.runner, args=args, pre_invocation_callback=authenticate)
 
 
-def _configure(environment: dict, ci: ClusterInfo = None, layer_path: Path = None):
+def _configure(environment: dict, ci: Optional[ClusterInfo] = None, layer_path: Optional[Path] = None):
     """
     Add the given EKS cluster configuration to the .kube/ files.
     """
