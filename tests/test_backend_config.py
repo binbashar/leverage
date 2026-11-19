@@ -151,8 +151,37 @@ def test_set_backend_key_raises_for_missing_backend(config_without_backend):
 
 def test_get_backend_key_raises_for_missing_backend(config_without_backend):
     """Test that get_backend_key raises ExitError when backend block is missing."""
-    with pytest.raises(ExitError, match="Malformed"):
+    with pytest.raises(ExitError, match="Missing backend block"):
         get_backend_key(config_without_backend)
+
+
+def test_get_backend_key_reports_missing_backend_when_backend_is_commented_out(tmp_path):
+    """A valid config.tf whose backend block is commented out (as in the tf-backend layer template before its first
+    apply) must report the missing backend, not a generic parsing error."""
+    config_file = tmp_path / "config.tf"
+    config_file.write_text(
+        'provider "aws" {\n'
+        "  region  = var.region\n"
+        "}\n"
+        "\n"
+        'provider "aws" {\n'
+        '  alias   = "secondary_region"\n'
+        "  region  = var.region_secondary\n"
+        "}\n"
+        "\n"
+        "terraform {\n"
+        '  required_version = "~> 1.2"\n'
+        "\n"
+        "  required_providers {\n"
+        '    aws = "~> 5.0"\n'
+        "  }\n"
+        '  # backend "s3" {\n'
+        '  #   key = "management/tf-backend/terraform.tfstate"\n'
+        "  # }\n"
+        "}\n"
+    )
+    with pytest.raises(ExitError, match="Missing backend block"):
+        get_backend_key(config_file)
 
 
 def test_set_backend_key_with_complex_formatting(tmp_path):
