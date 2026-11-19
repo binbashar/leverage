@@ -185,7 +185,8 @@ def validate(tf, paths: PathsHandler):
 @pass_paths
 def validate_layout(paths):
     """Validate layer conforms to Leverage convention."""
-    return _validate_layout(paths.cwd)
+    if not _validate_layout(paths.cwd):
+        raise Exit(1)
 
 
 @click.command("import")
@@ -276,7 +277,8 @@ def invoke_for_all_commands(paths, layers, command, *args: Sequence[str], skip_v
 
         # set the s3 key
         if not skip_validation and not get_backend_key(layer / "config.tf"):
-            backend_key_base = f"{paths.cwd.relative_to(paths.root_dir).as_posix()}/terraform.tfstate"
+            # The key follows the layer's path, not cwd's: with --layers, cwd is the account or layers-group
+            backend_key_base = f"{layer.relative_to(paths.root_dir).as_posix()}/terraform.tfstate"
             backend_key = backend_key_base.replace("/base-", "/").replace("/tools-", "/")
             set_backend_key(layer / "config.tf", backend_key)
 
