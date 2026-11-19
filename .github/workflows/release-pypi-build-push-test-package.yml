@@ -10,13 +10,17 @@ on:
         default: ""
         required: false
 
+# Read-only GITHUB_TOKEN: the job only checks out and uploads to PyPI with PYPI_TOKEN
+permissions:
+  contents: read
+
 jobs:
   build_push:
     runs-on: ubuntu-latest 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
@@ -35,13 +39,21 @@ jobs:
           poetry install --with=dev
 
       - name: bump_test_version
+        # The input goes through an env var, not ${{ }} in the script, so it can't inject shell code
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ -z "${{ github.event.inputs.version }}" ]; then
+          if [ -z "$VERSION" ]; then
             echo "No version input provided, running without RELEASE_VERSION."
             make bump-test-version
           else
-            echo "Version input provided: ${{ github.event.inputs.version }}"
-            make bump-test-version RELEASE_VERSION=${{ github.event.inputs.version }}
+            echo "Version input provided: $VERSION"
+            # make expands RELEASE_VERSION too ($(shell ...) would run), so only a well-formed version reaches it
+            if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+              echo "[ERROR] Invalid format for version input. Expected format: 9.9.9-rc9" >&2
+              exit 1
+            fi
+            make bump-test-version RELEASE_VERSION="$VERSION"
           fi
         shell: bash
 

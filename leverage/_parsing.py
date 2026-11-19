@@ -1,5 +1,5 @@
 """
-    Command line arguments and tasks arguments parsing utilities.
+Command line arguments and tasks arguments parsing utilities.
 """
 
 

@@ -4,7 +4,7 @@ setup(){
     bats_load_library bats-assert
     
     # Store useful paths
-    TEST_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/.." >/dev/null 2>&1 && pwd )"
+    TESTS_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/.." >/dev/null 2>&1 && pwd )"
     
     # Import utils
     load "utils"

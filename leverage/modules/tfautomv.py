@@ -20,8 +20,8 @@ def tfautomv(state, args):
     state.runner = Runner(
         binary="tfautomv",
         error_message=(
-            f"TFAutomv not found on system. "
-            f"Please install it following the instructions at: https://github.com/busser/tfautomv?tab=readme-ov-file#installation"
+            "TFAutomv not found on system. "
+            "Please install it following the instructions at: https://github.com/busser/tfautomv?tab=readme-ov-file#installation"
         ),
         env_vars=state.environment,
     )

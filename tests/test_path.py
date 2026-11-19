@@ -33,8 +33,7 @@ def test_get_root_path(pytester):
     # Make a git repository
     pytester.run("git", "init")
     # The test itself
-    test_file = pytester.makepyfile(
-        """
+    test_file = pytester.makepyfile("""
         import pytest
         from pathlib import Path
 
@@ -44,8 +43,7 @@ def test_get_root_path(pytester):
             root_path = get_root_path()
 
             assert root_path == Path.cwd().as_posix()
-        """
-    )
+        """)
     result = pytester.runpytest(test_file)
     assert result.ret == 0
 
@@ -54,8 +52,7 @@ def test_get_root_path_not_in_a_git_repository(pytester):
     # Allow importing from leverage
     pytester.syspathinsert(Path().cwd().parent)
     # The test itself
-    test_file = pytester.makepyfile(
-        """
+    test_file = pytester.makepyfile("""
         import pytest
 
         from leverage.path import get_root_path
@@ -64,8 +61,7 @@ def test_get_root_path_not_in_a_git_repository(pytester):
         def test_get_root_path():
             with pytest.raises(NotARepositoryError):
                 get_root_path()
-        """
-    )
+        """)
     result = pytester.runpytest(test_file)
     assert result.ret == 0
 
@@ -201,9 +197,9 @@ class TestGetProjectPathOrCurrentDir:
 
     @patch("leverage.path.get_root_path")
     @patch("pathlib.Path.cwd")
-    def test_get_root_path_returns_unexpected_type(self, mock_cwd, mock_get_root_path):
-        """Test falls back to current directory if TypeError is encountered."""
-        mock_get_root_path.side_effect = TypeError("Unexpected return type.")
+    def test_git_error(self, mock_cwd, mock_get_root_path):
+        """Falls back to the current directory on any other git error: it runs on import, the command reports it."""
+        mock_get_root_path.side_effect = ExitError(1, "Unable to find the root of the git repository")
         expected_cwd = Path("/current/working/directory")
         mock_cwd.return_value = expected_cwd
         assert get_project_root_or_current_dir_path() == expected_cwd

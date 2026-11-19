@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple
 
 import boto3
 import click
+from botocore.exceptions import ClientError
 from dateutil.tz import tzutc
 from configupdater import ConfigUpdater
 
@@ -13,11 +14,10 @@ from leverage import logger
 from leverage.path import PathsHandler
 from leverage.modules.runner import Runner
 from leverage.modules.utils import _handle_subcommand
-from leverage._utils import get_or_create_section, ExitError
+from leverage._utils import get_option_value, get_or_create_section, ExitError
 from leverage._internals import pass_state, pass_runner, pass_paths
 from leverage.modules.auth import get_sso_access_token, refresh_all_accounts_credentials
 from leverage.modules.auth import _perform_authentication as perform_authentication
-
 
 CONTEXT_SETTINGS = {"ignore_unknown_options": True}
 
@@ -75,14 +75,13 @@ def configure_sso_profiles(paths: PathsHandler) -> None:
 
     # get values from the default profile first
     default_sso_profile_name = f"profile {paths.project}-sso"
-    default_profile = updater[default_sso_profile_name]
-    region = default_profile["sso_region"].value
-    start_url = default_profile["sso_start_url"].value
+    region = get_option_value(updater, default_sso_profile_name, "sso_region")
+    start_url = get_option_value(updater, default_sso_profile_name, "sso_start_url")
 
     # then set a profile for each account
     access_token = get_sso_access_token(paths.sso_token_file)
 
-    logger.info(f"Fetching accounts and roles...")
+    logger.info("Fetching accounts and roles...")
     client = boto3.client("sso", region_name=region)
     account_roles = get_account_roles(client, access_token)
     for acc_name, values in account_roles.items():
@@ -105,8 +104,8 @@ def aws(context: click.Context, state: Any, args: Tuple[str, ...]) -> None:
     state.runner = Runner(
         binary="aws",
         error_message=(
-            f"AWS CLI not found on system. "
-            f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            "AWS CLI not found on system. "
+            "Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
         ),
         env_vars=state.environment,
     )
@@ -149,29 +148,36 @@ def _sso(context: click.Context, awscli: Runner, paths: PathsHandler) -> None:
     if not all(sso_key in paths.common_conf for sso_key in ("sso_start_url", "sso_region")):
         raise ExitError(1, "Missing configuration values for SSO in global config file.")
 
+    # Needed to name the account profiles once logged in: check it before sending the user to log in
+    if not paths.project_long:
+        raise ExitError(1, "Missing project_long in global config file (or PROJECT_LONG in build.env).")
+
     sso_role = paths.account_conf.get("sso_role")
     if not sso_role:
         raise ExitError(1, "Missing SSO role in account config file.")
 
     current_account = paths.account_conf.get("environment")
+    # Nested HCL data: a missing level shows up as an AttributeError on None
+    common_conf: Any = paths.common_conf
     try:
         # this is for ref-arch v1
-        account_id = paths.common_conf.get("accounts").get(current_account).get("id")
+        account_id = common_conf.get("accounts").get(current_account).get("id")
     except AttributeError:
         # this is for ref-arch v2
         try:
             # this is for accounts with no org unit on top of it
-            account_id = paths.common_conf.get("organization").get("accounts").get(current_account).get("id")
+            account_id = common_conf.get("organization").get("accounts").get(current_account).get("id")
         except AttributeError:
             try:
                 # this is for accounts with no org unit on top of it
                 found = False
-                for ou in paths.common_conf.get("organization").get("organizational_units"):
-                    if current_account in paths.common_conf.get("organization").get("organizational_units").get(ou).get(
+                # an organization may have no organizational units at all
+                for ou in common_conf.get("organization").get("organizational_units") or {}:
+                    if current_account in common_conf.get("organization").get("organizational_units").get(ou).get(
                         "accounts"
                     ):
                         account_id = (
-                            paths.common_conf.get("organization")
+                            common_conf.get("organization")
                             .get("organizational_units")
                             .get(ou)
                             .get("accounts")
@@ -227,7 +233,10 @@ def sso(context: click.Context, awscli: Runner, args: Tuple[str, ...]) -> None:
 @pass_runner
 def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
     """Login"""
-    exit_code, region, _ = awscli.exec("configure", "get", "sso_region", "--profile", f"{paths.project}-sso")
+    # raises=False: a missing profile is reported below, with a hint on how to configure it
+    exit_code, region, _ = awscli.exec(
+        "configure", "get", "sso_region", "--profile", f"{paths.project}-sso", raises=False
+    )
     if exit_code:
         raise ExitError(
             exit_code,
@@ -237,10 +246,10 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
 
     paths.sso_cache.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Logging in...")
+    logger.info("Logging in...")
     sso_oidc_client = boto3.client("sso-oidc", region_name=region)
 
-    logger.debug(f"Registering client...")
+    logger.debug("Registering client...")
     sso_oidc_client_creds = sso_oidc_client.register_client(
         clientName=f"leverage-{datetime.datetime.now().timestamp()}",
         clientType="public",
@@ -262,7 +271,7 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
         f"{paths.common_conf.get('sso_start_url')}/#/device?user_code={device_authorization['userCode']}"
     )
 
-    logger.debug(f"Attempting to create authorization token...")
+    logger.debug("Attempting to create authorization token...")
     _wait_interval = device_authorization["interval"]
     token = None
     while not token:
@@ -288,8 +297,9 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
             }
 
         except sso_oidc_client.exceptions.SlowDownException:
-            # Polling too frequently.
-            time.sleep(_wait_interval + 5)
+            # Polling too frequently: per RFC 8628 (3.5), add 5 seconds to this and every later wait
+            _wait_interval += 5
+            time.sleep(_wait_interval)
         except sso_oidc_client.exceptions.AuthorizationPendingException:
             # User hasn't finished logging in.
             time.sleep(_wait_interval)
@@ -299,11 +309,11 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
             )
 
     logger.debug(f"Token expires at: {token['expiresAt']}")
-    logger.debug(f"Caching token.")
+    logger.debug("Caching token.")
     token_file = paths.sso_cache / "token"
     token_file.write_text(json.dumps(token))
 
-    logger.info(f"Successfully logged in!.")
+    logger.info("Successfully logged in!.")
 
     if refresh_all:
         refresh_all_accounts_credentials(paths, force_refresh=False)
@@ -326,11 +336,19 @@ def refresh(paths: PathsHandler, force: bool) -> None:
 @pass_paths
 def logout(paths: PathsHandler) -> None:
     """Logout"""
-    region = paths.common_conf.get("sso_region")
-    sso_client = boto3.client("sso", region_name=region)
+    # Idempotent: whatever the state of the session, end with no local tokens nor credentials
+    if paths.sso_token_file.exists():
+        region = paths.common_conf.get("sso_region")
+        sso_client = boto3.client("sso", region_name=region)
 
-    logger.debug("Logging out of AWS SSO...")
-    sso_client.logout(accessToken=get_sso_access_token(paths.sso_token_file))
+        logger.debug("Logging out of AWS SSO...")
+        try:
+            sso_client.logout(accessToken=get_sso_access_token(paths.sso_token_file))
+        except ClientError as error:
+            # e.g. the token already expired, so there is no session left to end
+            logger.warning(f"Could not end the AWS SSO session ({error}). Removing the local credentials anyway.")
+    else:
+        logger.info("No active AWS SSO session found. Removing the local credentials.")
 
     logger.debug("Removing SSO Tokens...")
     if paths.sso_cache.exists():
@@ -338,15 +356,6 @@ def logout(paths: PathsHandler) -> None:
             file.unlink()
 
     logger.debug("Wiping current SSO credentials...")
-    updater = ConfigUpdater()
-    updater.read(paths.aws_credentials_file)
-
-    sections = updater.sections()
-    for section in sections:
-        if section not in ("default", f"{paths.project}-sso"):
-            updater.remove_section(section)
-    updater.update_file()
-
     paths.aws_credentials_file.unlink(missing_ok=True)
 
     logger.debug("All SSO credentials wiped!.")

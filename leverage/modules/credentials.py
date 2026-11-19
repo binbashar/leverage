@@ -1,5 +1,5 @@
 """
-    Credentials managing module.
+Credentials managing module.
 """
 
 import re
@@ -42,7 +42,8 @@ MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
 PROJECT_ROOT = get_project_root_or_current_dir_path()
 try:
     PROJECT_COMMON_TFVARS = Path(get_global_config_path())
-except NotARepositoryError:
+except (NotARepositoryError, ExitError):
+    # Evaluated on import: the command reports a git error when it loads the configuration
     PROJECT_COMMON_TFVARS = Path.cwd()
 
 PROJECT_COMMON_TFVARS_FILE = "common.tfvars"
@@ -270,7 +271,7 @@ def credentials(state):
             logger.info("Writing project short name to build.env.")
             build_env.write_text(f"PROJECT={short_name}\nTF_IMAGE_TAG=1.1.9")
 
-        if state.paths is None:
+        if not state.has_paths:
             # Upstream (leverage.py) skipped PathsHandler because only project.yaml existed.
             # build.env now has a project name (or already did) - reload config from disk and
             # build real, project-scoped paths here instead of leaving state.paths/environment None.
@@ -302,8 +303,8 @@ def credentials(state):
     state.runner = Runner(
         binary="aws",
         error_message=(
-            f"AWS CLI not found on system. "
-            f"Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            "AWS CLI not found on system. "
+            "Please install it following the instructions at: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
         ),
         env_vars=state.environment,
     )
@@ -342,7 +343,7 @@ def _load_configs_for_credentials(paths: PathsHandler, state: State):
     # region_primary was added in ref-arch v1
     # for v2 it was replaced by region at project level
     region_primary = "region_primary"
-    if not "region_primary" in project_config and not "region_primary" in terraform_config:
+    if "region_primary" not in project_config and "region_primary" not in terraform_config:
         region_primary = "region"
     config_values["primary_region"] = (
         project_config.get(region_primary) or terraform_config.get(region_primary) or _ask_for_region()
@@ -731,18 +732,18 @@ def _update_account_ids(paths: PathsHandler, config: dict):
     for account in config["organization"]["accounts"]:
         acc_name, acc_email, acc_id = account.values()
 
-        acc = [f'\n    email = "{acc_email}"']
+        fields = [f'\n    email = "{acc_email}"']
         if acc_id:
-            acc.append(f'    id = "{acc_id}"')
-        acc = ",\n".join(acc)
+            fields.append(f'    id = "{acc_id}"')
+        acc = ",\n".join(fields)
 
         accs.append(f"\n  {acc_name} = {{{acc}\n  }}")
 
-    accs = ",".join(accs)
-    accs = f"{{{accs}\n}}"
+    accounts = ",".join(accs)
+    accounts = f"{{{accounts}\n}}"
 
     common_tfvars = paths.common_tfvars.read_text()
-    common_tfvars = _replace_hcl_attribute(common_tfvars, "accounts", accs)
+    common_tfvars = _replace_hcl_attribute(common_tfvars, "accounts", accounts)
     paths.common_tfvars.write_text(common_tfvars)
 
 

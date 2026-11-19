@@ -1,5 +1,5 @@
 """
-    Logging utilities.
+Logging utilities.
 """
 
 import logging
@@ -9,13 +9,16 @@ from rich.console import Console
 from rich.logging import RichHandler
 from click import get_current_context
 
-
 _RAW_LOGGING_FORMAT = "%(message)s"
 _TASK_LOGGING_FORMAT = (
     "[bold light_yellow3][ %(build_script)s -[/bold light_yellow3]"
     " %(message)s [bold light_yellow3]][/bold light_yellow3]"
 )
-_TIME_FORMAT = lambda time: f"[{time:%H:%M:%S}.{time.microsecond//1000:03}]"
+
+
+def _TIME_FORMAT(time):
+    return f"[{time:%H:%M:%S}.{time.microsecond//1000:03}]"
+
 
 _leverage_logger = logging.getLogger("leverage")
 

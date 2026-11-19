@@ -187,7 +187,7 @@ def test_run_logs_debug_information(mock_runner, tmp_path, mocker):
     mock_runner.run("arg1", env_vars=env_vars, working_dir=tmp_path)
 
     expected_calls = [
-        mocker.call(f"[bold cyan]Running command:[/bold cyan] /usr/bin/test_binary arg1"),
+        mocker.call("[bold cyan]Running command:[/bold cyan] /usr/bin/test_binary arg1"),
         mocker.call(f"Working directory: {tmp_path}"),
         mocker.call(f"Additional environment variables: {merged_env_vars}"),
     ]

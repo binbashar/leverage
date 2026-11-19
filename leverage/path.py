@@ -1,11 +1,13 @@
 """
-    Utilities to obtain relevant files' and directories' locations
+Utilities to obtain relevant files' and directories' locations
 """
 
+import os
 from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import PIPE
 from subprocess import run
+from typing import Optional
 
 import hcl2
 
@@ -38,23 +40,30 @@ def get_root_path():
     """Get the path to the root of the Git repository.
 
     Raises:
-        NotARepositoryError: If the current directory is not within a git repository.
+        NotARepositoryError: If the current directory is not within a git repository, or git is not installed.
+        ExitError: If git fails for any other reason (e.g. the repository belongs to another user), with git's message.
 
     Returns:
         str: Root of the repository.
     """
     try:
         root = run(
-            ["git", "rev-parse", "--show-toplevel"], stdout=PIPE, stderr=PIPE, check=True, encoding="utf-8"
+            ["git", "rev-parse", "--show-toplevel"],
+            stdout=PIPE,
+            stderr=PIPE,
+            check=True,
+            encoding="utf-8",
+            # git translates its messages: keep them in English, the one below is matched
+            env={**os.environ, "LC_ALL": "C"},
         ).stdout
-
-    except CalledProcessError as exc:
-        if "fatal: not a git repository" in exc.stderr:
-            raise NotARepositoryError("Not running in a git repository.")
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         raise NotARepositoryError("Not running in a git repository.")
-    else:
-        return root.strip()
+    except CalledProcessError as exc:
+        if "not a git repository" in exc.stderr:
+            raise NotARepositoryError("Not running in a git repository.")
+        raise ExitError(1, f"Unable to find the root of the git repository:\n{exc.stderr.strip()}")
+
+    return root.strip()
 
 
 def get_account_path():
@@ -238,7 +247,7 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
         if self.root_dir == self.account_dir == self.common_config_dir == self.account_config_dir == self.cwd:
             raise ExitError(1, "Not running in a Leverage project. Exiting.")
 
-    def check_for_layer_location(self, path: Path = None):
+    def check_for_layer_location(self, path: Optional[Path] = None):
         """Make sure the command is being run at layer level. If not, bail."""
         path = path or self.cwd
         if path in (self.common_config_dir, self.account_config_dir):
@@ -253,7 +262,7 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
         if not list(path.glob("*.tf")):
             raise ExitError(1, "This command can only run at [bold]layer[/bold] level.")
 
-    def check_for_cluster_layer(self, path: Path = None):
+    def check_for_cluster_layer(self, path: Optional[Path] = None):
         path = path or self.cwd
         self.check_for_layer_location(path)
         # assuming the "cluster" layer will contain the expected EKS outputs
@@ -262,10 +271,14 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
 
 
 def get_project_root_or_current_dir_path() -> Path:
-    """Returns the project root if detected, otherwise the current path"""
+    """Returns the project root if detected, otherwise the current path.
+
+    Used when the modules are imported, before any command runs: a git error falls back to the current path
+    too, and the command reports it when it loads the configuration.
+    """
     try:
         root = Path(get_root_path())
-    except (NotARepositoryError, TypeError):
+    except (NotARepositoryError, ExitError):
         root = Path.cwd()
 
     return root

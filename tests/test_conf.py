@@ -1,6 +1,5 @@
 import pytest
 
-from leverage import leverage
 from leverage.conf import load
 
 ROOT_ENV_FILE = """

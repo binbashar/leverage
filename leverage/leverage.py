@@ -1,5 +1,5 @@
 """
-    Binbash Leverage Command-line tool.
+Binbash Leverage Command-line tool.
 """
 
 import click
@@ -7,7 +7,15 @@ import click
 from leverage import __version__, conf
 from leverage._internals import pass_state
 from leverage.path import NotARepositoryError, build_paths_and_environment, is_project_yaml_only_bootstrap
-from leverage.modules import aws, credentials, run, project, tofu, terraform, tfautomv, kubectl
+
+# Import each command from its own module: `leverage.modules.aws` and the like are also submodules
+from leverage.modules.aws import aws
+from leverage.modules.credentials import credentials
+from leverage.modules.kubectl import kubectl
+from leverage.modules.project import project
+from leverage.modules.run import run
+from leverage.modules.tf import terraform, tofu
+from leverage.modules.tfautomv import tfautomv
 
 
 @click.group(invoke_without_command=True)
@@ -26,6 +34,7 @@ def leverage(context, state, verbose):
     try:
         state.config = conf.load()
     except NotARepositoryError:
+        # Commands that need the project paths fail when they ask for them (see State.paths)
         return
 
     # The `project` commands bootstrap a project, so they run before its configuration exists.
@@ -45,7 +54,8 @@ def leverage(context, state, verbose):
 
 
 # Add modules to leverage
-leverage.add_command(run)
+# mypy can't infer the type of `run`: modules/run.py imports `leverage`, whose __init__ imports this module
+leverage.add_command(run)  # type: ignore[has-type]
 leverage.add_command(project)
 leverage.add_command(tofu)
 leverage.add_command(tofu, name="tf")

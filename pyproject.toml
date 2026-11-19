@@ -14,11 +14,11 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Build Tools",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13"
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15"
 ]
 packages = [
     { include = "leverage" },
@@ -26,28 +26,32 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.9 || ~3.10 || ~3.11 || ~3.12 || ~3.13"
-click = "8.0.1"
-yaenv = "1.5.3post1"
-"ruamel.yaml" = "0.17.10"
-jinja2 = "3.0.1"
-questionary = "1.10.0"
-prompt-toolkit = "3.0.51"
+# No cap on the minor version: with one, pip installs an old release that had none on every new Python (#341).
+# CI tests the versions in tests-unit.yml. The <4.0 is required by simple-term-menu.
+python = ">=3.11,<4.0"
+click = "8.5.1"
+yaenv = "1.6.5"
+"ruamel.yaml" = "0.19.1"
+jinja2 = "3.1.6"
+questionary = "2.1.1"
+prompt-toolkit = "3.0.53"
 python-hcl2 = "7.3.1"
-boto3 = "1.33.2"
-configupdater = "3.2"
-docutils = "0.17.1"
+boto3 = "1.44.3"
+configupdater = "4.1.1"
+docutils = "0.23"
 rich = "14.1.0"
-requests = "2.31"
-simple-term-menu = "1.6.4"
+requests = "2.34.2"
+simple-term-menu = "1.6.6"
 python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
-pylint = "2.8.3"
-pytest = "8.3.3"
+pytest = "9.2.0"
 pytest-cov = "6.0.0"
 twine = "6.1.0"
-black = "23.3.0"
+black = "26.10.1"
+ruff = "0.17.5"
+mypy = "1.19.1"
+types-python-dateutil = "^2.9.0"
 pre-commit = "3.5.0"
 pytest-mock = "^3.15.1"
 
@@ -65,3 +69,31 @@ extend-exclude = """
 simple_build_bad_syntax.py
 """
 
+[tool.mypy]
+# Gradual typing: checks the annotated code only. Tighten module by module (e.g. check_untyped_defs).
+python_version = "3.11"
+files = ["leverage"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+# No type information published for these
+module = ["boto3", "botocore.*", "simple_term_menu"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+# Deliberately broken: tests/test_tasks.py checks how a build script with a syntax error is reported
+extend-exclude = ["tests/build_scripts/simple_build_bad_syntax.py"]
+
+[tool.ruff.lint]
+# pyflakes (F) and the pycodestyle errors (E4, E7, E9): mistakes, not style. black owns the formatting.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# The package's public names, imported to be re-exported
+"leverage/__init__.py" = ["F401"]
+"leverage/modules/__init__.py" = ["F401"]
+# TODO: drop once #333 is merged; fixing these f-strings now would conflict with it
+"leverage/_backend_config.py" = ["F541"]

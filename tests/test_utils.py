@@ -1,4 +1,9 @@
-from leverage._utils import key_finder
+from configparser import NoOptionError
+
+import pytest
+from configupdater import ConfigUpdater
+
+from leverage._utils import get_option_value, key_finder
 
 
 def test_key_finder_real_scenario():
@@ -84,3 +89,21 @@ def test_key_finder_avoid_lookup():
     found = key_finder(data, "profile", avoid="lookup")
 
     assert found == ["valid"]
+
+
+def _updater(text):
+    updater = ConfigUpdater(allow_no_value=True)
+    updater.read_string(text)
+    return updater
+
+
+def test_get_option_value():
+    updater = _updater("[profile bb-sso]\nsso_region = us-east-1\n")
+
+    assert get_option_value(updater, "profile bb-sso", "sso_region") == "us-east-1"
+
+
+@pytest.mark.parametrize("text", ["[profile bb-sso]\n", "[profile bb-sso]\nsso_region\n"], ids=["missing", "no-value"])
+def test_get_option_value_requires_a_value(text):
+    with pytest.raises(NoOptionError):
+        get_option_value(_updater(text), "profile bb-sso", "sso_region")

@@ -1,5 +1,5 @@
 """
-    Env variables loading utility.
+Env variables loading utility.
 """
 
 from pathlib import Path
@@ -9,7 +9,6 @@ from yaenv.core import Env
 from leverage import logger
 from leverage.path import get_root_path
 from leverage.path import get_working_path
-
 
 ENV_CONFIG_FILE = "build.env"
 

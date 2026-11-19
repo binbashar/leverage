@@ -1,8 +1,7 @@
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
-from click.exceptions import Exit
 
 from leverage._utils import ExitError
 from leverage.modules.runner import Runner
@@ -49,13 +48,14 @@ class TFRunner(Runner):
         elif not self.__terraform and "OpenTofu" not in binary_version_stdout:
             raise ExitError(1, "The provided binary does not seem to be OpenTofu.")
 
-    def run(
+    # Always interactive, unlike Runner.run: exec() is the way to capture the output
+    def run(  # type: ignore[override]
         self,
         *args: str,
         env_vars: Optional[Dict[str, str]] = None,
         working_dir: Optional[Path] = None,
         raises: bool = True,
-    ):
+    ) -> int:
         """
         Run the Terraform/OpenTofu binary with the given arguments.
 
@@ -76,7 +76,7 @@ class TFRunner(Runner):
         env_vars: Optional[Dict[str, str]] = None,
         working_dir: Optional[Path] = None,
         raises: bool = False,
-    ):
+    ) -> Tuple[int, str, str]:
         """
         Execute the Terraform/OpenTofu binary in non-interactive mode (captures output).
 

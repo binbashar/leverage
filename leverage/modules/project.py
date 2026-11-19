@@ -1,5 +1,5 @@
 """
-    Module for managing Leverage projects.
+Module for managing Leverage projects.
 """
 
 import re
@@ -16,7 +16,6 @@ from jinja2 import FileSystemLoader
 
 from leverage import logger
 from leverage.path import get_project_root_or_current_dir_path
-from leverage.path import NotARepositoryError
 from leverage.modules.tfrunner import TFRunner
 from leverage._utils import git, ExitError
 

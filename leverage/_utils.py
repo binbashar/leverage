@@ -1,7 +1,8 @@
 """
-    General use utilities.
+General use utilities.
 """
 
+from configparser import NoOptionError
 from pathlib import Path
 from subprocess import PIPE, run
 from typing import List, Optional
@@ -68,7 +69,10 @@ class ExitError(ClickException):
     """
 
     def __init__(self, exit_code: int, error_description: str):
-        self.exit_code = exit_code
+        # Newer click releases declare exit_code as a class variable (1 for every ClickException), but click reads
+        # it from the instance when exiting: setting it here gives each error its own code. `unused-ignore` keeps
+        # mypy quiet on the click releases that don't declare it so.
+        self.exit_code = exit_code  # type: ignore[misc, unused-ignore]
         super(ExitError, self).__init__(message=error_description)
 
     def show(self):
@@ -116,6 +120,14 @@ def key_finder(d: dict, target: str, avoid: Optional[str] = None) -> List[str]:
             return [value]  # return it as an 1-item array to avoid .extend() to split the string
 
     return values
+
+
+def get_option_value(updater: ConfigUpdater, section_name: str, option: str) -> str:
+    """Value of an option, which must have one: an option with no value (no `=`) counts as missing."""
+    value = updater.get(section_name, option).value
+    if value is None:
+        raise NoOptionError(option, section_name)
+    return value
 
 
 def get_or_create_section(updater: ConfigUpdater, section_name: str):

@@ -1,5 +1,5 @@
 """
-    Tasks running module.
+Tasks running module.
 """
 
 import re
@@ -16,7 +16,6 @@ from leverage._parsing import InvalidArgumentOrderError
 from leverage._parsing import DuplicateKeywordArgumentError
 from leverage._utils import clean_exception_traceback
 from leverage._internals import pass_state
-
 
 _TASK_PATTERN = re.compile(r"^(?P<name>[^\[\],\s]+)(\[(?P<arguments>[^\]]*)\])?$")
 

@@ -2,38 +2,74 @@ name-template: 'v$RESOLVED_VERSION 🌈'
 tag-template: 'v$RESOLVED_VERSION'
 categories:
   - title: '🚀 Features'
-    labels:
-      - 'feature'
-      - 'enhancement'
+    when:
+      labels:
+        - 'feature'
+        - 'enhancement'
   - title: '💣 Breaking Change'
-    label:
-      - 'breakingchange'
-      - 'breaking'
+    when:
+      labels:
+        - 'breakingchange'
+        - 'breaking'
   - title: '🐛 Bug Fixes'
-    labels:
-      - 'fix'
-      - 'bugfix'
-      - 'bug'
+    when:
+      labels:
+        - 'fix'
+        - 'bugfix'
+        - 'bug'
   - title: '📝 Documentation'
-    label:
-      - 'doc'
-      - 'documentation'
+    when:
+      labels:
+        - 'doc'
+        - 'documentation'
   - title: '🔨 Maintenance'
-    label:
-      - 'chore'
-      - 'maintenance'
+    when:
+      labels:
+        - 'chore'
+        - 'maintenance'
+  - title: '📦 Dependencies'
+    when:
+      labels:
+        - 'dependencies'
+  # The next version is the highest bump among the merged PRs' labels: major, minor or patch.
+  # The autolabeler below sets minor or patch from the PR title. To override it, change the title, or
+  # add 'major'/'breaking', which the autolabeler doesn't manage (it removes its own labels, see below).
+  - type: 'version-resolver'
+    semver-increment: 'major'
+    when:
+      labels:
+        - 'major'
+        - 'breaking'
+        - 'breakingchange'
+  - type: 'version-resolver'
+    semver-increment: 'minor'
+    when:
+      label: 'minor'
+  - type: 'version-resolver'
+    semver-increment: 'patch'
+    when:
+      label: 'patch'
+# Labels PRs from their title, e.g. "Fix | ...", "fix: ...", "Enhancement | ...", "feat(cli): ...".
+# Runs on pull_request events, with the autolabeler action (see release-management-github.yml).
+# sync-labels: the labels below follow the title, so a PR retitled from "feat" to "fix" loses 'minor'
+# and 'enhancement'. Only these labels are removed; any other (bug, test, major, ...) is left alone.
+sync-labels: true
+autolabeler:
+  - labels: ['fix', 'patch']
+    title:
+      - '/^\s*(fix|bug|bugfix|hotfix)\b/i'
+  - labels: ['enhancement', 'minor']
+    title:
+      - '/^\s*(feat|feature|enhancement)\b/i'
+  - labels: ['documentation', 'patch']
+    title:
+      - '/^\s*docs?\b/i'
+  - labels: ['maintenance', 'patch']
+    title:
+      - '/^\s*chore\b/i'
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
 version-resolver:
-  major:
-    labels:
-      - 'major'
-  minor:
-    labels:
-      - 'minor'
-  patch:
-    labels:
-      - 'patch'
   default: patch
 footer: |
   ---  

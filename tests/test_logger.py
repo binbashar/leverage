@@ -12,7 +12,6 @@ from leverage.logger import BuildFilter
 from leverage.logger import _leverage_logger
 from leverage.logger import _TASK_LOGGING_FORMAT
 
-
 DEBUG = logging.getLevelName("DEBUG")
 INFO = logging.getLevelName("INFO")
 WARNING = logging.getLevelName("WARNING")

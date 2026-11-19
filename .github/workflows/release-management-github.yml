@@ -2,30 +2,47 @@ name: Release | Github Release Drafter
 
 on:
   push:
-  #   # branches to consider in the event; optional, defaults to all
     branches:
       - master
-  # pull_request event is required only for autolabeler
+  # Only for the autolabeler
   pull_request:
-    # Only following types are handled by the action, but one can default to all as well
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # edited: so a title change relabels the PR. Not on labeled/unlabeled: label changes can't change
+    # what the title matches, and rerunning there would only fight the maintainer's edits.
+    types: [opened, reopened, synchronize, edited]
 
 permissions:
   contents: read
-  
+
 jobs:
+  # Updates the draft of the next release with what was merged to master
   update_release_draft:
+    if: github.event_name == 'push'
+    # One update at a time, so concurrent pushes never create duplicate drafts
+    concurrency:
+      group: release-drafter-draft
+      cancel-in-progress: false
     permissions:
-      # write permission is required to create a github release
+      # To create and update the draft release
       contents: write
-      # write permission is required for autolabeler
-      # otherwise, read permission is required at least
+      # To read the labels of the merged PRs
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+
+  # Labels the PR from its title (see autolabeler in .github/release-drafter.yml). Since v7 the
+  # autolabeler is its own action and never touches the drafts (concurrent PR events used to create
+  # duplicate drafts targeting the PR branch).
+  autolabel:
+    if: github.event_name == 'pull_request'
+    # Only the latest event of a PR matters
+    concurrency:
+      group: release-drafter-autolabel-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      # To add labels to the PR
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      # Drafts your next Release notes
-      - uses: release-drafter/release-drafter@v6.1.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          commitish: ${{ github.head_ref }}
+      - uses: release-drafter/release-drafter/autolabeler@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0

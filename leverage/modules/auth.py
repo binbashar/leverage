@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError
 
 from leverage import logger
 from leverage.path import PathsHandler
-from leverage._utils import key_finder, ExitError, get_or_create_section, parse_tf_file
+from leverage._utils import key_finder, ExitError, get_option_value, get_or_create_section, parse_tf_file
 
 
 class SkipProfile(Exception):
@@ -39,16 +39,16 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
     )
 
     # the project and the role are at the beginning and end of the string
-    _, *account_name, _ = raw.split("-")
-    account_name = "-".join(account_name)
+    _, *account_name_parts, _ = raw.split("-")
+    account_name = "-".join(account_name_parts)
     logger.info(f"Attempting to get temporary credentials for {account_name} account.")
 
     sso_profile = f"{project}-sso-{account_name}"
     # if profile wasn't configured during configuration step
     # it means we do not have permissions for the role in the account
     try:
-        account_id = config_updater.get(f"profile {sso_profile}", "account_id").value
-        sso_role = config_updater.get(f"profile {sso_profile}", "role_name").value
+        account_id = get_option_value(config_updater, f"profile {sso_profile}", "account_id")
+        sso_role = get_option_value(config_updater, f"profile {sso_profile}", "role_name")
     except NoSectionError:
         raise ExitError(40, f"Missing {sso_profile} permission for account {account_name}.")
 
@@ -69,8 +69,8 @@ def _get_sso_profile_from_section(
     section names rather than profile references parsed from .tf files.
     """
     account_name = profile_section.replace(f"profile {project}-sso-", "")
-    account_id = config_updater.get(profile_section, "account_id").value
-    sso_role = config_updater.get(profile_section, "role_name").value
+    account_id = get_option_value(config_updater, profile_section, "account_id")
+    sso_role = get_option_value(config_updater, profile_section, "role_name")
     layer_profile = f"{project}-{account_name}-{sso_role.lower()}"
     return account_id, account_name, sso_role, layer_profile
 
@@ -181,8 +181,9 @@ def check_sso_token(paths: PathsHandler):
         )
 
     token = json.loads(paths.sso_token_file.read_text())
-    expiry = datetime.strptime(token.get("expiresAt"), "%Y-%m-%dT%H:%M:%SZ")
-    renewal = datetime.now()
+    # expiresAt is in UTC: compare it with the current time in UTC, not in the local timezone
+    expiry = datetime.strptime(token.get("expiresAt"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=tzutc())
+    renewal = datetime.now(tzutc())
 
     if expiry < renewal:
         raise ExitError(
@@ -251,7 +252,7 @@ def _check_credentials_expiration(
         return False
 
     try:
-        expiration = int(config_updater.get(f"profile {layer_profile}", "expiration").value) / 1000
+        expiration = int(get_option_value(config_updater, f"profile {layer_profile}", "expiration")) / 1000
     except (NoSectionError, NoOptionError):
         # first time using this profile, skip into the credential's retrieval step
         logger.debug("No cached credentials found.")
@@ -467,10 +468,11 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
             layer_profile = profile_name
 
         logger.info(f"Attempting to get temporary credentials for {profile_name} profile.")
-        if profile := config_updater.get_section(f"profile {profile_name}-mfa"):
-            role_arn = profile.get("role_arn").value
-            mfa_serial = profile.get("mfa_serial").value
-            source_profile = profile.get("source_profile").value
+        mfa_section = f"profile {profile_name}-mfa"
+        if config_updater.has_section(mfa_section):
+            role_arn = get_option_value(config_updater, mfa_section, "role_arn")
+            mfa_serial = get_option_value(config_updater, mfa_section, "mfa_serial")
+            source_profile = get_option_value(config_updater, mfa_section, "source_profile")
         else:
             raise ExitError(
                 40,
@@ -502,7 +504,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
         credentials = None
         for _ in range(3):
             try:
-                mfa_token_code = click.prompt("Enter MFA token code", type=str)
+                mfa_token_code = click.prompt("Enter MFA token code", type=click.STRING)
             except click.exceptions.Abort:
                 raise ExitError(1, "Aborted by user.")
 
@@ -519,27 +521,24 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 break
 
             except ClientError as error:
-                if "invalid MFA" in error.response["Error"]["Message"]:
+                code = error.response["Error"]["Code"]
+                message = error.response["Error"]["Message"]
+                # STS answers a wrong MFA code with AccessDenied too: tell them apart by the message
+                if "invalid MFA" in message:
                     logger.error("Unable to get valid credentials. Please try again.")
                     continue
-                elif error.response["Error"]["Code"] == "AccessDeniedException":
+                elif code in ("AccessDenied", "AccessDeniedException"):
                     raise ExitError(
                         40,
                         f"User does not have permission to assume role [bold]{role_arn}[/bold]"
                         " in this account.\nPlease check with your administrator or try"
                         " checking your credentials configuration.",
                     )
-                elif error.response["Error"]["Code"] == "ExpiredToken":
-                    logger.error("Token has expired. Please try again.")
-                    continue
-                elif (
-                    error.response["Error"]["Code"] == "ValidationError"
-                    and "Invalid length for parameter TokenCode" in error.response["Error"]["Message"]
-                ):
+                elif code == "ValidationError" and "Invalid length for parameter TokenCode" in message:
                     logger.error("Invalid token length, it must be 6 digits long. Please try again.")
                     continue
-                elif "An error occurred" in error.response["Error"]["Message"]:
-                    raise ExitError(50, f"Error assuming role: {error}")
+                # Anything else (e.g. the source profile's session expired) won't be fixed by another code
+                raise ExitError(50, f"Error assuming role: {error}")
 
         if credentials is None:
             raise ExitError(60, "Failed to get credentials after 3 attempts. Please try again later.")
@@ -558,4 +557,4 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 "aws_session_token": credentials["SessionToken"],
             },
         )
-        logger.info(f"Credentials written successfully.")
+        logger.info("Credentials written successfully.")
