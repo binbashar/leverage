@@ -53,13 +53,13 @@ def set_backend_key(config_file_path: Union[str, Path], key: str) -> None:
     ):
         raise ExitError(
             1,
-            f"Malformed config.tf: File must contain a terraform block with an S3 backend. "
-            f"Expected structure:\n"
-            f"terraform {{\n"
-            f'  backend "s3" {{\n'
-            f"    # configuration\n"
-            f"  }}\n"
-            f"}}",
+            "Malformed config.tf: File must contain a terraform block with an S3 backend. "
+            "Expected structure:\n"
+            "terraform {\n"
+            '  backend "s3" {\n'
+            "    # configuration\n"
+            "  }\n"
+            "}",
         )
 
     # Check if key already exists
@@ -157,9 +157,9 @@ def get_backend_key(config_file: Union[str, Path]) -> Optional[str]:
         else:
             raise ExitError(
                 1,
-                f"Malformed [bold]config.tf[/bold] file. Missing backend block.\n"
-                f"In some cases you may want to skip this check by using the --skip-validation flag, "
-                f"e.g. the first time you initialize a tf-backend layer.",
+                "Malformed [bold]config.tf[/bold] file. Missing backend block.\n"
+                "In some cases you may want to skip this check by using the --skip-validation flag, "
+                "e.g. the first time you initialize a tf-backend layer.",
             )
 
     except lark.exceptions.UnexpectedInput as error:
@@ -172,4 +172,4 @@ def get_backend_key(config_file: Union[str, Path]) -> Optional[str]:
         # Let our own, more specific errors (e.g. missing backend block) through untouched
         raise
     except Exception:
-        raise ExitError(1, f"Malformed [bold]config.tf[/bold] file. Unable to parse.")
+        raise ExitError(1, "Malformed [bold]config.tf[/bold] file. Unable to parse.")
