@@ -95,5 +95,3 @@ select = ["E4", "E7", "E9", "F"]
 # The package's public names, imported to be re-exported
 "leverage/__init__.py" = ["F401"]
 "leverage/modules/__init__.py" = ["F401"]
-# TODO: drop once #333 is merged; fixing these f-strings now would conflict with it
-"leverage/_backend_config.py" = ["F541"]
