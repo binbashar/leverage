@@ -9,7 +9,7 @@ from leverage import leverage
 from leverage import path as lepath
 from leverage._internals import State
 from leverage.path import PathsHandler
-from leverage.modules.tf import _validate_layout, has_a_plan_file
+from leverage.modules.tf import _make_layer_backend_key, _validate_layout, has_a_plan_file
 
 
 @pytest.mark.parametrize(
@@ -189,3 +189,202 @@ def test_layers_run_all_layers_when_none_fails(leverage_project, leverage_runner
         layers_group / "security-base",
         layers_group / "base-tf-backend",
     ]
+
+
+def _output(result):
+    """The command output with its whitespace collapsed: rich wraps long log lines."""
+    return " ".join(result.output.split())
+
+
+# ###########################################################################
+# --layers ERRORS
+# ###########################################################################
+@pytest.mark.parametrize(
+    "location, layers, message",
+    [
+        # Inside a layer, --layers is not allowed
+        ("account/us-east-1/security-base", "security-base", "Can not set --layers inside a layer."),
+        # In a layers-group (or account) directory, --layers is required
+        ("account/us-east-1", "", "--layers has to be set."),
+        ("account", "", "--layers has to be set."),
+        # Outside an account
+        (".", "", "This command has to be run inside a layer or account directory."),
+        # A layer that does not exist
+        ("account/us-east-1", "security-base,missing", "does not exist or is not a directory"),
+    ],
+)
+def test_layers_errors(leverage_project, leverage_runner, location, layers, message):
+    args = ["tofu", "plan", *(["--layers", layers] if layers else [])]
+
+    with leverage_runner(leverage_project, working_directory=leverage_project / location) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
+            result = runner.invoke(leverage, args)
+
+    assert result.exit_code == 1, result.output
+    assert message in _output(result)
+    # Every layer is checked before running anything
+    mocked_run.assert_not_called()
+
+
+# ###########################################################################
+# BACKEND KEY
+# ###########################################################################
+_CONFIG_TF_WITHOUT_KEY = 'terraform {\n  backend "s3" {\n    region = "us-east-1"\n  }\n}\n'
+
+
+@pytest.mark.parametrize(
+    "location, layers",
+    [
+        # From the layer itself
+        ("account/us-east-1/security-base", []),
+        # From the layers-group, with --layers
+        ("account/us-east-1", ["--layers", "security-base,base-tf-backend"]),
+    ],
+)
+def test_init_sets_the_backend_key_of_each_layer(leverage_project, leverage_runner, location, layers):
+    layers_group = leverage_project / "account" / "us-east-1"
+    for layer in ("security-base", "base-tf-backend"):
+        (layers_group / layer / "config.tf").write_text(_CONFIG_TF_WITHOUT_KEY)
+
+    with leverage_runner(leverage_project, working_directory=leverage_project / location) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0):
+            result = runner.invoke(leverage, ["tofu", "init", *layers])
+
+    assert result.exit_code == 0, result.output
+    assert (
+        'key = "account/us-east-1/security-base/terraform.tfstate"'
+        in (layers_group / "security-base" / "config.tf").read_text()
+    )
+    if layers:
+        # The base- prefix is dropped from the key
+        assert (
+            'key = "account/us-east-1/tf-backend/terraform.tfstate"'
+            in (layers_group / "base-tf-backend" / "config.tf").read_text()
+        )
+
+
+@pytest.mark.parametrize(
+    "layer, expected",
+    [
+        # Region directory: the key may or may not include it, and may carry the DR suffix
+        (
+            "us-east-1/security-base",
+            [
+                "acc/security-base/terraform.tfstate",
+                "acc/security-base-dr/terraform.tfstate",
+                "acc/us-east-1/security-base/terraform.tfstate",
+                "acc/us-east-1/security-base-dr/terraform.tfstate",
+            ],
+        ),
+        # base- and tools- prefixes are dropped; tf- and terraform- are interchangeable
+        (
+            "us-east-1/base-tf-backend",
+            [
+                "acc/tf-backend/terraform.tfstate",
+                "acc/tf-backend-dr/terraform.tfstate",
+                "acc/terraform-backend/terraform.tfstate",
+                "acc/terraform-backend-dr/terraform.tfstate",
+                "acc/us-east-1/tf-backend/terraform.tfstate",
+                "acc/us-east-1/tf-backend-dr/terraform.tfstate",
+                "acc/us-east-1/terraform-backend/terraform.tfstate",
+                "acc/us-east-1/terraform-backend-dr/terraform.tfstate",
+            ],
+        ),
+        (
+            "global/tools-vpn-server",
+            [
+                "acc/vpn-server/terraform.tfstate",
+                "acc/vpn-server-dr/terraform.tfstate",
+                "acc/global/vpn-server/terraform.tfstate",
+                "acc/global/vpn-server-dr/terraform.tfstate",
+            ],
+        ),
+        (
+            "apps/terraform-state",
+            [
+                "acc/apps/terraform-state/terraform.tfstate",
+                "acc/apps-dr/terraform-state/terraform.tfstate",
+                "acc/apps/tf-state/terraform.tfstate",
+                "acc/apps-dr/tf-state/terraform.tfstate",
+            ],
+        ),
+        # No region directory: the DR suffix goes on the first directory
+        (
+            "apps/backend",
+            [
+                "acc/apps/backend/terraform.tfstate",
+                "acc/apps-dr/backend/terraform.tfstate",
+            ],
+        ),
+    ],
+)
+def test_make_layer_backend_key(tmp_path, layer, expected):
+    account_dir = tmp_path / "acc"
+    assert sorted(_make_layer_backend_key(account_dir / layer, account_dir, "acc")) == sorted(expected)
+
+
+# ###########################################################################
+# validate-layout
+# ###########################################################################
+def _validate_layout_in(leverage_project, leverage_runner, layer="account/us-east-1/security-base"):
+    with leverage_runner(leverage_project, working_directory=leverage_project / layer) as runner:
+        return runner.invoke(leverage, ["tofu", "validate-layout"])
+
+
+def test_validate_layout_ok(leverage_project, leverage_runner):
+    result = _validate_layout_in(leverage_project, leverage_runner)
+
+    assert result.exit_code == 0, result.output
+    assert "FAILED" not in result.output
+
+
+def test_validate_layout_without_environment(leverage_project, leverage_runner):
+    (leverage_project / "account" / "config" / "account.tfvars").write_text('sso_role = "test-sso-role"\n')
+
+    result = _validate_layout_in(leverage_project, leverage_runner)
+
+    assert result.exit_code == 1, result.output
+    assert "FAILED" in result.output
+
+
+def test_validate_layout_wrong_backend_key(leverage_project, leverage_runner):
+    config_tf = leverage_project / "account" / "us-east-1" / "security-base" / "config.tf"
+    config_tf.write_text(config_tf.read_text().replace("security-base/", "other-layer/"))
+
+    result = _validate_layout_in(leverage_project, leverage_runner)
+
+    assert result.exit_code == 1, result.output
+    assert "Expected one of: account/security-base/terraform.tfstate;" in _output(result)
+    assert "FAILED" in result.output
+
+
+def test_validate_layout_wrong_backend_tfvars(leverage_project, leverage_runner):
+    (leverage_project / "account" / "config" / "backend.tfvars").write_text('bucket = "other-bucket"\n')
+
+    result = _validate_layout_in(leverage_project, leverage_runner)
+
+    assert result.exit_code == 1, result.output
+    # profile, bucket and dynamodb_table
+    assert result.output.count("FAILED") == 3
+
+
+def test_validate_layout_warns_when_the_account_directory_does_not_match(leverage_project, leverage_runner):
+    (leverage_project / "account" / "config" / "account.tfvars").write_text(
+        'environment = "apps-devstg"\nsso_role = "test-sso-role"\n'
+    )
+
+    result = _validate_layout_in(leverage_project, leverage_runner)
+
+    assert "Account directory name does not match environment name" in _output(result)
+
+
+def test_init_stops_on_an_invalid_layout(leverage_project, leverage_runner):
+    (leverage_project / "account" / "config" / "backend.tfvars").write_text('bucket = "other-bucket"\n')
+
+    with leverage_runner(leverage_project) as runner:
+        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
+            result = runner.invoke(leverage, ["tofu", "init"])
+
+    assert result.exit_code == 1, result.output
+    assert "Layer configuration doesn't seem to be valid" in _output(result)
+    mocked_run.assert_not_called()
