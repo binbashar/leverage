@@ -1499,14 +1499,14 @@ filelock = ">=3.16.1"
 
 [[package]]
 name = "python-hcl2"
-version = "7.3.1"
+version = "8.2.0"
 description = "A parser for HCL2"
 optional = false
-python-versions = ">=3.7.0"
+python-versions = ">=3.8.0"
 groups = ["main"]
 files = [
-    {file = "python_hcl2-7.3.1-py3-none-any.whl", hash = "sha256:6bf6036d3dffac04e05e6aa58ff6e9a3710bba2171325584dfd7b3f8c99c6d4d"},
-    {file = "python_hcl2-7.3.1.tar.gz", hash = "sha256:f8f55583703daf7bbcb595a33c68de891064d565974ea39998b81d15a4c4657b"},
+    {file = "python_hcl2-8.2.0-py3-none-any.whl", hash = "sha256:00a213df1b33e4d69b607b2f0a6a0a21f2c0df2d69ad6a2cb3d5af468f17a087"},
+    {file = "python_hcl2-8.2.0.tar.gz", hash = "sha256:88b615c2cea920090e4a8d869d8aa7ccb3658a9bd48e75a4b76fa6685e2ce657"},
 ]
 
 [package.dependencies]
@@ -2135,4 +2135,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "21aa274857f3f90c86e3abba53bd316cf60bd3f51c83b2e2fd4b947fdcf76c16"
+content-hash = "82391ef502ba1820e1b7335fc57b10775788c713a32def14d974ba170aa4af54"
