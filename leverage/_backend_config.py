@@ -98,7 +98,9 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
         # Update the existing key, only inside the backend block: other attributes ending in `key`
         # (`sse_customer_key`) or a `key` in another block (`locals`) must stay as they are
         body_end = _find_closing_brace(searchable, body_start)
-        current = re.compile(r'(?<![\w-])key\s*=\s*"[^"]*"').search(searchable, body_start, body_end)
+        # Only the backend's own `key`, not one nested in a value such as `assume_role = { tags = { key = ... } }`
+        top_level = _blank_nested_blocks(searchable, body_start, body_end)
+        current = re.compile(r'(?<![\w-])key\s*=\s*"[^"]*"').search(top_level, body_start, body_end)
         if current is None:
             return content
         assignment = content[current.start() : current.end()]
@@ -136,6 +138,32 @@ def _blank_comments(content: str) -> str:
             if chars[position] != "\n":
                 chars[position] = " "
         index = end
+    return "".join(chars)
+
+
+def _blank_nested_blocks(content: str, start: int, end: int) -> str:
+    """Return the content with whatever sits inside `{}` nested in `[start, end)` replaced by spaces, keeping
+    newlines and length. Expects content without comments (see `_blank_comments`)."""
+    chars = list(content)
+    depth = 0
+    index = start
+    while index < end:
+        char = content[index]
+        string_start = index
+        if char == '"':
+            # Skip the string, honoring escaped quotes
+            index += 1
+            while index < end and content[index] != '"':
+                index += 2 if content[index] == "\\" else 1
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        if depth > 0 or char == "}":
+            for position in range(string_start, min(index + 1, end)):
+                if chars[position] != "\n":
+                    chars[position] = " "
+        index += 1
     return "".join(chars)
 
 

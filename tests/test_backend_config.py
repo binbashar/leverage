@@ -239,3 +239,25 @@ def test_set_backend_key_skips_commented_backend_and_keys(tmp_path, existing_key
     assert '#   key = "old/commented/terraform.tfstate"' in content
     assert '// key = "another/commented/terraform.tfstate"' in content
     assert '/* key = "a/block/comment/terraform.tfstate" */' in content
+
+
+def test_set_backend_key_skips_keys_nested_in_values(tmp_path):
+    """A `key` nested in a backend value (assume_role tags) is not the backend key."""
+    config_file = tmp_path / "config.tf"
+    config_file.write_text("""\
+terraform {
+  backend "s3" {
+    bucket = "example-bucket"
+    assume_role = {
+      role_arn = "arn:aws:iam::123456789012:role/example"
+      tags     = { key = "tag-value" }
+    }
+    key = "old/terraform.tfstate"
+  }
+}
+""")
+
+    set_backend_key(config_file, "new/terraform.tfstate")
+
+    assert get_backend_key(config_file) == "new/terraform.tfstate"
+    assert 'tags     = { key = "tag-value" }' in config_file.read_text()
