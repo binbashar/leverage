@@ -77,6 +77,9 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
     """
     Modify the backend key in the HCL content.
 
+    The searches run on a copy of the content with its comments blanked out, so a commented
+    `backend "s3" {` or `key = "..."` is never taken for the active one. Positions match the original.
+
     Args:
         content: The original file content
         key: The new key value
@@ -85,50 +88,61 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
     Returns:
         Modified content with the key set
     """
-    # Pattern to find the backend "s3" block
-    # This matches: backend "s3" { ... }
-    backend_pattern = r'(backend\s+"s3"\s*\{)'
+    searchable = _blank_comments(content)
+    backend = re.search(r'backend\s+"s3"\s*\{', searchable)
+    if backend is None:
+        return content
+    body_start = backend.end()
 
     if key_exists:
         # Update the existing key, only inside the backend block: other attributes ending in `key`
         # (`sse_customer_key`) or a `key` in another block (`locals`) must stay as they are
-        backend = re.search(backend_pattern, content)
-        if backend is None:
+        body_end = _find_closing_brace(searchable, body_start)
+        current = re.compile(r'(?<![\w-])key\s*=\s*"[^"]*"').search(searchable, body_start, body_end)
+        if current is None:
             return content
-        body_start = backend.end()
-        body_end = _find_closing_brace(content, body_start)
-        body = re.sub(
-            r'((?<![\w-])key\s*=\s*)"[^"]*"',
-            lambda match: f'{match.group(1)}"{key}"',
-            content[body_start:body_end],
-            count=1,
-        )
-        return content[:body_start] + body + content[body_end:]
-    else:
-        # Add new key attribute
-        # Find the backend "s3" block and add the key after the opening brace
-        def add_key(match):
-            # Get the matched backend opening
-            backend_opening = match.group(1)
+        assignment = content[current.start() : current.end()]
+        value_start = current.start() + assignment.index('"')
+        return f'{content[:value_start]}"{key}"{content[current.end():]}'
 
-            # Find the indentation by looking at the next line
-            remaining = content[match.end() :]
-            next_line_match = re.search(r"\n(\s*)", remaining)
-            if next_line_match:
-                indent = next_line_match.group(1)
-            else:
-                indent = "    "  # Default to 4 spaces
+    # Add the key right after the opening brace, with the indentation of the line that follows
+    next_line = re.match(r"[^\n]*\n([ \t]*)", content[body_start:])
+    indent = next_line.group(1) if next_line else "    "
+    return f'{content[:body_start]}\n{indent}key = "{key}"{content[body_start:]}'
 
-            # Add the key attribute with proper indentation
-            return f'{backend_opening}\n{indent}key = "{key}"'
 
-        modified = re.sub(backend_pattern, add_key, content, count=1)
-
-        return modified
+def _blank_comments(content: str) -> str:
+    """Return the content with every comment (`#`, `//`, `/* */`) replaced by spaces, keeping newlines and length."""
+    chars = list(content)
+    index = 0
+    while index < len(content):
+        if content[index] == '"':
+            # Skip the string, honoring escaped quotes
+            index += 1
+            while index < len(content) and content[index] != '"':
+                index += 2 if content[index] == "\\" else 1
+            index += 1
+            continue
+        if content[index] == "#" or content.startswith("//", index):
+            end = content.find("\n", index)
+            end = len(content) if end == -1 else end
+        elif content.startswith("/*", index):
+            end = content.find("*/", index + 2)
+            end = len(content) if end == -1 else end + 2
+        else:
+            index += 1
+            continue
+        for position in range(index, end):
+            if chars[position] != "\n":
+                chars[position] = " "
+        index = end
+    return "".join(chars)
 
 
 def _find_closing_brace(content: str, start: int) -> int:
-    """Return the index of the `}` that closes the block whose body starts at `start`, skipping strings and comments."""
+    """Return the index of the `}` that closes the block whose body starts at `start`, skipping strings.
+
+    Expects content without comments (see `_blank_comments`)."""
     depth = 1
     index = start
     while index < len(content):
@@ -138,15 +152,6 @@ def _find_closing_brace(content: str, start: int) -> int:
             index += 1
             while index < len(content) and content[index] != '"':
                 index += 2 if content[index] == "\\" else 1
-        elif char == "#" or content.startswith("//", index):
-            index = content.find("\n", index)
-            if index == -1:
-                break
-        elif content.startswith("/*", index):
-            index = content.find("*/", index)
-            if index == -1:
-                break
-            index += 1
         elif char == "{":
             depth += 1
         elif char == "}":

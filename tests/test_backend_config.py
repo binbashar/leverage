@@ -210,3 +210,32 @@ def test_set_backend_key_with_complex_formatting(tmp_path):
     assert "# inline comment" in new_content
     assert "bucket" in new_content
     assert "dynamodb_table" in new_content
+
+
+COMMENTED_CONFIG = """\
+terraform {
+  # backend "s3" {
+  #   key = "old/commented/terraform.tfstate"
+  # }
+  backend "s3" {
+    // key = "another/commented/terraform.tfstate"
+    /* key = "a/block/comment/terraform.tfstate" */
+    bucket = "my-bucket"
+%s  }
+}
+"""
+
+
+@pytest.mark.parametrize("existing_key", ['    key = "old/terraform.tfstate"\n', ""])
+def test_set_backend_key_skips_commented_backend_and_keys(tmp_path, existing_key):
+    """Commented backend blocks and key lines are left alone; the active backend gets the new key."""
+    config_file = tmp_path / "config.tf"
+    config_file.write_text(COMMENTED_CONFIG % existing_key)
+
+    set_backend_key(config_file, "new/terraform.tfstate")
+
+    assert get_backend_key(config_file) == "new/terraform.tfstate"
+    content = config_file.read_text()
+    assert '#   key = "old/commented/terraform.tfstate"' in content
+    assert '// key = "another/commented/terraform.tfstate"' in content
+    assert '/* key = "a/block/comment/terraform.tfstate" */' in content

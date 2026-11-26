@@ -20,6 +20,15 @@ from leverage.modules.tf import REGION, _layer_backend_key, _make_layer_backend_
 
 # Building blocks shared by the tests -----------------------------------------------------------------------------
 
+
+def _drop_legacy_prefix(name):
+    """Expected naming: a single legacy prefix, `base-` or `tools-`, is dropped from the start of the name."""
+    for prefix in ("base-", "tools-"):
+        if name.startswith(prefix):
+            return name[len(prefix) :]
+    return name
+
+
 # A directory name as found in a project: account, layer or layer group
 DIR_NAME = st.text(alphabet=string.ascii_lowercase + string.digits + "-_", min_size=1, max_size=20).filter(
     lambda name: name not in (".", "..")
@@ -30,7 +39,9 @@ LAYER_DIR = st.builds(
     lambda chunks, name: "".join(chunks) + name,
     st.lists(st.one_of(st.sampled_from(["base-", "tools-", "tf-", "terraform-", "global", "us-east-1-"]), DIR_NAME)),
     DIR_NAME,
-).filter(lambda name: not re.fullmatch(REGION, name))
+)
+# A layer is never named after a region, not even behind a legacy prefix (`base-global`)
+LAYER_DIR = LAYER_DIR.filter(lambda name: not re.fullmatch(REGION, _drop_legacy_prefix(name)))
 REGION_DIRS = ["us-east-1", "us-west-2", "eu-central-1", "sa-east-1", "global"]
 REGION_DIR = st.sampled_from(REGION_DIRS)
 # The path of a layer below the account directory: an optional region directory, then 1 to 3 levels
@@ -83,14 +94,6 @@ def test_parse_task_args_only_raises_its_own_errors(arguments):
 def test_parse_task_args_keeps_equal_signs_in_values(key, value):
     """Only the first `=` separates the keyword: a value such as a URL query or base64 text keeps the others."""
     assert parse_task_args(f"{key}={value}") == ([], {key: value})
-
-
-def _drop_legacy_prefix(name):
-    """Expected naming: a single legacy prefix, `base-` or `tools-`, is dropped from the start of the name."""
-    for prefix in ("base-", "tools-"):
-        if name.startswith(prefix):
-            return name[len(prefix) :]
-    return name
 
 
 # _make_layer_backend_key --------------------------------------------------------------------------------------------
