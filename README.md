@@ -194,6 +194,17 @@ Integration tests are implemented using [bats](https://github.com/bats-core/bats
 poetry run pytest
 ```
 
+They include contract tests with the reference architecture (`tests/test_refarch_contract.py`): the cli must keep
+working on the layout and conventions of [le-tf-infra-aws](https://github.com/binbashar/le-tf-infra-aws). By default
+they run on a snapshot of a few of its layers, kept in `tests/refarch/`. To run them on every layer of a clone, or to
+refresh the snapshot after the ref-arch changes:
+
+```bash
+git clone --depth 1 https://github.com/binbashar/le-tf-infra-aws.git /tmp/le-tf-infra-aws
+LEVERAGE_REFARCH_DIR=/tmp/le-tf-infra-aws poetry run pytest tests/test_refarch_contract.py
+python tests/refarch/snapshot.py /tmp/le-tf-infra-aws
+```
+
 2. Integration tests:
 
 Install dependencies (MacOS):

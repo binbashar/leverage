@@ -56,3 +56,37 @@ jobs:
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # The contract tests with the reference architecture (tests/test_refarch_contract.py) run in
+  # unit_tests on a snapshot of a few ref-arch layers. Here they run on every layer of the current
+  # le-tf-infra-aws, so a change there that breaks the cli shows up too. No AWS involved.
+  # Not a required check: le-tf-infra-aws can change without this repo changing.
+  contract_tests_refarch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          poetry config virtualenvs.create false
+
+      - name: Install dependencies using Poetry
+        run: poetry install --with=dev
+
+      - name: Clone the reference architecture
+        run: |
+          git clone --depth 1 https://github.com/binbashar/le-tf-infra-aws.git "${RUNNER_TEMP}/le-tf-infra-aws"
+          echo "[INFO] le-tf-infra-aws at $(git -C "${RUNNER_TEMP}/le-tf-infra-aws" rev-parse --short HEAD)"
+
+      - name: Run the contract tests on every ref-arch layer
+        run: |
+          export LEVERAGE_REFARCH_DIR="${RUNNER_TEMP}/le-tf-infra-aws"
+          poetry run pytest --verbose --no-cov tests/test_refarch_contract.py

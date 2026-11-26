@@ -1,0 +1,515 @@
+locals {
+  #----------------------------------------------------------------------------
+  # Define the users here
+  #----------------------------------------------------------------------------
+  users = {
+    # Binbash
+    "agustin.godnic" = {
+      first_name = "Agustin"
+      last_name  = "Godnic"
+      email      = "agustin.godnic@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops",
+      ]
+    }
+    "alex.delossantos" = {
+      first_name = "Alex"
+      last_name  = "DelosSantos"
+      email      = "alex.delossantos@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "administrators",
+        "kiropro",
+      ]
+    }
+    "angelo.fenoglio" = {
+      first_name = "Angelo"
+      last_name  = "Fenoglio"
+      email      = "angelo.fenoglio@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+      ]
+    }
+    "ariel.jalil" = {
+      first_name = "Ariel"
+      last_name  = "Jalil"
+      email      = "ariel.jalil@binbash.com.ar",
+      groups = [
+        "devops",
+      ]
+    }
+    "caetano.prates" = {
+      first_name = "Caetano"
+      last_name  = "Prates"
+      email      = "caetano.prates@binbash.com.ar"
+      groups = [
+        "marketplaceandpartnercentral",
+      ]
+    }
+    "cristian.silva" = {
+      first_name = "Cristian"
+      last_name  = "Silva"
+      email      = "cristian.silva@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops",
+      ]
+    }
+    "dario.villavicencio" = {
+      first_name = "Dario"
+      last_name  = "Villavicencio"
+      email      = "dario.villavicencio@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "diego.ojeda" = {
+      first_name = "Diego"
+      last_name  = "Ojeda"
+      email      = "diego.ojeda@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+        "devopsprd",
+        "kiropro",
+      ]
+    }
+    "dorian.machado" = {
+      first_name = "Dorian"
+      last_name  = "Machado"
+      email      = "dorian.machado@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops"
+      ]
+    }
+    "exequiel.barrirero" = {
+      first_name = "Exequiel"
+      last_name  = "Barrirero"
+      email      = "exequiel.barrirero@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+        "devopsprd",
+        "datascientists",
+        "marketplaceandpartnercentral",
+        "kiropro",
+        "quickadmin",
+      ]
+    }
+    "ezequiel.godoy" = {
+      first_name = "Ezequiel"
+      last_name  = "Godoy"
+      email      = "ezequiel.godoy@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+      ]
+    }
+    "favio.tolosa" = {
+      first_name = "Favio"
+      last_name  = "Tolosa"
+      email      = "favio.tolosa@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "federico.bello" = {
+      first_name = "Federico"
+      last_name  = "Bello"
+      email      = "federico.bello@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "kiropro",
+        "quickauthor",
+      ]
+    }
+    "franco.gauchat" = {
+      first_name = "Franco"
+      last_name  = "Gauchat"
+      email      = "franco.gauchat@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "hecber.cordova" = {
+      first_name = "Hecber"
+      last_name  = "Cordova"
+      email      = "hecber.cordova@binbash.com.ar"
+      groups = [
+        "devops",
+        "devopsprd",
+      ]
+    }
+    "hernan.rezilo" = {
+      first_name = "Hernan"
+      last_name  = "Rezilo"
+      email      = "hernan.rezilo@binbash.com.ar"
+      groups = [
+        "devops"
+      ]
+    }
+    "ignacio.gomez" = {
+      first_name = "Ignacio"
+      last_name  = "Gomez"
+      email      = "ignacio.gomez@binbash.com.ar"
+      groups = [
+        "datascientists",
+      ]
+    }
+    "ivan.mejia" = {
+      first_name = "Ivan"
+      last_name  = "Mejia"
+      email      = "ivan.mejia@binbash.com.ar"
+      groups = [
+        "marketplaceandpartnercentral",
+      ]
+    }
+    "jose.peinado" = {
+      first_name = "Jose"
+      last_name  = "Peinado"
+      email      = "jose.peinado@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "juan.delacamara" = {
+      first_name = "Juan"
+      last_name  = "de la Camara"
+      email      = "juan.delacamara@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "juan.delatorre" = {
+      first_name = "Juan"
+      last_name  = "De la Torre"
+      email      = "juan.delatorre@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "juan.rodriguez" = {
+      first_name = "Juan Manuel"
+      last_name  = "Rodriguez"
+      email      = "juan.rodriguez@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops"
+      ]
+    }
+    "julian.curetti" = {
+      first_name = "Julian"
+      last_name  = "Curetti"
+      email      = "julian.curetti@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+    "kevin.santos" = {
+      first_name = "Kevin"
+      last_name  = "Santos"
+      email      = "kevin.santos@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops"
+      ]
+    }
+    "luis.gallardo" = {
+      first_name = "Luis"
+      last_name  = "Gallardo"
+      email      = "luis.gallardo@binbash.com.ar"
+      groups = [
+        "devops",
+        "administrators",
+        "marketplacevalidationsellers",
+        "marketplacevalidationbuyers",
+      ]
+    }
+    "manuel.quinteros" = {
+      first_name = "Manuel"
+      last_name  = "Quinteros"
+      email      = "manuel.quinteros@binbash.com.ar"
+      groups = [
+        "devops",
+        "marketplaceandpartnercentral",
+      ]
+    }
+    "marcelo.beresvil" = {
+      first_name = "Marcelo"
+      last_name  = "Beresvil"
+      email      = "marcelo.beresvil@binbash.com.ar"
+      groups = [
+        "marketplaceandpartnercentral",
+      ]
+    }
+    "marcelo.rodriguez" = {
+      first_name = "Marcelo"
+      last_name  = "Rodriguez"
+      email      = "marcelo.rodriguez@binbash.com.ar"
+      groups = [
+        "datascientists"
+      ]
+    }
+    "marcos.pagnucco" = {
+      first_name = "Marcos"
+      last_name  = "Pagnucco"
+      email      = "marcos.pagnucco@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+        "readonly",
+      ]
+    }
+    "martin.galeano" = {
+      first_name = "Martin"
+      last_name  = "Galeano"
+      email      = "martin.galeano@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+      ]
+    }
+    "matias.rodriguez" = {
+      first_name = "Matias"
+      last_name  = "Rodriguez"
+      email      = "matias.rodriguez@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+        "datascientists",
+        "readonly",
+      ]
+    }
+    "maximiliano.dumon" = {
+      first_name = "Maximiliano"
+      last_name  = "Dumon"
+      email      = "maximiliano.dumon@binbash.com.ar"
+      groups = [
+        "devops",
+        "datascientists",
+      ]
+    }
+    "nestor.navarro" = {
+      first_name = "Nestor"
+      last_name  = "Navarro"
+      email      = "nestor.navarro@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops",
+        "managementmarketplaceaipublishers",
+        "managementdatascientists",
+        "marketplacevalidationbuyers",
+        "marketplacevalidationsellers",
+      ]
+    }
+    "nicolas.suarez" = {
+      first_name = "Nicolas"
+      last_name  = "Suarez"
+      email      = "nicolas.suarez@binbash.com.ar"
+      groups = [
+        "datascientists",
+        "devops",
+      ]
+    }
+    "patricia.charlier" = {
+      first_name = "Patricia"
+      last_name  = "Charlier"
+      email      = "patricia.charlier@binbash.com.ar"
+      groups = [
+        "marketplaceandpartnercentral",
+      ]
+    }
+    "rene.montilva" = {
+      first_name = "Rene"
+      last_name  = "Montilva"
+      email      = "rene.montilva@binbash.com.ar"
+      groups = [
+        "administrators",
+        "devops",
+      ]
+    }
+    "tomas.gauchat" = {
+      first_name = "Tomas"
+      last_name  = "Gauchat"
+      email      = "tomas.gauchat@binbash.com.ar"
+      groups = [
+        "devops",
+      ]
+    }
+  }
+
+  #----------------------------------------------------------------------------
+  # Define the groups here
+  #----------------------------------------------------------------------------
+  groups = {
+    administrators = {
+      name        = "Administrators"
+      description = "Provides full access to AWS services and resources."
+    }
+    devops = {
+      name        = "DevOps"
+      description = "Provides full access to many AWS services and resources except billing."
+    }
+    #
+    # NOTE Production access is deliberately NOT granted through the `devops`
+    # group. The DevOps permission set is assigned to every account except
+    # apps-prd; apps-prd is reached only through this group, so prod access is
+    # an explicit, separately reviewed membership rather than a side effect of
+    # being a DevOps team member.
+    #
+    devopsprd = {
+      name        = "DevOpsPrd"
+      description = "Provides the DevOps permission set in the apps-prd (production) account."
+    }
+    finops = {
+      name        = "FinOps"
+      description = "Provides access to billing and cost management."
+    }
+    securityauditor = {
+      name        = "SecurityAuditor"
+      description = "Provides access for security auditing."
+    }
+    readonly = {
+      name        = "ReadOnly"
+      description = "Provides view-only access to most resources."
+    }
+    marketplaceandpartnercentral = {
+      name        = "MarketplaceAndPartnerCentral"
+      description = "Provides access to the AWS Marketplace Seller and AWS Partner Central (APN)."
+    }
+    marketplacevalidationsellers = {
+      name        = "MarketplaceValidationSellers"
+      description = "Provides access to AWS MarketPlace seller validation."
+    }
+    marketplacevalidationbuyers = {
+      name        = "MarketplaceValidationBuyers"
+      description = "Provides access to AWS MarketPlace buyer validation."
+    }
+    datascientists = {
+      name        = "DataScientists"
+      description = "Provides access to the Data Science related services."
+    }
+    managementdatascientists = {
+      name        = "ManagementDataScientists"
+      description = "Provides access to Data Science related services in the Management account."
+    }
+    managementmarketplaceaipublishers = {
+      name        = "ManagementMarketplaceAIPublishers"
+      description = "Provides access to publish AI products in AWS Marketplace and Partner Central from the Management account."
+    }
+    #
+    # NOTE Subscription-only group: it is intentionally NOT referenced by any
+    # permission set in account_assignments.tf, so it grants no AWS access.
+    # It exists so that Kiro Pro seats are assigned once to the group in the
+    # Kiro console (Kiro has no public API / OpenTofu resource for subscription
+    # assignment), while seat membership stays managed as code here.
+    # Ref: https://kiro.dev/docs/enterprise/subscribe/
+    #
+    kiropro = {
+      name        = "KiroPro"
+      description = "Members hold a Kiro Pro (USD 20/user/month) subscription, assigned to this group in the Kiro console."
+    }
+    #
+    # NOTE Subscription-only groups: like `kiropro` above, they are intentionally
+    # NOT referenced by any permission set in account_assignments.tf, so they
+    # grant no AWS access. Amazon Quick maps one Identity Center group to one
+    # Quick role, so membership here is what provisions -- and bills -- a seat.
+    #
+    # Unlike Kiro, the group -> role mapping is managed as code as well, in
+    # data-science/us-east-1/quick-suite, so adding a member below is the only
+    # step needed to grant a seat. There is no console step.
+    #
+    # One group per role. The Pro tiers (Admin Pro / Author Pro / Reader Pro)
+    # are deliberately absent: they unlock generative BI but add a USD 250
+    # per-account monthly infrastructure fee. Add sibling groups if those are
+    # ever wanted, rather than mixing tiers in one group.
+    # Ref: https://docs.aws.amazon.com/quick/latest/userguide/managing-user-access-idc.html
+    #
+    quickadmin = {
+      name        = "QuickAdmin"
+      description = "Members hold an Amazon Quick Admin role (USD 24/user/month)."
+    }
+    quickauthor = {
+      name        = "QuickAuthor"
+      description = "Members hold an Amazon Quick Author role (USD 24/user/month)."
+    }
+    quickreader = {
+      name        = "QuickReader"
+      description = "Members hold an Amazon Quick Reader role (USD 3/user/month)."
+    }
+  }
+
+  #----------------------------------------------------------------------------
+  # Define user and group membership
+  #----------------------------------------------------------------------------
+  # Get only users and groups, discard the rest
+  extract_users_groups_only = {
+    for user, user_data in local.users : user => user_data.groups
+  }
+
+  # Get a list of maps that combine every user with every group they belong to
+  users_groups_combined = [
+    for user, groups in local.extract_users_groups_only : {
+      for group in groups :
+      "${user}_${group}" => {
+        "user"  = user
+        "group" = group
+      }
+    }
+  ]
+
+  # Now get all the submaps in the list merged into a single map that can be iterated more easily
+  users_groups_membership = zipmap(
+    flatten(
+      [for item in local.users_groups_combined : keys(item)]
+    ),
+    flatten(
+      [for item in local.users_groups_combined : values(item)]
+    )
+  )
+
+  #----------------------------------------------------------------------------
+  # IAM Identity Center
+  #----------------------------------------------------------------------------
+  # This identifies the SSO instance we'll be working with
+  identity_store_id = tolist(data.aws_ssoadmin_instances.main.identity_store_ids)[0]
+
+  # Principal types
+  principal_type_group = "GROUP"
+  principal_type_user  = "USER"
+
+  # The duration needs to be specified in ISO 8601. The minimum session duration
+  # is 1 hour, and can be set to a maximum of 12 hours.
+  # Ref: https://docs.aws.amazon.com/singlesignon/latest/userguide/howtosessionduration.html
+  #
+  # You can find some examples below:
+  #  - PT12H    Twelve hours
+  #  - PT2H30M  Two hours and thirty minutes
+  #  - PT90M    Ninety minutes
+  #
+  default_session_duration = "PT1H"
+
+  default_relay_state = ""
+
+  #----------------------------------------------------------------------------
+  # AWS Client VPN
+  #----------------------------------------------------------------------------
+  enable_sso_client_vpn = true
+
+  client_vpn_groups = [
+    "devops"
+  ]
+
+  #----------------------------------------------------------------------------
+  # Misc
+  #----------------------------------------------------------------------------
+
+  tags = {
+    Terraform    = "true"
+    Layer        = local.layer_name
+    "aws-apn-id" = local.prm_apn_id
+  }
+}
