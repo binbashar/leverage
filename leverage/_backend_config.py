@@ -90,14 +90,20 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
     backend_pattern = r'(backend\s+"s3"\s*\{)'
 
     if key_exists:
-        # Update existing key
-        # Match: key = "anything" or key = "anything" with various whitespace/quotes
-        key_pattern = r'(\s*key\s*=\s*)"[^"]*"'
-        replacement = r'\1"' + key + '"'
-
-        modified = re.sub(key_pattern, replacement, content)
-
-        return modified
+        # Update the existing key, only inside the backend block: other attributes ending in `key`
+        # (`sse_customer_key`) or a `key` in another block (`locals`) must stay as they are
+        backend = re.search(backend_pattern, content)
+        if backend is None:
+            return content
+        body_start = backend.end()
+        body_end = _find_closing_brace(content, body_start)
+        body = re.sub(
+            r'((?<![\w-])key\s*=\s*)"[^"]*"',
+            lambda match: f'{match.group(1)}"{key}"',
+            content[body_start:body_end],
+            count=1,
+        )
+        return content[:body_start] + body + content[body_end:]
     else:
         # Add new key attribute
         # Find the backend "s3" block and add the key after the opening brace
@@ -119,6 +125,36 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
         modified = re.sub(backend_pattern, add_key, content, count=1)
 
         return modified
+
+
+def _find_closing_brace(content: str, start: int) -> int:
+    """Return the index of the `}` that closes the block whose body starts at `start`, skipping strings and comments."""
+    depth = 1
+    index = start
+    while index < len(content):
+        char = content[index]
+        if char == '"':
+            # Skip the string, honoring escaped quotes
+            index += 1
+            while index < len(content) and content[index] != '"':
+                index += 2 if content[index] == "\\" else 1
+        elif char == "#" or content.startswith("//", index):
+            index = content.find("\n", index)
+            if index == -1:
+                break
+        elif content.startswith("/*", index):
+            index = content.find("*/", index)
+            if index == -1:
+                break
+            index += 1
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return len(content)
 
 
 def get_backend_key(config_file: Union[str, Path]) -> Optional[str]:

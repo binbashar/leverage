@@ -43,7 +43,8 @@ def parse_task_args(arguments):
             args.append(argument.strip())
 
         else:
-            key, value = [part.strip() for part in argument.split("=")]
+            # Only the first `=` separates the keyword, the value may hold more (a URL query, base64 text)
+            key, value = [part.strip() for part in argument.split("=", 1)]
             if key in kwargs:
                 raise DuplicateKeywordArgumentError(f"Duplicated keyword argument `{key}` in task `{{task}}`.")
 

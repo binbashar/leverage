@@ -17,3 +17,6 @@ coverage.xml
 .coverage
 
 .idea
+
+# Hypothesis example database
+.hypothesis/
