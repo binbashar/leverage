@@ -278,9 +278,7 @@ def invoke_for_all_commands(paths, layers, command, *args: Sequence[str], skip_v
         # set the s3 key
         if not skip_validation and not get_backend_key(layer / "config.tf"):
             # The key follows the layer's path, not cwd's: with --layers, cwd is the account or layers-group
-            backend_key_base = f"{layer.relative_to(paths.root_dir).as_posix()}/terraform.tfstate"
-            backend_key = backend_key_base.replace("/base-", "/").replace("/tools-", "/")
-            set_backend_key(layer / "config.tf", backend_key)
+            set_backend_key(layer / "config.tf", _layer_backend_key(layer, paths.root_dir))
 
     for layer in layers:
         if len(layers) > 1:
@@ -427,6 +425,21 @@ def _destroy(tf: TFRunner, paths: PathsHandler, args: Sequence[str], working_dir
 # ###########################################################################
 # MISC FUNCTIONS
 # ###########################################################################
+def _strip_layer_prefix(directory_name):
+    """Drop the legacy `base-` or `tools-` prefix of a layer directory name, as backend keys don't carry it."""
+    for prefix in ("base-", "tools-"):
+        if directory_name.startswith(prefix):
+            return directory_name.removeprefix(prefix)
+    return directory_name
+
+
+def _layer_backend_key(layer, root_dir):
+    """The backend key `init` gives a layer that has none: the account directory, then the layer directories
+    without their legacy `base-`/`tools-` prefix. validate-layout accepts it (see `_make_layer_backend_key`)."""
+    account_dir, *layer_dirs = Path(layer).relative_to(root_dir).parts
+    return "/".join([account_dir, *map(_strip_layer_prefix, layer_dirs), "terraform.tfstate"])
+
+
 def _make_layer_backend_key(cwd, account_dir, account_name):
     """Create expected backend key.
 
@@ -443,7 +456,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
     layer_path = cwd.relative_to(account_dir)
     layer_path = layer_path.as_posix().split("/")
     # Check region directory to keep retro compat
-    if re.match(REGION, layer_path[0]):
+    if re.fullmatch(REGION, layer_path[0]):
         layer_paths = [layer_path[1:], layer_path]
     else:
         layer_paths = [layer_path]
@@ -453,11 +466,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
     for layer_path in layer_paths:
         curated_layer_path = []
         for lp in layer_path:
-            if lp.startswith("base-"):
-                lp = lp.replace("base-", "")
-            elif lp.startswith("tools-"):
-                lp = lp.replace("tools-", "")
-            curated_layer_path.append(lp)
+            curated_layer_path.append(_strip_layer_prefix(lp))
         curated_layer_paths.append(curated_layer_path)
 
     curated_layer_paths_retrocomp = []
@@ -467,12 +476,12 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         for idx, lp in enumerate(layer_path):
             if lp.startswith("tf-"):
                 layer_path_tmp = layer_path.copy()
-                layer_path_tmp[idx] = layer_path_tmp[idx].replace("tf-", "terraform-")
+                layer_path_tmp[idx] = "terraform-" + lp.removeprefix("tf-")
                 curated_layer_paths_retrocomp.append(layer_path_tmp)
                 break
             elif lp.startswith("terraform-"):
                 layer_path_tmp = layer_path.copy()
-                layer_path_tmp[idx] = layer_path_tmp[idx].replace("terraform-", "tf-")
+                layer_path_tmp[idx] = "tf-" + lp.removeprefix("terraform-")
                 curated_layer_paths_retrocomp.append(layer_path_tmp)
                 break
 
@@ -482,7 +491,7 @@ def _make_layer_backend_key(cwd, account_dir, account_name):
         curated_layer_path = []
         append_str = "-dr"
         for lp in layer_path:
-            if re.match(REGION, lp):
+            if re.fullmatch(REGION, lp):
                 curated_layer_path.append(lp)
             else:
                 curated_layer_path.append(lp + append_str)

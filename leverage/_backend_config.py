@@ -77,6 +77,9 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
     """
     Modify the backend key in the HCL content.
 
+    The searches run on a copy of the content with its comments blanked out, so a commented
+    `backend "s3" {` or `key = "..."` is never taken for the active one. Positions match the original.
+
     Args:
         content: The original file content
         key: The new key value
@@ -85,40 +88,106 @@ def _modify_backend_key(content: str, key: str, key_exists: bool) -> str:
     Returns:
         Modified content with the key set
     """
-    # Pattern to find the backend "s3" block
-    # This matches: backend "s3" { ... }
-    backend_pattern = r'(backend\s+"s3"\s*\{)'
+    searchable = _blank_comments(content)
+    backend = re.search(r'backend\s+"s3"\s*\{', searchable)
+    if backend is None:
+        return content
+    body_start = backend.end()
 
     if key_exists:
-        # Update existing key
-        # Match: key = "anything" or key = "anything" with various whitespace/quotes
-        key_pattern = r'(\s*key\s*=\s*)"[^"]*"'
-        replacement = r'\1"' + key + '"'
+        # Update the existing key, only inside the backend block: other attributes ending in `key`
+        # (`sse_customer_key`) or a `key` in another block (`locals`) must stay as they are
+        body_end = _find_closing_brace(searchable, body_start)
+        # Only the backend's own `key`, not one nested in a value such as `assume_role = { tags = { key = ... } }`
+        top_level = _blank_nested_blocks(searchable, body_start, body_end)
+        current = re.compile(r'(?<![\w-])key\s*=\s*"[^"]*"').search(top_level, body_start, body_end)
+        if current is None:
+            return content
+        assignment = content[current.start() : current.end()]
+        value_start = current.start() + assignment.index('"')
+        return f'{content[:value_start]}"{key}"{content[current.end():]}'
 
-        modified = re.sub(key_pattern, replacement, content)
+    # Add the key right after the opening brace, with the indentation of the line that follows
+    next_line = re.match(r"[^\n]*\n([ \t]*)", content[body_start:])
+    indent = next_line.group(1) if next_line else "    "
+    return f'{content[:body_start]}\n{indent}key = "{key}"{content[body_start:]}'
 
-        return modified
-    else:
-        # Add new key attribute
-        # Find the backend "s3" block and add the key after the opening brace
-        def add_key(match):
-            # Get the matched backend opening
-            backend_opening = match.group(1)
 
-            # Find the indentation by looking at the next line
-            remaining = content[match.end() :]
-            next_line_match = re.search(r"\n(\s*)", remaining)
-            if next_line_match:
-                indent = next_line_match.group(1)
-            else:
-                indent = "    "  # Default to 4 spaces
+def _blank_comments(content: str) -> str:
+    """Return the content with every comment (`#`, `//`, `/* */`) replaced by spaces, keeping newlines and length."""
+    chars = list(content)
+    index = 0
+    while index < len(content):
+        if content[index] == '"':
+            # Skip the string, honoring escaped quotes
+            index += 1
+            while index < len(content) and content[index] != '"':
+                index += 2 if content[index] == "\\" else 1
+            index += 1
+            continue
+        if content[index] == "#" or content.startswith("//", index):
+            end = content.find("\n", index)
+            end = len(content) if end == -1 else end
+        elif content.startswith("/*", index):
+            end = content.find("*/", index + 2)
+            end = len(content) if end == -1 else end + 2
+        else:
+            index += 1
+            continue
+        for position in range(index, end):
+            if chars[position] != "\n":
+                chars[position] = " "
+        index = end
+    return "".join(chars)
 
-            # Add the key attribute with proper indentation
-            return f'{backend_opening}\n{indent}key = "{key}"'
 
-        modified = re.sub(backend_pattern, add_key, content, count=1)
+def _blank_nested_blocks(content: str, start: int, end: int) -> str:
+    """Return the content with whatever sits inside `{}` nested in `[start, end)` replaced by spaces, keeping
+    newlines and length. Expects content without comments (see `_blank_comments`)."""
+    chars = list(content)
+    depth = 0
+    index = start
+    while index < end:
+        char = content[index]
+        string_start = index
+        if char == '"':
+            # Skip the string, honoring escaped quotes
+            index += 1
+            while index < end and content[index] != '"':
+                index += 2 if content[index] == "\\" else 1
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        if depth > 0 or char == "}":
+            for position in range(string_start, min(index + 1, end)):
+                if chars[position] != "\n":
+                    chars[position] = " "
+        index += 1
+    return "".join(chars)
 
-        return modified
+
+def _find_closing_brace(content: str, start: int) -> int:
+    """Return the index of the `}` that closes the block whose body starts at `start`, skipping strings.
+
+    Expects content without comments (see `_blank_comments`)."""
+    depth = 1
+    index = start
+    while index < len(content):
+        char = content[index]
+        if char == '"':
+            # Skip the string, honoring escaped quotes
+            index += 1
+            while index < len(content) and content[index] != '"':
+                index += 2 if content[index] == "\\" else 1
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return len(content)
 
 
 def get_backend_key(config_file: Union[str, Path]) -> Optional[str]:
