@@ -518,10 +518,13 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 write_private_file(cache_file, json.dumps(credentials))
                 break
 
-            except ParamValidationError:
+            except ParamValidationError as error:
                 # botocore rejects a code shorter than 6 characters before sending it
-                logger.error("Invalid token length, it must be 6 digits long. Please try again.")
-                continue
+                if "parameter TokenCode" in str(error):
+                    logger.error("Invalid token length, it must be 6 digits long. Please try again.")
+                    continue
+                # Anything else is in the MFA profile (e.g. a role_arn too short): another code won't fix it
+                raise ExitError(50, f"Error assuming role: {error}")
             except ClientError as error:
                 code = error.response["Error"]["Code"]
                 message = error.response["Error"]["Message"]
