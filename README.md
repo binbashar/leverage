@@ -183,31 +183,19 @@ poetry run pre-commit install
 
 ## Running Tests
 
-To run unit tests, pytest is the tool of choice. It comes with the dev dependencies (`poetry install --with=dev`).
+What each suite checks, where a new test goes and how to refresh the snapshots the tests run on is in
+[docs/testing.md](docs/testing.md).
 
-Integration tests are implemented using [bats](https://github.com/bats-core/bats-core/). They drive the installed
-`leverage` command, and work on temporary directories of their own, so they can be run directly on your machine.
-
-1. Unit tests:
+1. Unit tests, with pytest (a dev dependency). They include the CLI, property-based, contract and golden-file tests,
+   and take about 15 seconds:
 
 ```bash
 poetry run pytest
 ```
 
-They include contract tests with the reference architecture (`tests/test_refarch_contract.py`): the cli must keep
-working on the layout and conventions of [le-tf-infra-aws](https://github.com/binbashar/le-tf-infra-aws). By default
-they run on a snapshot of a few of its layers, kept in `tests/refarch/`. To run them on every layer of a clone, or to
-refresh the snapshot after the ref-arch changes:
-
-```bash
-git clone --depth 1 https://github.com/binbashar/le-tf-infra-aws.git /tmp/le-tf-infra-aws
-LEVERAGE_REFARCH_DIR=/tmp/le-tf-infra-aws poetry run pytest tests/test_refarch_contract.py
-python tests/refarch/snapshot.py /tmp/le-tf-infra-aws
-```
-
-2. Integration tests:
-
-Install dependencies (MacOS):
+2. Integration tests, with [bats](https://github.com/bats-core/bats-core/). They drive the installed `leverage`
+   command with the real `tofu` and `terraform` binaries (see [System requirements](#system-requirements)), on
+   temporary directories of their own, with no AWS access. Install bats (MacOS):
 
 ```bash
 brew install bats-core
@@ -215,9 +203,6 @@ brew tap bats-core/bats-core
 brew install bats-support
 brew install bats-assert
 ```
-
-The cli runs the infrastructure binaries directly, so `terraform` and `tofu` need to be installed as well. See
-[System requirements](#system-requirements).
 
 ```bash
 bats -r tests/bats
@@ -230,14 +215,9 @@ the directory holding them:
 BATS_LIB_PATH=/opt/homebrew/lib bats -r tests/bats
 ```
 
-Alternatively, `make tests` runs both suites, and `make test-unit` or `make test-int` runs one of them.
+`make tests` runs both suites, and `make test-unit` or `make test-int` runs one of them.
 
-3. Mutation testing, by hand:
-
-`make mutation` runs [mutmut](https://github.com/boxed/mutmut) on `auth.py` and `tf.py`: it changes their code one
-small edit at a time and runs the tests that cover each change. A change no test notices (a surviving mutant) points to
-a line the tests run without checking. It takes a few minutes; run it once per quarter or before a major release, not
-in CI. `mutmut browse` shows each survivor; most of the ones left are log messages and equivalent changes.
+3. Mutation testing, by hand, once per quarter or before a major release: `make mutation`.
 
 Besides the tests, CI type checks `leverage/` with mypy (`poetry run mypy`), lints with ruff (`poetry run ruff check .`)
 and fails when unit test coverage drops below 75% (`make test-unit` reports it).

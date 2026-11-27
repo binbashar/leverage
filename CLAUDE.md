@@ -9,13 +9,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `poetry shell` - Activate virtual environment for development
 
 ### Testing
-- `poetry run pytest` - Run unit tests
-- `poetry run pytest --verbose --cov=./ --cov-report=xml` - Run unit tests with coverage
-- `make test-unit` - Run unit tests (with coverage)
+What each suite checks, where a new test goes and how to refresh the snapshots: `docs/testing.md`.
+- `poetry run pytest` - Run unit tests (also CLI, property-based, contract and golden-file tests; ~15 s)
+- `make test-unit` - Run unit tests with the coverage report CI checks (`fail_under = 75` in `.coveragerc`)
 - `make test-unit-no-cov` - Run unit tests (no coverage)
 - `make test-int` - Run integration tests using bats (requires bats, terraform and tofu)
 - `make tests` - Run full test suite (unit + integration)
 - `make mutation` - Mutation testing (mutmut) on `auth.py` and `tf.py`; by hand, not in CI (config in `[tool.mutmut]`)
+- `LEVERAGE_REFARCH_DIR=<clone of le-tf-infra-aws> poetry run pytest tests/test_refarch_contract.py` - Contract tests on every ref-arch layer, not just the snapshot in `tests/refarch/`
+- `UPDATE_GOLDEN=1 poetry run pytest tests/test_modules/test_project_cli.py` - Regenerate the golden files of `project create` after an intended change; review the diff
+
+Put each check at the cheapest level that catches its bug (unit/CLI before bats), fake AWS with `botocore.stub.Stubber`
+rather than mocking the CLI's own functions, and assert the exit code of every `CliRunner` call. Changes that touch
+credentials, tokens, logging or subprocesses follow the checklist in `docs/threat-model.md`.
 
 ### Code Quality
 - `poetry run black .` - Format code with Black (line length: 120)
@@ -160,7 +166,7 @@ Uses generic Runner class to execute `tfautomv` binary:
 #### SSO Authentication
 
 **Token Validation** (`check_sso_token()`):
-- Validates SSO token existence in cache directory (`~/.aws/sso/cache/<sso_role>`)
+- Validates SSO token existence in cache directory (`~/.aws/<project>/sso/cache/token`)
 - Checks token expiration against current time
 - Provides clear error messages for missing or expired tokens
 
