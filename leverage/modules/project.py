@@ -361,7 +361,7 @@ def _validate_organizational_units(config: dict):
             "[bold]organization.organizational_units[/bold] must be a list of units with a name, policy and accounts.",
         )
 
-    parents = {account: [] for account in PROJECT_STRUCTURE if account != "management"}
+    parents: dict[str, list[str]] = {account: [] for account in PROJECT_STRUCTURE if account != "management"}
     unit_names = []
     for unit in organizational_units:
         name = unit.get("name")
