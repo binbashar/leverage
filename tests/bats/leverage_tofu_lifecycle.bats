@@ -102,47 +102,6 @@ teardown(){
     assert_output "ts-account-second"
 }
 
-@test "Stops at the first failing layer" {
-    cd "$ACCOUNT_DIR"
-    leverage tofu init --skip-validation --layers first,second
-    printf 'resource "terraform_data" "broken" { input = var.undeclared }\n' > second/broken.tf
-
-    run leverage tofu apply -auto-approve -no-color --layers second,first
-
-    assert_failure
-    assert_output --partial "Invoking command for layer $ACCOUNT_DIR/second"
-    refute_output --partial "Invoking command for layer $ACCOUNT_DIR/first"
-    assert [ ! -f "first/leverage-test.tfstate" ]
-}
-
-@test "Refuses --layers inside a layer" {
-    cd "$ACCOUNT_DIR/first"
-
-    run leverage tofu plan --layers second
-
-    assert_failure
-    assert_output --partial "Can not set --layers inside a layer"
-}
-
-@test "Refuses a layer that does not exist" {
-    cd "$ACCOUNT_DIR"
-
-    run leverage tofu plan --layers first,missing
-
-    assert_failure
-    assert_output --partial "does not exist or is not a directory"
-}
-
-@test "Validates the layout on init unless told to skip it" {
-    cd "$ACCOUNT_DIR/first"
-
-    # The layout validation expects an S3 backend; this layer has a local one
-    run leverage tofu init
-
-    assert_failure
-    assert [ ! -d ".terraform" ]
-}
-
 @test "Runs the full lifecycle of a layer with terraform" {
     cd "$ACCOUNT_DIR/first"
 

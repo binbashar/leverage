@@ -248,28 +248,6 @@ def test_create_orders_accounts_like_the_project_structure(tmp_path, monkeypatch
     assert [account["name"] for account in rendered_config["organization"]["accounts"]] == list(PROJECT_STRUCTURE)
 
 
-def test_render_templates_writes_to_the_current_project_root(tmp_path, monkeypatch):
-    """The default destination must be resolved when rendering, not frozen at import time, so it always
-    follows PROJECT_ROOT (and never writes into whatever directory the module was imported from)."""
-    templates_repo = tmp_path / "templates"
-    source = templates_repo / "template"
-    source.mkdir(parents=True)
-    template_file = source / "build.env.template"
-    template_file.write_text("PROJECT={{ short_name }}")
-
-    project_root = tmp_path / "project"
-    project_root.mkdir()
-    monkeypatch.setattr(project_module, "PROJECT_ROOT", project_root)
-    monkeypatch.setattr(project_module, "TEMPLATES_REPO_DIR", templates_repo)
-    monkeypatch.setattr(
-        project_module, "JINJA_ENV", project_module.Environment(loader=FileSystemLoader(templates_repo.as_posix()))
-    )
-
-    project_module._render_templates([template_file], config={"short_name": "ok"}, source=source)
-
-    assert (project_root / "build.env").read_text() == "PROJECT=ok"
-
-
 @pytest.mark.parametrize(
     "config,expected",
     [

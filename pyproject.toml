@@ -114,7 +114,5 @@ source_paths = ["leverage"]
 only_mutate = ["leverage/modules/auth.py", "leverage/modules/tf.py"]
 # Lines no test runs can't be killed; coverage already reports them
 mutate_only_covered_lines = true
-# Enables the pytester plugin
-also_copy = ["conftest.py"]
 # mutmut copies the tests without their symlinks, which the golden file list records; that test covers project.py only
 pytest_add_cli_args = ["--deselect", "tests/test_modules/test_project_cli.py::test_create_matches_the_golden_files"]

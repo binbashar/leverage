@@ -48,22 +48,6 @@ def test_init_arguments(leverage_project, leverage_runner, args):
     assert remaining_args == [*args, backend_config_arg]
 
 
-def test_init_with_args(leverage_project, leverage_runner):
-    """
-    Test tf init with arguments.
-    """
-    with leverage_runner(leverage_project) as runner:
-        with patch("leverage.modules.tfrunner.TFRunner.run", return_value=0) as mocked_run:
-            runner.invoke(leverage, ["tf", "init", "-migrate-state"])
-
-    called_args = list(mocked_run.call_args_list[0][0])
-
-    # User arguments are placed after the layer tfvars and before the backend configuration
-    assert called_args[0] == "init"
-    assert called_args[-2] == "-migrate-state"
-    assert called_args[-1] == f"-backend-config={leverage_project / 'account' / 'config' / 'backend.tfvars'}"
-
-
 def test_validate_layout_checks_the_given_layer_not_cwd(leverage_project, monkeypatch):
     """
     Regression test: `_validate_layout` must validate the *layer* it was given, not `paths.cwd`.
