@@ -215,9 +215,9 @@ jobs:
           set -euo pipefail
           sed -i 's/<project name>/the-adam-project/' project.yaml
           sed -i 's/<short project name>/bb/' project.yaml
-          sed -i 's/<management email address>/bb@domainmgmt/' project.yaml
-          sed -i 's/<security email address>/bb@domainsec/' project.yaml
-          sed -i 's/<shared email address>/bb@domainshared/' project.yaml
+          sed -i 's/<management email address>/aws+management@example.com/' project.yaml
+          sed -i 's/<security email address>/aws+security@example.com/' project.yaml
+          sed -i 's/<shared email address>/aws+shared@example.com/' project.yaml
           sed -i 's/<user.name>/bbuser/' project.yaml
           leverage project create
           for account in config management security shared; do
