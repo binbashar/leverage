@@ -1,0 +1,30 @@
+locals {
+  organizational_units = {
+  {%- if organization.organizational_units %}
+    {% for organizational_unit in organization.organizational_units -%}
+    {{ organizational_unit.name }} = {
+      policy = {{ organizational_unit.policy | first }}
+    }{% if not loop.last %},
+    {% endif -%}
+    {% endfor -%}
+  {% endif %}
+  }
+
+  management_account = {
+    email = "{{ organization.accounts | selectattr("name", "equalto", "management") | first | value(key="email") }}"
+  }
+
+  accounts = {
+  {%- for account in organization.accounts | rejectattr("name", "equalto", "management") %}
+    {{ account.name }} = {
+      email     = "{{ account.email }}",
+      {#- Assumes account has a parent organizational unit and is unique #}
+      parent_ou = {% for organizational_unit in organization.organizational_units -%}
+      {%- if account.name in organizational_unit.accounts -%}
+      "{{ organizational_unit.name }}"
+      {%- endif -%}
+      {%- endfor %}
+    }{% if not loop.last %},{% endif -%}
+  {% endfor %}
+  }
+}

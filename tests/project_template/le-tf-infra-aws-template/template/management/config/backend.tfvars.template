@@ -1,0 +1,18 @@
+#
+# Backend Configuration
+#
+
+# AWS Profile (required by the backend but also used for other resources)
+profile         = "{{ short_name }}-bootstrap"
+
+# S3 bucket
+bucket          = "{{ short_name }}-management-terraform-backend"
+
+# AWS Region (required by the backend but also used for other resources)
+region          = "{{ primary_region | default("us-west-2") }}"
+
+# Enable DynamoDB server-side encryption?
+encrypt         = {{ organization.accounts | selectattr("name", "equalto", "management") | first | attr("enable_dynamo_encryption") | default("true") | lower }}
+
+# DynamoDB Table Name
+dynamodb_table  = "{{ short_name }}-management-terraform-backend"

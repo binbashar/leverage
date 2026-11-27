@@ -1,0 +1,64 @@
+.gitignore
+build.env
+config/common-variables.tf
+config/common.tfvars
+management/config/account.tfvars
+management/config/backend.tfvars
+management/global/organizations/accounts.tf
+management/global/organizations/common-variables.tf -> ../../../config/common-variables.tf
+management/global/organizations/config.tf
+management/global/organizations/locals.tf
+management/global/organizations/organization.tf
+management/global/organizations/organizational_units.tf
+management/global/organizations/policies_scp.tf
+management/global/organizations/policy_scp_attachments.tf
+management/global/organizations/variables.tf
+management/global/sso/account_assignments.tf
+management/global/sso/common-variables.tf -> ../../../config/common-variables.tf
+management/global/sso/config.tf
+management/global/sso/locals.tf
+management/global/sso/permission_sets.tf
+management/global/sso/policies.tf
+management/global/sso/users_groups.tf
+management/global/sso/variables.tf
+management/us-east-1/base-tf-backend/common-variables.tf -> ../../../config/common-variables.tf
+management/us-east-1/base-tf-backend/config.tf
+management/us-east-1/base-tf-backend/locals.tf
+management/us-east-1/base-tf-backend/main.tf
+management/us-east-1/base-tf-backend/variables.tf
+management/us-east-1/security-base/account.tf
+management/us-east-1/security-base/common-variables.tf -> ../../../config/common-variables.tf
+management/us-east-1/security-base/config.tf
+management/us-east-1/security-base/variables.tf
+security/config/account.tfvars
+security/config/backend.tfvars
+security/us-east-1/base-tf-backend/common-variables.tf -> ../../../config/common-variables.tf
+security/us-east-1/base-tf-backend/config.tf
+security/us-east-1/base-tf-backend/locals.tf
+security/us-east-1/base-tf-backend/main.tf
+security/us-east-1/base-tf-backend/variables.tf
+security/us-east-1/security-base/account.tf
+security/us-east-1/security-base/common-variables.tf -> ../../../config/common-variables.tf
+security/us-east-1/security-base/config.tf
+security/us-east-1/security-base/iam_access_analizer.tf
+security/us-east-1/security-base/locals.tf
+security/us-east-1/security-base/variables.tf
+shared/config/account.tfvars
+shared/config/backend.tfvars
+shared/us-east-1/base-network/account.tf
+shared/us-east-1/base-network/common-variables.tf -> ../../../config/common-variables.tf
+shared/us-east-1/base-network/config.tf
+shared/us-east-1/base-network/locals.tf
+shared/us-east-1/base-network/network.tf
+shared/us-east-1/base-network/network_vpc_flow_logs.tf
+shared/us-east-1/base-network/outputs.tf
+shared/us-east-1/base-network/variables.tf
+shared/us-east-1/base-tf-backend/common-variables.tf -> ../../../config/common-variables.tf
+shared/us-east-1/base-tf-backend/config.tf
+shared/us-east-1/base-tf-backend/locals.tf
+shared/us-east-1/base-tf-backend/main.tf
+shared/us-east-1/base-tf-backend/variables.tf
+shared/us-east-1/security-base/account.tf
+shared/us-east-1/security-base/common-variables.tf -> ../../../config/common-variables.tf
+shared/us-east-1/security-base/config.tf
+shared/us-east-1/security-base/variables.tf

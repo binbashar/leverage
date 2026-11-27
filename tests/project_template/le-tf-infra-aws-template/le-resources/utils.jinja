@@ -1,0 +1,104 @@
+{#
+    Template utils for known structures
+#}
+
+{# Groups with policies:
+    accounts (dict): config value containing all accounts configuration
+    account_name (string): name of the account being rendered
+    group_name (string): name of the group to render, all `.` and `-` will be replaced by `_`
+        in the module name
+    default_policies (list): list of policies to assign to the group when no policies are given in the
+        configuration file. In both the configuration file and in the default policies quotation marks should be
+        escaped when an arn is given and not a reference to a resource
+#}
+{%- macro iam_group_with_policies(accounts, account_name, group_name, default_policies) %}
+module "iam_group_{{ group_name | replace('-', '_') | replace('.', '_') }}" {
+  source = "github.com/binbashar/terraform-aws-iam.git//modules/iam-group-with-policies?ref=v4.24.1"
+  name   = "{{ group_name }}{% if account_name == 'management' %}_management_org{% endif %}"
+
+{%- set account = accounts[account_name] | default({}) %}
+{%- set groups = account["groups"] | default([]) %}
+{%- set group = groups | selectattr("name", "equalto", group_name) | first | default({}) %}
+{%- set users = group.get("users", []) %}
+{%- set policies = group.get("policies", default_policies) %}
+
+  group_users = [{%- for user in users %}
+    module.user["{{ user }}"].iam_user_name
+    {%- if not loop.last %},{% else %}
+    {% endif %}
+{%- endfor %}]
+
+  custom_group_policy_arns = [{%- for policy in policies %}
+    {{ policy }}
+    {%- if not loop.last %},{% else %}
+    {% endif %}
+{%- endfor %}] 
+}
+{% endmacro %}
+
+{# Users list:
+    users (list): given a list of users, it renders them in the expected HCL format.
+#}
+{% macro users_list(users) -%}
+  {
+  {%- for user in users %}
+    "{{ user.first_name | lower }}.{{ user.last_name | lower }}" = {
+      first_name = "{{ user.first_name }}"
+      last_name  = "{{ user.last_name }}"
+      email      = "{{ user.email }}"
+      groups = [
+        {%- for group in user.groups %}
+        "{{ group }}",
+        {%- endfor %}
+      ]
+    }
+  {% endfor -%}
+  }
+{% endmacro %}
+
+{# Account users list:
+    account (dict): config of the account for which all the users will be listed. Repeated users are purged.
+#}
+{% macro account_users_list(account) %}
+{%- set acc = namespace(users=[]) -%}
+{%- for groupusers in account.groups | map(attribute="users") -%}
+{%- set acc.users = acc.users + groupusers -%}
+{%- endfor -%}
+  [
+    "{{ acc.users | unique | sort | join("\",\n\"") | indent(width=4) }}"
+  ]{% endmacro %}
+
+{# Output user name:
+    user (string): name of the user. `.` will be replaced by `_` in the output name
+#}
+{% macro user_name_output(user) %}
+output "user_{{ user | replace(".", "_") }}_name" {
+  description = "The user's name"
+  value       = module.user["{{ user }}"].iam_user_name
+}{% endmacro %}
+
+{# Output user encripted password:
+    user (string): name of the user. `.` will be replaced by `_` in the output name
+    sensitive (bool): show raw value on output. Defaults to `True`
+#}
+{% macro user_encripted_password_output(user, sensitive=True) %}
+output "user_{{ user | replace(".", "_") }}_login_profile_encrypted_password" {
+  description = "The encrypted password, base64 encoded"
+  value       = module.user["{{ user }}"].iam_user_login_profile_encrypted_password
+  sensitive   = {% if sensitive %}true{% else %}false{% endif %}
+}{% endmacro %}
+
+{# users Outputs:
+    account (dict): config of the account for which users' outputs will be produced.
+#}
+{% macro users_outputs(account) %}
+
+{%- set acc = namespace(users=[]) -%}
+{%- for groupusers in account.groups | map(attribute="users") -%}
+{%- set acc.users = acc.users + groupusers -%}
+{%- endfor -%}
+
+{%- for user in acc.users | unique | sort -%}
+{{ user_name_output(user) }}
+{{ user_encripted_password_output(user) }}
+{% endfor %}{% endmacro %}
