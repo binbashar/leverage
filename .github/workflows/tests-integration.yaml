@@ -215,10 +215,14 @@ jobs:
           set -euo pipefail
           sed -i 's/<project name>/the-adam-project/' project.yaml
           sed -i 's/<short project name>/bb/' project.yaml
-          sed -i 's/<management email address>/bb@domainmgmt/' project.yaml
-          sed -i 's/<security email address>/bb@domainsec/' project.yaml
-          sed -i 's/<shared email address>/bb@domainshared/' project.yaml
-          sed -i 's/<user.name>/bbuser/' project.yaml
+          sed -i 's/<aws+management@example\.com>/aws+management@bbdomain.com/' project.yaml
+          sed -i 's/<aws+security@example\.com>/aws+security@bbdomain.com/' project.yaml
+          sed -i 's/<aws+shared@example\.com>/aws+shared@bbdomain.com/' project.yaml
+          sed -i 's/<User>/bb/; s/<Name>/user/; s/<user\.name@example\.com>/bbuser@bbdomain.com/' project.yaml
+          if grep -n '<[^>]*>' project.yaml; then
+            echo "::error::project.yaml still has unresolved template placeholders"
+            exit 1
+          fi
           leverage project create
           for account in config management security shared; do
             [[ -d "${account}" ]] || { echo "::error::project create did not create ${account}"; exit 1; }
