@@ -142,12 +142,12 @@ ensuring that all Python operations within this directory use this isolated envi
 
 Before you begin, ensure you are running one of the supported Python versions.
 
-We now use Poetry for dependency management. Setup your development environment as follows:
+We use Poetry for dependency management, in the version CI uses (the lock file records the one that wrote it). Set up your development environment as follows:
 
 1. Install Poetry:
 
 ```bash
-curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.5.1 python -
 ```
 
 2. Clone the repository and navigate into it:
@@ -163,10 +163,10 @@ cd leverage
 poetry install --with=dev --with=main
 ```
 
-4. To activate the virtual environment and start using the CLI in dev mode, use:
+4. To activate the virtual environment and start using the CLI in dev mode, use (Poetry 2 no longer has `poetry shell`):
 
 ```bash
-poetry shell
+eval $(poetry env activate)
 ```
 
 ## Pre-commit hooks
