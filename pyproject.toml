@@ -46,7 +46,7 @@ python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "9.2.0"
-pytest-cov = "6.0.0"
+pytest-cov = "7.1.0"
 twine = "6.1.0"
 black = "26.10.1"
 ruff = "0.17.5"
