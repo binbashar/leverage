@@ -232,6 +232,13 @@ BATS_LIB_PATH=/opt/homebrew/lib bats -r tests/bats
 
 Alternatively, `make tests` runs both suites, and `make test-unit` or `make test-int` runs one of them.
 
+3. Mutation testing, by hand:
+
+`make mutation` runs [mutmut](https://github.com/boxed/mutmut) on `auth.py` and `tf.py`: it changes their code one
+small edit at a time and runs the tests that cover each change. A change no test notices (a surviving mutant) points to
+a line the tests run without checking. It takes a few minutes; run it once per quarter or before a major release, not
+in CI. `mutmut browse` shows each survivor; most of the ones left are log messages and equivalent changes.
+
 Besides the tests, CI type checks `leverage/` with mypy (`poetry run mypy`), lints with ruff (`poetry run ruff check .`)
 and fails when unit test coverage drops below 75% (`make test-unit` reports it).
 

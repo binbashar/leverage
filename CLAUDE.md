@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make test-unit-no-cov` - Run unit tests (no coverage)
 - `make test-int` - Run integration tests using bats (requires bats, terraform and tofu)
 - `make tests` - Run full test suite (unit + integration)
+- `make mutation` - Mutation testing (mutmut) on `auth.py` and `tf.py`; by hand, not in CI (config in `[tool.mutmut]`)
 
 ### Code Quality
 - `poetry run black .` - Format code with Black (line length: 120)

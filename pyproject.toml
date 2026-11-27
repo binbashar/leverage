@@ -55,6 +55,7 @@ types-python-dateutil = "^2.9.0"
 pre-commit = "3.5.0"
 pytest-mock = "^3.15.1"
 hypothesis = "6.170.17"
+mutmut = "3.8.1"
 
 
 [build-system]
@@ -100,3 +101,20 @@ select = ["E4", "E7", "E9", "F", "S"]
 # The package's public names, imported to be re-exported
 "leverage/__init__.py" = ["F401"]
 "leverage/modules/__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+# Not mutmut's working copy (mutants/)
+testpaths = ["tests"]
+
+[tool.mutmut]
+# Mutation testing, run by hand (`make mutation`), not in CI: once per quarter or before a major release (#346).
+# The whole package is copied; only the modules that guard credentials and the layer layout are mutated, where a test
+# that runs a line without checking it costs most.
+source_paths = ["leverage"]
+only_mutate = ["leverage/modules/auth.py", "leverage/modules/tf.py"]
+# Lines no test runs can't be killed; coverage already reports them
+mutate_only_covered_lines = true
+# Enables the pytester plugin
+also_copy = ["conftest.py"]
+# mutmut copies the tests without their symlinks, which the golden file list records; that test covers project.py only
+pytest_add_cli_args = ["--deselect", "tests/test_modules/test_project_cli.py::test_create_matches_the_golden_files"]
