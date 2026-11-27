@@ -14,7 +14,7 @@ from leverage import logger
 from leverage.path import PathsHandler
 from leverage.modules.runner import Runner
 from leverage.modules.utils import _handle_subcommand
-from leverage._utils import get_option_value, get_or_create_section, ExitError
+from leverage._utils import get_option_value, get_or_create_section, ExitError, make_private_dir, write_private_file
 from leverage._internals import pass_state, pass_runner, pass_paths
 from leverage.modules.auth import get_sso_access_token, refresh_all_accounts_credentials
 from leverage.modules.auth import _perform_authentication as perform_authentication
@@ -244,7 +244,7 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
             f"Please run [bold]leverage configure sso[/bold] to configure the SSO profile.",
         )
 
-    paths.sso_cache.mkdir(parents=True, exist_ok=True)
+    make_private_dir(paths.sso_cache)
 
     logger.info("Logging in...")
     sso_oidc_client = boto3.client("sso-oidc", region_name=region)
@@ -311,7 +311,7 @@ def login(awscli: Runner, paths: PathsHandler, refresh_all: bool) -> None:
     logger.debug(f"Token expires at: {token['expiresAt']}")
     logger.debug("Caching token.")
     token_file = paths.sso_cache / "token"
-    token_file.write_text(json.dumps(token))
+    write_private_file(token_file, json.dumps(token))
 
     logger.info("Successfully logged in!.")
 

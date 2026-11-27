@@ -34,7 +34,8 @@ def _handle_subcommand(
         caller_pos = 0
 
     # Only called from groups, which hold the wrapped subcommands
-    assert isinstance(context.command, Group)
+    if not isinstance(context.command, Group):
+        raise TypeError(f"Expected a click group, got {type(context.command).__name__}")
     # Find if one of the wrapped subcommand was invoked
     wrapped_subcommands = context.command.commands.keys()
     subcommand_name = next((arg for arg in args[caller_pos:] if arg in wrapped_subcommands), None)

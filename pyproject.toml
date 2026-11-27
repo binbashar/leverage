@@ -90,9 +90,13 @@ extend-exclude = ["tests/build_scripts/simple_build_bad_syntax.py"]
 
 [tool.ruff.lint]
 # pyflakes (F) and the pycodestyle errors (E4, E7, E9): mistakes, not style. black owns the formatting.
-select = ["E4", "E7", "E9", "F"]
+# S (bandit): security patterns. Each accepted finding in leverage/ carries a `noqa: S...` with its reason;
+# see docs/threat-model.md.
+select = ["E4", "E7", "E9", "F", "S"]
 
 [tool.ruff.lint.per-file-ignores]
+# Tests assert, use fake secrets and run git/tofu by name
+"tests/**" = ["S101", "S105", "S106", "S107", "S603", "S607", "S701"]
 # The package's public names, imported to be re-exported
 "leverage/__init__.py" = ["F401"]
 "leverage/modules/__init__.py" = ["F401"]

@@ -41,7 +41,10 @@ class TFRunner(Runner):
     def _validate_binary(self):
         super()._validate_binary()
 
-        binary_version_stdout = subprocess.run([self.binary_path, "--version"], capture_output=True, text=True).stdout
+        # The binary found in PATH or set in TF_BINARY, run with a fixed argument
+        binary_version_stdout = subprocess.run(  # noqa: S603
+            [self.binary_path, "--version"], capture_output=True, text=True
+        ).stdout
 
         if self.__terraform and "Terraform" not in binary_version_stdout:
             raise ExitError(1, "The provided binary does not seem to be Terraform.")

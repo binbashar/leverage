@@ -238,7 +238,11 @@ def test_login_caches_the_token_after_the_user_authorizes(cli, aws_dir, stubs, b
     # Polled again after the interval the device authorization asked for
     assert sleeps == [5]
 
-    token = json.loads((aws_dir / "sso" / "cache" / "token").read_text())
+    token_file = aws_dir / "sso" / "cache" / "token"
+    # Only its owner can read the token, as the AWS CLI does
+    assert token_file.stat().st_mode & 0o777 == 0o600
+    assert token_file.parent.stat().st_mode & 0o777 == 0o700
+    token = json.loads(token_file.read_text())
     assert token["accessToken"] == ACCESS_TOKEN
     assert token["startUrl"] == START_URL
     assert token["region"] == REGION

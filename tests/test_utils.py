@@ -3,7 +3,7 @@ from configparser import NoOptionError
 import pytest
 from configupdater import ConfigUpdater
 
-from leverage._utils import get_option_value, key_finder
+from leverage._utils import get_option_value, key_finder, make_private_dir, make_private_file, write_private_file
 
 
 def test_key_finder_real_scenario():
@@ -107,3 +107,44 @@ def test_get_option_value():
 def test_get_option_value_requires_a_value(text):
     with pytest.raises(NoOptionError):
         get_option_value(_updater(text), "profile bb-sso", "sso_region")
+
+
+def _mode(path):
+    return path.stat().st_mode & 0o777
+
+
+def test_make_private_dir_creates_and_tightens(tmp_path):
+    new_dir = tmp_path / "aws" / "project"
+    make_private_dir(new_dir)
+    assert _mode(new_dir) == 0o700
+
+    existing = tmp_path / "existing"
+    existing.mkdir(mode=0o755)
+    existing.chmod(0o755)
+    make_private_dir(existing)
+    assert _mode(existing) == 0o700
+
+
+def test_make_private_file_creates_and_tightens_without_touching_the_content(tmp_path):
+    new_file = tmp_path / "credentials"
+    make_private_file(new_file)
+    assert _mode(new_file) == 0o600
+    assert new_file.read_text() == ""
+
+    existing = tmp_path / "token"
+    existing.write_text("secret")
+    existing.chmod(0o644)
+    make_private_file(existing)
+    assert _mode(existing) == 0o600
+    assert existing.read_text() == "secret"
+
+
+def test_write_private_file(tmp_path):
+    token = tmp_path / "token"
+    token.write_text("old")
+    token.chmod(0o644)
+
+    write_private_file(token, "new")
+
+    assert _mode(token) == 0o600
+    assert token.read_text() == "new"

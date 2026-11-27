@@ -126,7 +126,8 @@ class Runner:
         logger.debug(f"Working directory: {working_dir or Path.cwd()}")
         logger.debug(f"Additional environment variables: {merged_env_vars}")
 
-        process = subprocess.run(
+        # A list, no shell: running the user's tofu/terraform/kubectl/... with their arguments is the point
+        process = subprocess.run(  # noqa: S603
             command, env=env, cwd=working_dir, capture_output=not interactive, text=not interactive
         )
 

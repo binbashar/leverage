@@ -3,6 +3,7 @@ General use utilities.
 """
 
 from configparser import NoOptionError
+from contextlib import suppress
 from pathlib import Path
 from subprocess import PIPE, run
 from typing import List, Optional
@@ -13,6 +14,32 @@ from click.exceptions import ClickException
 from configupdater import ConfigUpdater
 
 from leverage import logger
+
+# Credentials, SSO tokens and their caches are readable by their owner only, as the AWS CLI does
+PRIVATE_FILE_MODE = 0o600
+PRIVATE_DIR_MODE = 0o700
+
+
+def make_private_dir(path: Path) -> None:
+    """Create the directory, and its parents, if missing, and leave it accessible only to its owner.
+
+    An existing directory is tightened too; one owned by another user is left as it is."""
+    path.mkdir(mode=PRIVATE_DIR_MODE, parents=True, exist_ok=True)
+    with suppress(PermissionError):
+        path.chmod(PRIVATE_DIR_MODE)
+
+
+def make_private_file(path: Path) -> None:
+    """Create the file if missing, and leave it readable and writable only by its owner, before any secret is
+    written to it. An existing file is tightened too."""
+    path.touch(mode=PRIVATE_FILE_MODE, exist_ok=True)
+    path.chmod(PRIVATE_FILE_MODE)
+
+
+def write_private_file(path: Path, text: str) -> None:
+    """Write the text to a file only its owner can read (see `make_private_file`)."""
+    make_private_file(path)
+    path.write_text(text)
 
 
 def clean_exception_traceback(exception):
@@ -60,7 +87,8 @@ def git(command):
     command = command.split()
     command = ["git"] + command if command[0] != "git" else command
 
-    run(command, stdout=PIPE, stderr=PIPE, check=True)
+    # A list, no shell: the commands are the cli's own (`clone <template repo> <dir>`, `init`, ...)
+    run(command, stdout=PIPE, stderr=PIPE, check=True)  # noqa: S603
 
 
 class ExitError(ClickException):

@@ -307,6 +307,8 @@ def test_refresh_layer_credentials_writes_the_credentials_of_every_layer_profile
 
     # The layer's own account (from backend.tfvars) and the cross-account provider
     assert sorted(stubs["requested_accounts"]) == ["111111111111", "222222222222"]
+    # Only their owner can read the credentials, as the AWS CLI does
+    assert paths.aws_credentials_file.stat().st_mode & 0o777 == 0o600
     config = read_ini(paths.aws_config_file)
     credentials = read_ini(paths.aws_credentials_file)
     for profile in ("bb-account-devops", "bb-shared-devops"):
@@ -537,6 +539,10 @@ def test_mfa_assumes_the_role_and_writes_and_caches_the_credentials(mfa_layer, s
     }
     cached = json.loads((mfa_layer.aws_cache_dir / "bb-account-devops").read_text())
     assert cached["Expiration"] == expiration.strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Only their owner can read the credentials and their cache
+    assert mfa_layer.aws_credentials_file.stat().st_mode & 0o777 == 0o600
+    assert mfa_layer.aws_cache_dir.stat().st_mode & 0o777 == 0o700
+    assert (mfa_layer.aws_cache_dir / "bb-account-devops").stat().st_mode & 0o777 == 0o600
 
 
 def test_mfa_uses_cached_credentials_while_valid(mfa_layer, stubs, mfa_codes):

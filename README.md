@@ -235,6 +235,9 @@ Alternatively, `make tests` runs both suites, and `make test-unit` or `make test
 Besides the tests, CI type checks `leverage/` with mypy (`poetry run mypy`), lints with ruff (`poetry run ruff check .`)
 and fails when unit test coverage drops below 75% (`make test-unit` reports it).
 
+ruff includes its security rules (bandit's). What the CLI does to keep credentials and tokens from leaking, and
+what to check when a change touches them, is in [docs/threat-model.md](docs/threat-model.md).
+
 ## Release Process
 
 * Every PR gets labels from its title prefix:

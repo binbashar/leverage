@@ -89,7 +89,9 @@ def _configure_logger(logger, show_level=True):
         enable_link_path=False,
         markup=True,
         rich_tracebacks=True,
-        tracebacks_show_locals=True,
+        # Never: the locals of the credential code hold SSO tokens and AWS keys, and would end up in the
+        # terminal and in CI logs
+        tracebacks_show_locals=False,
         log_time_format=_TIME_FORMAT,
     )
 

@@ -85,3 +85,25 @@ def test_get_tasks_logger(with_click_context):
     assert logger.handlers[0].filters[0]._build_script == "build.py"
 
     assert handler.formatter._fmt == _TASK_LOGGING_FORMAT
+
+
+def test_logged_exceptions_do_not_show_local_variables(with_click_context, capsys):
+    """The locals of the credential code hold SSO tokens and AWS keys: a logged traceback must not print them."""
+    _configure_logger(logger=_leverage_logger)
+    # Built at runtime, so they can only reach the output through the locals, not through the source lines shown
+    access_token = "-".join(["sso", "access", "token", "4f1c"])
+    secret_key = "-".join(["secret", "access", "key", "9b2e"])
+
+    def refresh(access_token):
+        credentials = {"SecretAccessKey": secret_key}  # noqa: F841 - a local the traceback could show
+        raise RuntimeError("AccessDenied")
+
+    try:
+        refresh(access_token)
+    except RuntimeError as error:
+        _leverage_logger.exception(f"Failed to refresh credentials: {error}")
+
+    output = capsys.readouterr()
+    assert "AccessDenied" in output.out + output.err
+    assert access_token not in output.out + output.err
+    assert secret_key not in output.out + output.err

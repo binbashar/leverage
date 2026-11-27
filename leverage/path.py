@@ -11,7 +11,7 @@ from typing import Optional
 
 import hcl2
 
-from leverage._utils import ExitError
+from leverage._utils import ExitError, make_private_dir
 
 
 class NotARepositoryError(RuntimeError):
@@ -47,8 +47,9 @@ def get_root_path():
         str: Root of the repository.
     """
     try:
-        root = run(
-            ["git", "rev-parse", "--show-toplevel"],
+        # git from PATH, as the user runs it
+        root = run(  # noqa: S603
+            ["git", "rev-parse", "--show-toplevel"],  # noqa: S607
             stdout=PIPE,
             stderr=PIPE,
             check=True,
@@ -176,8 +177,7 @@ class PathsHandler:  # TODO: Turn this class into a something that represents a 
 
         # Ensure credentials directory
         self.aws_credentials_dir = self.home / ".aws" / self.project
-        if not self.aws_credentials_dir.exists():
-            self.aws_credentials_dir.mkdir(parents=True)
+        make_private_dir(self.aws_credentials_dir)
         self.sso_cache = self.aws_credentials_dir / "sso" / "cache"
 
         # Make the binary path absolute

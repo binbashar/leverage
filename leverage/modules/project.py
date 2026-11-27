@@ -194,8 +194,11 @@ def value(dictionary, key):
     return dictionary[key]
 
 
-# Jinja environment used for rendering the templates
-JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()), trim_blocks=False, lstrip_blocks=False)
+# Jinja environment used for rendering the templates. They render HCL, YAML and .env files, not HTML: autoescaping
+# would corrupt them (quotes, `<`, `&`)
+JINJA_ENV = Environment(  # noqa: S701
+    loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()), trim_blocks=False, lstrip_blocks=False
+)
 JINJA_ENV.filters["value"] = value
 
 

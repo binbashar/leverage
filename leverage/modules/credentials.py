@@ -33,7 +33,7 @@ PROJECT_SHORT = r"[a-z]{2,4}"
 USERNAME = r"[a-zA-Z0-9\+,=\.@\-_]{1,64}"  # https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html#id_users_create_console
 # https://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateUser.html#API_CreateUser_RequestParameters
 KEY_ID = r"[A-Z0-9]{20}"
-SECRET_KEY = r"[a-zA-Z0-9/\+]{40}"
+SECRET_KEY = r"[a-zA-Z0-9/\+]{40}"  # noqa: S105 - the pattern a secret key must match, not a secret
 REGION = r"(([a-z]{2}(-gov)?)-(central|(north|south)?(east|west)?)-\d)"
 ACCOUNT_ID = r"[0-9]{12}"
 MFA_SERIAL = rf"arn:aws:iam::{ACCOUNT_ID}:mfa/{USERNAME}"
