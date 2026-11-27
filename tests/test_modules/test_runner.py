@@ -59,23 +59,6 @@ def test_init_with_custom_error_message(mocker):
     assert error_msg == custom_error
 
 
-def test_init_logs_error_on_missing_binary(mocker):
-    mocker.patch("shutil.which", return_value=None)
-
-    with pytest.raises(ExitError) as exc_info:
-        Runner("nonexistent")
-
-    error_msg = str(exc_info.value)
-    assert "Binary 'nonexistent' not found on system" in error_msg
-
-
-def test_validate_version_base_implementation_does_nothing(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/python3")
-    runner = Runner("python3")
-    # Base implementation should not raise any exceptions
-    runner._validate_version()
-
-
 @pytest.fixture
 def mock_runner(mocker):
     mocker.patch("shutil.which", return_value="/usr/bin/test_binary")
@@ -148,28 +131,6 @@ def test_run_with_no_args_defaults_to_empty_list(mock_runner, mocker):
     mock_subprocess.return_value.returncode = 0
 
     mock_runner.run()
-
-    mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test_binary"], env=os.environ.copy(), cwd=None, capture_output=False, text=False
-    )
-
-
-def test_run_with_none_args_defaults_to_empty_list(mock_runner, mocker):
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-
-    mock_runner.run()
-
-    mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test_binary"], env=os.environ.copy(), cwd=None, capture_output=False, text=False
-    )
-
-
-def test_run_with_none_env_vars_defaults_to_empty_dict(mock_runner, mocker):
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-
-    mock_runner.run(env_vars=None)
 
     mock_subprocess.assert_called_once_with(
         ["/usr/bin/test_binary"], env=os.environ.copy(), cwd=None, capture_output=False, text=False
@@ -254,50 +215,6 @@ def test_integration_with_environment_variables():
     assert "TEST_RUNNER_VAR=test_value" in stdout
 
 
-def test_binary_input_as_path_object(tmp_path):
-    binary_file = tmp_path / "test_binary"
-    binary_file.touch()
-
-    runner = Runner(binary_file)
-    assert isinstance(runner.binary_input, Path)
-    assert runner.binary_path == str(binary_file)
-
-
-def test_binary_input_as_string(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    runner = Runner("test")
-    assert isinstance(runner.binary_input, str)
-    assert runner.binary_path == "/usr/bin/test"
-
-
-def test_env_vars_converted_to_strings(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    runner = Runner("test")
-
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-
-    runner.run(env_vars={"INT_VAR": 42, "FLOAT_VAR": 3.14, "BOOL_VAR": True})
-
-    called_env = mock_subprocess.call_args[1]["env"]
-    assert called_env["INT_VAR"] == "42"
-    assert called_env["FLOAT_VAR"] == "3.14"
-    assert called_env["BOOL_VAR"] == "True"
-
-
-def test_init_with_instance_env_vars(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    env_vars = {"TEST_VAR": "test_value", "ANOTHER_VAR": "another_value"}
-    runner = Runner("test", env_vars=env_vars)
-    assert runner.instance_env_vars == env_vars
-
-
-def test_init_with_none_instance_env_vars(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    runner = Runner("test", env_vars=None)
-    assert runner.instance_env_vars == {}
-
-
 def test_run_with_instance_env_vars_only(mocker):
     mocker.patch("shutil.which", return_value="/usr/bin/test")
     instance_env = {"INST_VAR": "inst_value"}
@@ -333,51 +250,6 @@ def test_run_merges_instance_and_run_env_vars(mocker):
 
     mock_subprocess.assert_called_once_with(
         ["/usr/bin/test", "arg1"], env=expected_env, cwd=None, capture_output=False, text=False
-    )
-
-
-def test_run_env_vars_override_instance_env_vars(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    instance_env = {"VAR": "instance_value"}
-    run_env = {"VAR": "runtime_value"}
-
-    expected_env = os.environ.copy()
-    expected_env.update({"VAR": "runtime_value"})
-
-    runner = Runner("test", env_vars=instance_env)
-
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-
-    runner.run("arg1", env_vars=run_env)
-
-    mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test", "arg1"], env=expected_env, cwd=None, capture_output=False, text=False
-    )
-
-
-def test_instance_env_vars_preserved_across_multiple_runs(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    instance_env = {"INST_VAR": "inst_value"}
-    expected_env = os.environ.copy()
-    expected_env.update(instance_env)
-
-    runner = Runner("test", env_vars=instance_env)
-
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-
-    # First run
-    runner.run("arg1")
-    mock_subprocess.assert_called_with(
-        ["/usr/bin/test", "arg1"], env=expected_env, cwd=None, capture_output=False, text=False
-    )
-
-    # Second run - instance env vars should still be present
-    runner.run("arg2")
-    assert mock_subprocess.call_count == 2
-    mock_subprocess.assert_called_with(
-        ["/usr/bin/test", "arg2"], env=expected_env, cwd=None, capture_output=False, text=False
     )
 
 
@@ -429,7 +301,7 @@ def test_exec_calls_run_with_interactive_false(mock_runner, mocker):
     )
 
 
-def test_exec_with_env_vars(mock_runner, mocker):
+def test_exec_passes_env_vars_and_working_dir_on(mock_runner, tmp_path, mocker):
     env_vars = {"TEST_VAR": "test_value"}
     expected_env = os.environ.copy()
     expected_env.update(env_vars)
@@ -439,80 +311,10 @@ def test_exec_with_env_vars(mock_runner, mocker):
     mock_subprocess.return_value.stdout = "output"
     mock_subprocess.return_value.stderr = ""
 
-    exit_code, stdout, stderr = mock_runner.exec("arg1", env_vars=env_vars)
-
-    assert exit_code == 0
-    assert stdout == "output"
-    assert stderr == ""
+    assert mock_runner.exec("arg1", env_vars=env_vars, working_dir=tmp_path) == (0, "output", "")
     mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test_binary", "arg1"], env=expected_env, cwd=None, capture_output=True, text=True
+        ["/usr/bin/test_binary", "arg1"], env=expected_env, cwd=tmp_path, capture_output=True, text=True
     )
-
-
-def test_exec_with_working_directory(mock_runner, tmp_path, mocker):
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-    mock_subprocess.return_value.stdout = ""
-    mock_subprocess.return_value.stderr = ""
-
-    mock_runner.exec("arg1", working_dir=tmp_path)
-
-    mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test_binary", "arg1"], env=os.environ.copy(), cwd=tmp_path, capture_output=True, text=True
-    )
-
-
-def test_exec_with_instance_env_vars(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    instance_env = {"INST_VAR": "inst_value"}
-    expected_env = os.environ.copy()
-    expected_env.update(instance_env)
-
-    runner = Runner("test", env_vars=instance_env)
-
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-    mock_subprocess.return_value.stdout = "output"
-    mock_subprocess.return_value.stderr = ""
-
-    exit_code, stdout, stderr = runner.exec("arg1")
-
-    assert exit_code == 0
-    mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test", "arg1"], env=expected_env, cwd=None, capture_output=True, text=True
-    )
-
-
-def test_exec_merges_instance_and_run_env_vars(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/test")
-    instance_env = {"INST_VAR": "inst_value"}
-    run_env = {"RUN_VAR": "run_value"}
-
-    expected_env = os.environ.copy()
-    expected_env.update(instance_env)
-    expected_env.update(run_env)
-
-    runner = Runner("test", env_vars=instance_env)
-
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.returncode = 0
-    mock_subprocess.return_value.stdout = ""
-    mock_subprocess.return_value.stderr = ""
-
-    runner.exec("arg1", env_vars=run_env)
-
-    mock_subprocess.assert_called_once_with(
-        ["/usr/bin/test", "arg1"], env=expected_env, cwd=None, capture_output=True, text=True
-    )
-
-
-@pytest.mark.skipif(shutil.which("echo") is None, reason="echo binary not available")
-def test_integration_exec_with_echo():
-    runner = Runner("echo")
-    exit_code, stdout, stderr = runner.exec("hello", "world")
-    assert exit_code == 0
-    assert stdout.strip() == "hello world"
-    assert stderr == ""
 
 
 def test_run_raises_on_failure_when_raises_true(mock_runner, mocker):

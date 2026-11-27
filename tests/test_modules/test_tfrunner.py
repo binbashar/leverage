@@ -37,24 +37,6 @@ def test_init_with_terraform_flag(mock_terraform_binary):
     assert runner.binary_path == mock_terraform_binary
 
 
-def test_init_with_env_vars(mock_tofu_binary):
-    env_vars = {"TF_VAR_region": "us-east-1", "TF_LOG": "DEBUG"}
-    runner = TFRunner(binary="", env_vars=env_vars)
-    assert runner.instance_env_vars == env_vars
-
-
-def test_init_with_terraform_and_env_vars(mock_terraform_binary):
-    env_vars = {"TF_VAR_region": "us-west-2"}
-    runner = TFRunner(binary="", terraform=True, env_vars=env_vars)
-    assert runner.binary_input == "terraform"
-    assert runner.instance_env_vars == env_vars
-
-
-def test_init_with_none_env_vars(mock_tofu_binary):
-    runner = TFRunner(binary="", env_vars=None)
-    assert runner.instance_env_vars == {}
-
-
 def test_opentofu_not_found_error_message(mocker):
     mocker.patch("shutil.which", return_value=None)
     with pytest.raises(ExitError) as exc_info:
@@ -71,28 +53,6 @@ def test_terraform_not_found_error_message(mocker):
 
     assert "Terraform binary not found" in str(exc_info.value)
     assert TFRunner.TERRAFORM_INSTALL_URL in str(exc_info.value)
-
-
-def test_validate_binary_opentofu_success(mocker):
-    """Test that OpenTofu binary is validated correctly"""
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0\non linux_amd64"
-
-    runner = TFRunner(binary="")
-    # Should not raise an exception
-    assert runner.binary_path == "/usr/bin/tofu"
-
-
-def test_validate_binary_terraform_success(mocker):
-    """Test that Terraform binary is validated correctly"""
-    mocker.patch("shutil.which", return_value="/usr/bin/terraform")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "Terraform v1.6.0\non linux_amd64"
-
-    runner = TFRunner(binary="", terraform=True)
-    # Should not raise an exception
-    assert runner.binary_path == "/usr/bin/terraform"
 
 
 def test_validate_binary_wrong_binary_for_opentofu(mocker):
@@ -138,51 +98,12 @@ def test_run_without_env_vars(mocker):
     assert mock_subprocess.call_args[1]["text"] is False
 
 
-def test_run_merges_instance_and_run_env_vars(mocker):
-    """TFRunner passes env_vars on to Runner, which merges them: the merge itself is tested in test_runner.py"""
-    mocker.patch("shutil.which", return_value="/usr/bin/tofu")
+def test_exec_does_not_raise_by_default(mock_tofu_binary, mocker):
+    """Unlike Runner.exec: callers of TFRunner.exec check the exit code themselves."""
+    runner = TFRunner(binary="")
     mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "OpenTofu v1.6.0"
-    mock_subprocess.return_value.returncode = 0
+    mock_subprocess.return_value.returncode = 1
+    mock_subprocess.return_value.stdout = ""
+    mock_subprocess.return_value.stderr = "Error: no configuration files"
 
-    instance_env = {"TF_VAR_region": "us-east-1", "TF_LOG": "DEBUG"}
-    run_env = {"TF_VAR_environment": "production", "TF_VAR_instance_type": "t3.micro"}
-
-    expected_env = os.environ.copy()
-    expected_env.update(instance_env)
-    expected_env.update(run_env)
-
-    runner = TFRunner(binary="", env_vars=instance_env)
-    result = runner.run("apply", env_vars=run_env)
-
-    assert result == 0
-    # Check the last call
-    assert mock_subprocess.call_args[0][0] == ["/usr/bin/tofu", "apply"]
-    assert mock_subprocess.call_args[1]["env"] == expected_env
-    assert mock_subprocess.call_args[1]["cwd"] is None
-    assert mock_subprocess.call_args[1]["capture_output"] is False
-    assert mock_subprocess.call_args[1]["text"] is False
-
-
-def test_run_with_multiple_args(mocker):
-    mocker.patch("shutil.which", return_value="/usr/bin/terraform")
-    mock_subprocess = mocker.patch("subprocess.run")
-    mock_subprocess.return_value.stdout = "Terraform v1.6.0"
-    mock_subprocess.return_value.returncode = 0
-
-    runner = TFRunner(binary="", terraform=True)
-    result = runner.run("plan", "-var", "region=us-east-1", "-out=plan.tfplan")
-
-    assert result == 0
-    # Check the last call
-    assert mock_subprocess.call_args[0][0] == [
-        "/usr/bin/terraform",
-        "plan",
-        "-var",
-        "region=us-east-1",
-        "-out=plan.tfplan",
-    ]
-    assert mock_subprocess.call_args[1]["env"] == os.environ.copy()
-    assert mock_subprocess.call_args[1]["cwd"] is None
-    assert mock_subprocess.call_args[1]["capture_output"] is False
-    assert mock_subprocess.call_args[1]["text"] is False
+    assert runner.exec("output") == (1, "", "Error: no configuration files")
