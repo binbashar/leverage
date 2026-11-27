@@ -1,0 +1,29 @@
+# Project (short name)
+project         = "{{ short_name }}"
+
+# Project (long name)
+project_long    = "{{ project_name }}"
+
+# AWS primary region
+region_primary  = "{{ primary_region | default("us-east-1") }}"
+
+# AWS Region for DR replication (required by the backend but also used for other resources)
+region_secondary      = "{{ secondary_region | default("us-west-2") }}"
+
+# Account IDs
+{%- for account in organization.accounts %}
+{{ account.name }}_account_id = "{% if account.id %}{{ account.id }}{% else %}XXXXXXXXXXXX{% endif %}"{% endfor %}
+
+# Accounts
+accounts    = {
+{%- for account in organization.accounts %}
+  {{ account.name }} = {
+      email = "{{ account.email }}"{% if account.id -%},
+      id = "{{ account.id }}"{% endif %}
+  }{% endfor %}
+}
+
+# AWS SSO
+sso_enabled   = false
+sso_start_url = "https://bbleverage.awsapps.com/start"
+sso_region    = "{{ primary_region | default("us-east-1") }}"

@@ -1,0 +1,67 @@
+project_name: <project name>
+short_name: <short project name> # A short version of the project name (from 2 to 4 letters long)
+
+primary_region: us-east-1
+secondary_region: us-west-2
+
+##---------------------------------------------------------------------------##
+## Define the accounts and organizational units of your AWS organization.
+##---------------------------------------------------------------------------##
+organization:
+  accounts:
+  - name: management
+    email: <aws+management@example.com>
+  - name: security
+    email: <aws+security@example.com>
+  - name: shared
+    email: <aws+shared@example.com>
+  organizational_units:
+    ##-------------------------------------##
+    ## Available organizations policies:
+    ## - aws_organizations_policy.default
+    ## - aws_organizations_policy.standard
+    ##-------------------------------------##
+  - name: security
+    policy:
+    - aws_organizations_policy.default
+    accounts:
+    - security
+  - name: shared
+    policy:
+    - aws_organizations_policy.standard
+    accounts:
+    - shared
+
+##---------------------------------------------------------------------------##
+## Define the initial users accounts and their groups.
+##---------------------------------------------------------------------------##
+## Fields `first_name`, `last_name`, and `email` are mandatory.
+##
+## Available groups are:
+##  - administrators
+##  - devops
+##  - finops
+##  - securityauditor
+##  - readonly
+##---------------------------------------------------------------------------##
+users:
+- first_name: <User>
+  last_name: <Name>
+  email: <user.name@example.com>
+  groups:
+  - administrators
+  - devops
+
+accounts:
+  shared:
+    networks:
+    - cidr_block: "172.20.0.0/20"
+      availability_zones: [a,b]
+      private_subnets_cidr: "172.20.0.0/21"
+      private_subnets:
+      - "172.20.0.0/23"
+      - "172.20.2.0/23"
+      public_subnets_cidr: "172.20.8.0/21"
+      public_subnets:
+      - "172.20.8.0/23"
+      - "172.20.10.0/23"

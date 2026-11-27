@@ -199,7 +199,7 @@ JINJA_ENV = Environment(loader=FileSystemLoader(TEMPLATES_REPO_DIR.as_posix()), 
 JINJA_ENV.filters["value"] = value
 
 
-def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=None):
+def _render_templates(template_files, config, source=None, destination=None):
     """Render the given templates using the given configuration values.
 
     Args:
@@ -207,9 +207,11 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=N
             templates to render.
         config (dict): Values to replace in the templates.
         source (Path, optional): Source directory of the templates. Defaults to TEMPLATE_DIR.
-        destination (Path, optional): Destination where to render the templates. Defaults to PROJECT_ROOT,
-            resolved at call time so it always matches the project root the rest of the module is using.
+        destination (Path, optional): Destination where to render the templates. Defaults to PROJECT_ROOT.
+        Both defaults are resolved at call time, so they always match the ones the rest of the module is using.
     """
+    if source is None:
+        source = TEMPLATE_DIR
     if destination is None:
         destination = PROJECT_ROOT
 
@@ -240,7 +242,9 @@ def _render_templates(template_files, config, source=TEMPLATE_DIR, destination=N
         rendered_location.write_text(rendered_template)
 
 
-def _render_account_templates(account_name, config, source=TEMPLATE_DIR):
+def _render_account_templates(account_name, config, source=None):
+    if source is None:
+        source = TEMPLATE_DIR
     logger.info(f"Account: Setting up [bold]{account_name}[/bold].")
     account_dir = source / account_name
 
@@ -256,7 +260,9 @@ def _render_account_templates(account_name, config, source=TEMPLATE_DIR):
         _render_templates(template_files=layer_templates, config=config, source=source)
 
 
-def _render_project_template(config, source=TEMPLATE_DIR):
+def _render_project_template(config, source=None):
+    if source is None:
+        source = TEMPLATE_DIR
     # Render base and non account related templates
     template_files = list(source.glob(TEMPLATE_PATTERN))
     config_templates = list((source / CONFIG_DIRECTORY).rglob(TEMPLATE_PATTERN))
@@ -464,11 +470,11 @@ def create():
             "No configuration file found for the project."
             " Make sure the project has already been initialized ([bold]leverage project init[/bold])."
         )
-        return
+        raise Exit(1)
 
     if (PROJECT_ROOT / "config").exists():
         logger.error("Project has already been created.")
-        return
+        raise Exit(1)
 
     validate_config(config)
 
