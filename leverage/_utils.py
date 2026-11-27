@@ -23,8 +23,13 @@ PRIVATE_DIR_MODE = 0o700
 def make_private_dir(path: Path) -> None:
     """Create the directory, and its parents, if missing, and leave it accessible only to its owner.
 
-    An existing directory is tightened too; one owned by another user is left as it is."""
-    path.mkdir(mode=PRIVATE_DIR_MODE, parents=True, exist_ok=True)
+    The parents it creates are private too (`mkdir(parents=True)` would leave them to the umask); the ones that
+    already exist are left as they are. An existing directory is tightened too; one owned by another user is left
+    as it is."""
+    missing = [directory for directory in (path, *path.parents) if not directory.exists()]
+    for directory in reversed(missing):
+        directory.mkdir(mode=PRIVATE_DIR_MODE, exist_ok=True)
+        directory.chmod(PRIVATE_DIR_MODE)
     with suppress(PermissionError):
         path.chmod(PRIVATE_DIR_MODE)
 

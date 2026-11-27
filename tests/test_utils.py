@@ -114,9 +114,13 @@ def _mode(path):
 
 
 def test_make_private_dir_creates_and_tightens(tmp_path):
-    new_dir = tmp_path / "aws" / "project"
+    tmp_path.chmod(0o755)
+    new_dir = tmp_path / "project" / "sso" / "cache"
     make_private_dir(new_dir)
     assert _mode(new_dir) == 0o700
+    assert _mode(tmp_path / "project" / "sso") == 0o700
+    assert _mode(tmp_path / "project") == 0o700
+    assert _mode(tmp_path) == 0o755, "a parent that already existed is left as it was"
 
     existing = tmp_path / "existing"
     existing.mkdir(mode=0o755)
