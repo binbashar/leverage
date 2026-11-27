@@ -784,7 +784,8 @@ def test_mfa_asks_again_after_a_code_too_short(mfa_layer, stubs, mfa_codes, capl
     assert "Invalid token length, it must be 6 digits long. Please try again." in caplog.messages
 
 
-def test_mfa_reports_an_invalid_mfa_profile_at_once(paths, stubs, mfa_codes, monkeypatch):
+@pytest.mark.parametrize("code", ["123456", "12345"])
+def test_mfa_reports_an_invalid_mfa_profile_at_once(paths, stubs, mfa_codes, monkeypatch, code):
     """botocore rejects a role_arn too short before sending it, the way it rejects a short code: no point asking
     again. A real client, not the Stubber, whose own parameter check runs first; nothing is sent."""
     set_layer_profiles(paths, "var.profile")
@@ -794,8 +795,9 @@ def test_mfa_reports_an_invalid_mfa_profile_at_once(paths, stubs, mfa_codes, mon
     )
     sts = boto3.session.Session().client("sts", region_name=REGION)
     monkeypatch.setattr(auth_module.boto3, "Session", lambda **kwargs: SimpleNamespace(client=lambda service: sts))
+    # botocore reports every invalid parameter in one error: a short code too doesn't hide the role_arn
     codes, asked = mfa_codes
-    codes.append("123456")
+    codes.append(code)
 
     with pytest.raises(ExitError, match="(?s)Error assuming role: .*parameter RoleArn") as error:
         refresh_layer_credentials_mfa(paths)

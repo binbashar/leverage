@@ -1,3 +1,4 @@
+import re
 import time
 import json
 from pathlib import Path
@@ -520,7 +521,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
 
             except ParamValidationError as error:
                 # botocore rejects a code shorter than 6 characters before sending it
-                if "parameter TokenCode" in str(error):
+                if set(re.findall(r"for parameter (\w+)", str(error))) == {"TokenCode"}:
                     logger.error("Invalid token length, it must be 6 digits long. Please try again.")
                     continue
                 # Anything else is in the MFA profile (e.g. a role_arn too short): another code won't fix it
