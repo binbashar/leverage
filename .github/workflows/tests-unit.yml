@@ -26,7 +26,7 @@ jobs:
       - name: Install Poetry
         run: |
           echo "[INFO] Installing Poetry..."
-          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.5.1 python -
           echo "[INFO] Configuring Poetry..."
           poetry config virtualenvs.create false  # This prevents poetry from creating a virtual environment
 
@@ -77,7 +77,7 @@ jobs:
 
       - name: Install Poetry
         run: |
-          curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.8.2 python -
+          curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.5.1 python -
           poetry config virtualenvs.create false
 
       - name: Install dependencies using Poetry

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Setup
 - `poetry install --with=dev --with=main` - Install all dependencies including dev tools
-- `poetry shell` - Activate virtual environment for development
+- `eval $(poetry env activate)` - Activate virtual environment for development (Poetry 2.5.1, as in CI; Poetry 2 has no `poetry shell`)
 
 ### Testing
 What each suite checks, where a new test goes and how to refresh the snapshots: `docs/testing.md`.
