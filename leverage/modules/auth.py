@@ -15,7 +15,16 @@ from botocore.exceptions import ClientError
 
 from leverage import logger
 from leverage.path import PathsHandler
-from leverage._utils import key_finder, ExitError, get_option_value, get_or_create_section, parse_tf_file
+from leverage._utils import (
+    ExitError,
+    get_option_value,
+    get_or_create_section,
+    key_finder,
+    make_private_dir,
+    make_private_file,
+    parse_tf_file,
+    write_private_file,
+)
 
 
 class SkipProfile(Exception):
@@ -274,7 +283,7 @@ def _get_credentials_updater(paths: PathsHandler) -> ConfigUpdater:
     """
     Prepare and return a ConfigUpdater for the credentials file.
     """
-    paths.aws_credentials_file.touch(exist_ok=True)
+    make_private_file(paths.aws_credentials_file)
     credentials_updater = ConfigUpdater()
     credentials_updater.read(paths.aws_credentials_file)
     return credentials_updater
@@ -480,8 +489,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 f"Check the following link for possible solutions: https://leverage.binbash.co/user-guide/troubleshooting/credentials/",
             )
 
-        if not paths.aws_cache_dir.exists():
-            paths.aws_cache_dir.mkdir(parents=True)
+        make_private_dir(paths.aws_cache_dir)
 
         cache_file = paths.aws_cache_dir / profile_name
         if cache_file.exists():
@@ -517,7 +525,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 )
                 credentials = credentials["Credentials"]
                 credentials["Expiration"] = credentials["Expiration"].strftime("%Y-%m-%dT%H:%M:%SZ")
-                cache_file.write_text(json.dumps(credentials))
+                write_private_file(cache_file, json.dumps(credentials))
                 break
 
             except ClientError as error:
@@ -544,7 +552,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
             raise ExitError(60, "Failed to get credentials after 3 attempts. Please try again later.")
 
         # write credentials on aws/<project>/credentials (create the file if it doesn't exist first)
-        paths.aws_credentials_file.touch(exist_ok=True)
+        make_private_file(paths.aws_credentials_file)
         credentials_updater = ConfigUpdater()
         credentials_updater.read(paths.aws_credentials_file)
 
