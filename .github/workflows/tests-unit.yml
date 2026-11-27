@@ -60,8 +60,10 @@ jobs:
   # The contract tests with the reference architecture (tests/test_refarch_contract.py) run in
   # unit_tests on a snapshot of a few ref-arch layers. Here they run on every layer of the current
   # le-tf-infra-aws, so a change there that breaks the cli shows up too. No AWS involved.
-  # Not a required check: le-tf-infra-aws can change without this repo changing.
+  # Not a required check, and skipped when gating a release (the snapshot tests in unit_tests still
+  # run there): le-tf-infra-aws can change without this repo changing.
   contract_tests_refarch:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

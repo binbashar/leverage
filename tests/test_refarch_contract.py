@@ -27,7 +27,7 @@ SNAPSHOT_DIR = Path(__file__).parent / "refarch" / "le-tf-infra-aws"
 REFARCH_DIR = Path(os.environ.get("LEVERAGE_REFARCH_DIR") or SNAPSHOT_DIR).resolve()
 
 # Profiles the ref-arch still uses that don't follow `<project>-<account>-<role>` with an existing account.
-# The test for them is expected to fail (strict: once the ref-arch fixes them, remove them from here).
+# The test expects exactly that profile of that layer to fail, and fails once it's gone, to remove it from here.
 KNOWN_STALE_PROFILES = {
     # `root` was the old name of the management account: binbashar/le-tf-infra-aws#1347
     "network/us-east-1/client-vpn": "${var.project}-root-administrator",
@@ -131,18 +131,7 @@ def test_account_directory(paths_in, account):
     assert paths.account_conf["environment"] == account.name
 
 
-def _profile_params():
-    for layer in LAYERS:
-        if layer.as_posix() in KNOWN_STALE_PROFILES:
-            reason = f"stale profile {KNOWN_STALE_PROFILES[layer.as_posix()]} in the ref-arch"
-            yield pytest.param(
-                layer, id=str(layer), marks=pytest.mark.xfail(raises=ExitError, strict=True, reason=reason)
-            )
-        else:
-            yield pytest.param(layer, id=str(layer))
-
-
-@pytest.mark.parametrize("layer", list(_profile_params()))
+@pytest.mark.parametrize("layer", LAYERS, ids=str)
 def test_layer_profiles_resolve_to_accounts(paths_in, layer):
     """Each AWS profile a layer uses resolves to a project account, the way the SSO credential refresh does it.
 
@@ -159,7 +148,14 @@ def test_layer_profiles_resolve_to_accounts(paths_in, layer):
     tf_profile, raw_profiles = auth.get_profiles(paths)
 
     assert tf_profile.startswith(f"{paths.project}-")
+    stale_profile = KNOWN_STALE_PROFILES.get(layer.as_posix())
+    if stale_profile:
+        assert stale_profile in raw_profiles, f"{stale_profile} is gone: remove it from KNOWN_STALE_PROFILES"
     for raw_profile in raw_profiles:
+        if raw_profile == stale_profile:
+            with pytest.raises(ExitError, match="Missing .* permission"):
+                auth.get_layer_profile(raw_profile, config, tf_profile, paths.project)
+            continue
         try:
             auth.get_layer_profile(raw_profile, config, tf_profile, paths.project)
         except auth.SkipProfile:
