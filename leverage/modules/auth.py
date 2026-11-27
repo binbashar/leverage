@@ -1,3 +1,4 @@
+import re
 import time
 import json
 from pathlib import Path
@@ -11,7 +12,7 @@ import click
 from dateutil.tz import tzutc
 from configupdater import ConfigUpdater
 from botocore.session import get_session
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ParamValidationError
 
 from leverage import logger
 from leverage.path import PathsHandler
@@ -31,6 +32,18 @@ class SkipProfile(Exception):
     pass
 
 
+# The provider profile expressions that stand for the layer's own profile (the one in backend.tfvars). The HCL parser
+# returns references in interpolation syntax; the bare form is kept for any parser that doesn't.
+LAYER_PROFILE_REFERENCES = ("${var.profile}", "${each.value.profile}", "var.profile", "each.value.profile")
+
+
+def _resolve_profile(raw_profile: str, tf_profile: str, project: str) -> str:
+    """The profile name a provider's `profile` expression stands for."""
+    if raw_profile in LAYER_PROFILE_REFERENCES:
+        return tf_profile
+    return raw_profile.replace("${var.profile}", tf_profile).replace("${var.project}", project)
+
+
 def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profile: str, project: str):
     if "local." in raw_profile:
         # ignore values referencing to local variables
@@ -38,14 +51,8 @@ def get_layer_profile(raw_profile: str, config_updater: ConfigUpdater, tf_profil
         raise SkipProfile
 
     # if it is exactly that variable, we already know the layer profile is tf_profile
-    layer_profile = tf_profile if raw_profile in ("var.profile", "each.value.profile") else None
-
-    # replace variables with their corresponding values
-    raw = (
-        raw_profile.replace("${var.profile}", tf_profile)
-        .replace("${var.project}", project)
-        .replace("each.value.profile", tf_profile)
-    )
+    layer_profile = tf_profile if raw_profile in LAYER_PROFILE_REFERENCES else None
+    raw = _resolve_profile(raw_profile, tf_profile, project)
 
     # the project and the role are at the beginning and end of the string
     _, *account_name_parts, _ = raw.split("-")
@@ -230,7 +237,6 @@ def refresh_layer_credentials(paths: PathsHandler) -> None:
             credentials_updater = _get_credentials_updater(paths)
 
         _retrieve_and_update_credentials(
-            paths=paths,
             client=client,
             access_token=access_token,
             account_id=account_id,
@@ -290,7 +296,6 @@ def _get_credentials_updater(paths: PathsHandler) -> ConfigUpdater:
 
 
 def _retrieve_and_update_credentials(
-    paths: PathsHandler,
     client,
     access_token: str,
     account_id: str,
@@ -305,7 +310,6 @@ def _retrieve_and_update_credentials(
     Retrieve credentials from SSO and update both config and credentials files.
 
     Args:
-        paths: PathsHandler instance.
         client: boto3 SSO client.
         access_token: SSO access token.
         account_id: AWS account ID.
@@ -424,7 +428,6 @@ def refresh_all_accounts_credentials(paths: PathsHandler, force_refresh: bool = 
 
             logger.info(f"Retrieving credentials for {account_name} account...")
             if _retrieve_and_update_credentials(
-                paths=paths,
                 client=client,
                 access_token=access_token,
                 account_id=account_id,
@@ -462,19 +465,7 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
             # we will search for profiles directly in locals.tf instead
             continue
 
-        # if it is exactly that variable, we already know the layer profile is tf_profile
-        layer_profile = tf_profile if raw_profile in ("var.profile", "each.value.profile") else None
-
-        # replace variables with their corresponding values
-        profile_name = (
-            raw_profile.replace("${var.profile}", tf_profile)
-            .replace("${var.project}", paths.project)
-            .replace("each.value.profile", tf_profile)
-        )
-
-        # if layer_profile wasn't set, use profile_name
-        if layer_profile is None:
-            layer_profile = profile_name
+        profile_name = layer_profile = _resolve_profile(raw_profile, tf_profile, paths.project)
 
         logger.info(f"Attempting to get temporary credentials for {profile_name} profile.")
         mfa_section = f"profile {profile_name}-mfa"
@@ -528,12 +519,23 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                 write_private_file(cache_file, json.dumps(credentials))
                 break
 
+            except ParamValidationError as error:
+                # botocore rejects a code shorter than 6 characters before sending it
+                if set(re.findall(r"for parameter (\w+)", str(error))) == {"TokenCode"}:
+                    logger.error("Invalid token length, it must be 6 digits long. Please try again.")
+                    continue
+                # Anything else is in the MFA profile (e.g. a role_arn too short): another code won't fix it
+                raise ExitError(50, f"Error assuming role: {error}")
             except ClientError as error:
                 code = error.response["Error"]["Code"]
                 message = error.response["Error"]["Message"]
                 # STS answers a wrong MFA code with AccessDenied too: tell them apart by the message
                 if "invalid MFA" in message:
                     logger.error("Unable to get valid credentials. Please try again.")
+                    continue
+                elif code == "ValidationError" and "tokencode" in message.lower():
+                    # STS rejects a longer code, or one that isn't all digits
+                    logger.error("Invalid token code, it must be 6 digits long. Please try again.")
                     continue
                 elif code in ("AccessDenied", "AccessDeniedException"):
                     raise ExitError(
@@ -542,9 +544,6 @@ def refresh_layer_credentials_mfa(paths: PathsHandler):
                         " in this account.\nPlease check with your administrator or try"
                         " checking your credentials configuration.",
                     )
-                elif code == "ValidationError" and "Invalid length for parameter TokenCode" in message:
-                    logger.error("Invalid token length, it must be 6 digits long. Please try again.")
-                    continue
                 # Anything else (e.g. the source profile's session expired) won't be fixed by another code
                 raise ExitError(50, f"Error assuming role: {error}")
 

@@ -20,3 +20,6 @@ coverage.xml
 
 # Hypothesis example database
 .hypothesis/
+
+# mutmut working copy and results (make mutation)
+mutants/

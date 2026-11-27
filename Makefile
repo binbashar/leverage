@@ -34,6 +34,12 @@ test-int: ## Run integration tests (requires bats, terraform and tofu, see READM
 
 tests: test-unit-no-cov test-int ## Run full set of tests
 
+# By hand, not in CI: once per quarter or before a major release (#346). Config in [tool.mutmut], pyproject.toml
+# no_proxy: on macOS, looking up the system proxies crashes mutmut's forked test runs (the tests never reach the network)
+mutation: ## Run mutation testing on auth.py and tf.py, then list the mutants no test kills
+	no_proxy='*' mutmut run --max-children 8
+	mutmut results
+
 setup: ## Set up requirements
 	poetry install --with=dev --with=main
 

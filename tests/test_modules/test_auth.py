@@ -12,10 +12,12 @@ a test has not queued a response for, so "no call was made" is asserted for free
 import importlib
 import json
 import time
+from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import boto3
+import hcl2
 import pytest
 from botocore.stub import ANY, Stubber
 from configupdater import ConfigUpdater
@@ -25,8 +27,10 @@ from leverage import path as lepath
 from leverage._utils import ExitError
 from leverage.modules.auth import (
     SkipProfile,
+    _perform_authentication,
     check_sso_token,
     get_layer_profile,
+    get_profiles,
     refresh_all_accounts_credentials,
     refresh_layer_credentials,
     refresh_layer_credentials_mfa,
@@ -240,12 +244,57 @@ def test_get_layer_profile(muted_click_context):
     )
 
 
+@pytest.mark.parametrize("reference", ["var.profile", "each.value.profile"])
+def test_get_layer_profile_of_the_layer_is_the_backend_profile(muted_click_context, reference):
+    """A provider on the layer's own profile gets the profile of backend.tfvars, even when it doesn't follow the
+    <project>-<account>-<role> convention."""
+    updater = ConfigUpdater()
+    updater.read_string("[profile project-sso-acc123]\naccount_id = 123\nrole_name = DevOps\n")
+    # What the HCL parser returns for `profile = var.profile`
+    raw_profile = hcl2_profile(reference)
+
+    assert get_layer_profile(raw_profile, updater, "project-acc123-admin", "project") == (
+        "123",
+        "acc123",
+        "DevOps",
+        "project-acc123-admin",
+    )
+
+
+def hcl2_profile(reference):
+    """The value the HCL parser gives a provider's `profile = <reference>`."""
+    return hcl2.loads(f'provider "aws" {{\n  profile = {reference}\n}}\n')["provider"][0]["aws"]["profile"]
+
+
+def test_get_profiles_reads_config_locals_and_runtime(paths):
+    (paths.cwd / "config.tf").unlink()
+    (paths.cwd / "locals.tf").write_text(
+        'locals {\n  shared = {\n    profile = "${var.project}-shared-devops"\n  }\n}\n'
+    )
+    (paths.cwd / "runtime.tf").write_text(
+        'provider "aws" {\n  alias   = "network"\n  profile = "bb-network-devops"\n}\n'
+    )
+
+    assert get_profiles(paths) == ("bb-account-devops", {"${var.project}-shared-devops", "bb-network-devops"})
+
+
 # ###########################################################################
 # check_sso_token
 # ###########################################################################
 def test_check_sso_token_requires_a_token(paths):
-    with pytest.raises(ExitError, match="No AWS SSO token found"):
+    with pytest.raises(ExitError, match="No AWS SSO token found") as error:
         check_sso_token(paths)
+
+    assert error.value.exit_code == 1
+
+
+def test_check_sso_token_rejects_another_accounts_token(paths):
+    write_token(paths, datetime.now(timezone.utc) + timedelta(hours=1), name="another-role")
+
+    with pytest.raises(ExitError, match="No valid AWS SSO token found for current account") as error:
+        check_sso_token(paths)
+
+    assert error.value.exit_code == 1
 
 
 def test_check_sso_token_accepts_a_valid_token(paths):
@@ -257,8 +306,10 @@ def test_check_sso_token_accepts_a_valid_token(paths):
 def test_check_sso_token_rejects_an_expired_token(paths):
     write_token(paths, datetime.now(timezone.utc) - timedelta(minutes=1))
 
-    with pytest.raises(ExitError, match="AWS SSO token has expired"):
+    with pytest.raises(ExitError, match="AWS SSO token has expired") as error:
         check_sso_token(paths)
+
+    assert error.value.exit_code == 1
 
 
 @pytest.mark.parametrize(
@@ -282,6 +333,34 @@ def test_check_sso_token_expiry_does_not_depend_on_the_local_timezone(
     else:
         with pytest.raises(ExitError, match="AWS SSO token has expired"):
             check_sso_token(paths)
+
+
+# ###########################################################################
+# _perform_authentication (the `authenticate` decorator of tofu/terraform commands)
+# ###########################################################################
+@pytest.mark.parametrize(
+    "location, common_conf, mfa_enabled, expected",
+    [
+        ("layer", {"sso_enabled": True}, False, ["check_sso_token", "refresh_layer_credentials"]),
+        # SSO wins over MFA
+        ("layer", {"sso_enabled": True}, True, ["check_sso_token", "refresh_layer_credentials"]),
+        ("layer", {"sso_enabled": False}, True, ["refresh_layer_credentials_mfa"]),
+        ("layer", {}, True, ["refresh_layer_credentials_mfa"]),
+        ("layer", {}, False, []),
+        # Credentials are per layer: anywhere else, nothing to refresh
+        ("account", {"sso_enabled": True}, True, []),
+        ("root", {"sso_enabled": True}, True, []),
+    ],
+)
+def test_perform_authentication(monkeypatch, location, common_conf, mfa_enabled, expected):
+    called = []
+    for name in ("check_sso_token", "refresh_layer_credentials", "refresh_layer_credentials_mfa"):
+        monkeypatch.setattr(auth_module, name, lambda paths, name=name: called.append((name, paths)))
+    paths = SimpleNamespace(get_location_type=lambda: location, common_conf=common_conf, mfa_enabled=mfa_enabled)
+
+    _perform_authentication(paths)
+
+    assert called == [(name, paths) for name in expected]
 
 
 # ###########################################################################
@@ -321,6 +400,41 @@ def test_refresh_layer_credentials_writes_the_credentials_of_every_layer_profile
     # The SSO profiles are left as they were
     for section, values in SSO_PROFILES.items():
         assert config[section] == values
+
+
+def test_refresh_layer_credentials_writes_the_layer_profile_of_backend_tfvars(paths, stubs):
+    """`profile = var.profile` is the profile of backend.tfvars, the one tofu looks up, whatever its name."""
+    (paths.cwd.parent.parent / "config" / "backend.tfvars").write_text(
+        'profile = "bb-account-admin"\nbucket = "bb-account-terraform-backend"\nregion = "us-east-1"\n'
+    )
+    paths = PathsHandler(conf.load())
+    set_layer_profiles(paths, "var.profile")
+    write_ini(paths.aws_config_file, SSO_PROFILES)
+    write_token(paths, datetime.now(timezone.utc) + timedelta(hours=1))
+    stub_role_credentials(stubs["sso"], "111111111111", "account", epoch_ms(timedelta(hours=1)))
+
+    refresh_layer_credentials(paths)
+
+    assert set(read_ini(paths.aws_credentials_file)) == {"bb-account-admin"}
+
+
+def test_refresh_layer_credentials_skips_local_references_and_valid_profiles_and_goes_on(paths, stubs, monkeypatch):
+    # A list, not a set, so the local reference and the still valid profile come first
+    monkeypatch.setattr(
+        auth_module,
+        "get_profiles",
+        lambda paths: ("bb-account-devops", ["${local.profile}", "${var.project}-shared-devops", "${var.profile}"]),
+    )
+    write_ini(
+        paths.aws_config_file,
+        {**SSO_PROFILES, "profile bb-shared-devops": {"expiration": epoch_ms(timedelta(hours=2))}},
+    )
+    write_token(paths, datetime.now(timezone.utc) + timedelta(hours=1))
+    stub_role_credentials(stubs["sso"], "111111111111", "account", epoch_ms(timedelta(hours=1)))
+
+    refresh_layer_credentials(paths)
+
+    assert set(read_ini(paths.aws_credentials_file)) == {"bb-account-devops"}
 
 
 def test_refresh_layer_credentials_keeps_credentials_that_are_still_valid(paths, stubs):
@@ -399,6 +513,26 @@ ALL_ACCOUNTS_PROFILES = {
 }
 
 
+def test_refresh_all_accounts_counts_every_account(paths, stubs, caplog):
+    still_valid = epoch_ms(timedelta(hours=2))
+    write_ini(
+        paths.aws_config_file,
+        {
+            **ALL_ACCOUNTS_PROFILES,
+            "profile bb-sso-network": {"account_id": "444444444444", "role_name": "DevOps"},
+            "profile bb-account-devops": {"expiration": still_valid},
+            "profile bb-shared-devops": {"expiration": still_valid},
+        },
+    )
+    write_token(paths, datetime.now(timezone.utc) + timedelta(hours=1))
+    stub_role_credentials_error(stubs["sso"], "333333333333", "ForbiddenException")
+    stub_role_credentials_error(stubs["sso"], "444444444444", "AccessDeniedException")
+
+    refresh_all_accounts_credentials(paths)
+
+    assert "Credential refresh complete: 0 refreshed, 2 skipped, 2 failed." in caplog.messages
+
+
 def test_refresh_all_accounts_renews_expired_skips_valid_and_survives_denied(paths, stubs, caplog):
     write_ini(
         paths.aws_config_file,
@@ -448,8 +582,10 @@ def test_refresh_all_accounts_without_account_profiles(paths, stubs, caplog):
 def test_refresh_all_accounts_requires_a_token(paths, stubs):
     write_ini(paths.aws_config_file, ALL_ACCOUNTS_PROFILES)
 
-    with pytest.raises(ExitError, match="Failed to get SSO access token"):
+    with pytest.raises(ExitError, match="Failed to get SSO access token") as error:
         refresh_all_accounts_credentials(paths)
+
+    assert error.value.exit_code == 1
 
 
 # ###########################################################################
@@ -529,7 +665,7 @@ def test_mfa_assumes_the_role_and_writes_and_caches_the_credentials(mfa_layer, s
 
     refresh_layer_credentials_mfa(mfa_layer)
 
-    assert len(asked) == 1
+    assert asked == ["Enter MFA token code"]
     # The role is assumed with the source profile's credentials
     assert stubs["sessions"] == ["bb-management-oaar"]
     assert read_ini(mfa_layer.aws_credentials_file)["bb-account-devops"] == {
@@ -556,6 +692,144 @@ def test_mfa_uses_cached_credentials_while_valid(mfa_layer, stubs, mfa_codes):
     refresh_layer_credentials_mfa(mfa_layer)
 
     assert asked == []
+
+
+@pytest.mark.parametrize("keys_in", ["credentials", "config"])
+def test_mfa_assumes_the_role_with_the_source_profile_of_the_project(mfa_layer, stubs, mfa_codes, monkeypatch, keys_in):
+    """The source profile's keys come from the project's own files (~/.aws/<project>), not ~/.aws. The AWS CLI
+    takes them from either file."""
+    keys = {"aws_access_key_id": "AKIASOURCE", "aws_secret_access_key": "source-secret"}
+    if keys_in == "credentials":
+        write_ini(mfa_layer.aws_credentials_file, {"bb-management-oaar": keys})
+    else:
+        write_ini(mfa_layer.aws_config_file, {**MFA_PROFILES, "profile bb-management-oaar": keys})
+    used_keys = []
+
+    class Session(boto3.session.Session):
+        def client(self, service, **kwargs):
+            used_keys.append(self.get_credentials().access_key)
+            return stubs["sts"].client
+
+    monkeypatch.setattr(auth_module.boto3, "Session", Session)
+    mfa_codes[0].append("123456")
+    stub_assume_role(stubs["sts"])
+
+    refresh_layer_credentials_mfa(mfa_layer)
+
+    assert used_keys == ["AKIASOURCE"]
+
+
+def test_mfa_skips_local_references_and_cached_profiles_and_goes_on(mfa_layer, stubs, mfa_codes, monkeypatch):
+    # A list, not a set, so the local reference and the cached profile come first
+    monkeypatch.setattr(
+        auth_module,
+        "get_profiles",
+        lambda paths: ("bb-account-devops", ["${local.profile}", "${var.project}-shared-devops", "${var.profile}"]),
+    )
+    write_ini(
+        mfa_layer.aws_config_file,
+        {**MFA_PROFILES, "profile bb-shared-devops-mfa": MFA_PROFILES["profile bb-account-devops-mfa"]},
+    )
+    mfa_layer.aws_cache_dir.mkdir(parents=True)
+    expiration = datetime.now(timezone.utc) + timedelta(hours=2)
+    (mfa_layer.aws_cache_dir / "bb-shared-devops").write_text(
+        json.dumps({"Expiration": expiration.strftime("%Y-%m-%dT%H:%M:%SZ")})
+    )
+    mfa_codes[0].append("123456")
+    stub_assume_role(stubs["sts"])
+
+    refresh_layer_credentials_mfa(mfa_layer)
+
+    assert set(read_ini(mfa_layer.aws_credentials_file)) == {"bb-account-devops"}
+
+
+def test_mfa_on_a_for_each_provider(paths, stubs, mfa_codes):
+    """`profile = each.value.profile` is the layer's own profile too."""
+    set_layer_profiles(paths, "each.value.profile")
+    write_ini(paths.aws_config_file, MFA_PROFILES)
+    mfa_codes[0].append("123456")
+    stub_assume_role(stubs["sts"])
+
+    refresh_layer_credentials_mfa(paths)
+
+    assert set(read_ini(paths.aws_credentials_file)) == {"bb-account-devops"}
+
+
+def test_mfa_renews_cached_credentials_about_to_expire(mfa_layer, stubs, mfa_codes):
+    # Within the 30 minutes margin, so a long apply does not run out of credentials
+    mfa_layer.aws_cache_dir.mkdir(parents=True)
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=10)
+    (mfa_layer.aws_cache_dir / "bb-account-devops").write_text(
+        json.dumps({"Expiration": expiration.strftime("%Y-%m-%dT%H:%M:%SZ")})
+    )
+    codes, asked = mfa_codes
+    codes.append("123456")
+    stub_assume_role(stubs["sts"])
+
+    refresh_layer_credentials_mfa(mfa_layer)
+
+    assert len(asked) == 1
+
+
+def test_mfa_asks_again_after_a_code_too_short(mfa_layer, stubs, mfa_codes, caplog):
+    # botocore rejects it before sending it, so STS answers once. The Stubber checks the parameters before botocore
+    # validates them: the queued response has to accept any code.
+    codes, asked = mfa_codes
+    codes.extend(["12345", "123456"])
+    stub_assume_role(stubs["sts"], token_code=ANY)
+
+    refresh_layer_credentials_mfa(mfa_layer)
+
+    assert len(asked) == 2
+    assert "Invalid token length, it must be 6 digits long. Please try again." in caplog.messages
+
+
+@pytest.mark.parametrize("code", ["123456", "12345"])
+def test_mfa_reports_an_invalid_mfa_profile_at_once(paths, stubs, mfa_codes, monkeypatch, code):
+    """botocore rejects a role_arn too short before sending it, the way it rejects a short code: no point asking
+    again. A real client, not the Stubber, whose own parameter check runs first; nothing is sent."""
+    set_layer_profiles(paths, "var.profile")
+    write_ini(
+        paths.aws_config_file,
+        {"profile bb-account-devops-mfa": {**MFA_PROFILES["profile bb-account-devops-mfa"], "role_arn": "x"}},
+    )
+    sts = boto3.session.Session().client("sts", region_name=REGION)
+    monkeypatch.setattr(auth_module.boto3, "Session", lambda **kwargs: SimpleNamespace(client=lambda service: sts))
+    # botocore reports every invalid parameter in one error: a short code too doesn't hide the role_arn
+    codes, asked = mfa_codes
+    codes.append(code)
+
+    with pytest.raises(ExitError, match="(?s)Error assuming role: .*parameter RoleArn") as error:
+        refresh_layer_credentials_mfa(paths)
+
+    assert error.value.exit_code == 50
+    assert len(asked) == 1
+
+
+@pytest.mark.parametrize(
+    "wrong_code, constraint",
+    [
+        ("1234567", "Member must have length less than or equal to 6"),
+        ("12345a", "Member must satisfy regular expression pattern: [\\d]*"),
+    ],
+)
+def test_mfa_asks_again_after_a_code_sts_rejects(mfa_layer, stubs, mfa_codes, caplog, wrong_code, constraint):
+    codes, asked = mfa_codes
+    codes.extend([wrong_code, "123456"])
+    stubs["sts"].add_client_error(
+        "assume_role",
+        service_error_code="ValidationError",
+        service_message=f"1 validation error detected: Value '{wrong_code}' at 'tokenCode' failed to satisfy "
+        f"constraint: {constraint}",
+        http_status_code=400,
+        expected_params={**ASSUME_ROLE_PARAMS, "TokenCode": wrong_code},
+    )
+    stub_assume_role(stubs["sts"], token_code="123456")
+
+    refresh_layer_credentials_mfa(mfa_layer)
+
+    assert len(asked) == 2
+    assert "Invalid token code, it must be 6 digits long. Please try again." in caplog.messages
 
 
 def test_mfa_asks_again_after_an_invalid_code(mfa_layer, stubs, mfa_codes):
@@ -587,13 +861,14 @@ def test_mfa_gives_up_after_three_invalid_codes(mfa_layer, stubs, mfa_codes):
     assert len(asked) == 3
 
 
-def test_mfa_reports_a_role_the_user_cannot_assume(mfa_layer, stubs, mfa_codes):
+@pytest.mark.parametrize("code", ["AccessDenied", "AccessDeniedException"])
+def test_mfa_reports_a_role_the_user_cannot_assume(mfa_layer, stubs, mfa_codes, code):
     # What STS answers when the source identity may not assume the role: no point asking again
     codes, asked = mfa_codes
     codes.append("123456")
     stub_assume_role_error(
         stubs["sts"],
-        "AccessDenied",
+        code,
         f"User: arn:aws:iam::000000000000:user/john is not authorized to perform: sts:AssumeRole on resource: {ROLE_ARN}",
     )
 
@@ -604,13 +879,19 @@ def test_mfa_reports_a_role_the_user_cannot_assume(mfa_layer, stubs, mfa_codes):
     assert len(asked) == 1
 
 
-def test_mfa_reports_any_other_error_at_once(mfa_layer, stubs, mfa_codes):
-    # e.g. the source profile's own session expired: another MFA code would not help
+@pytest.mark.parametrize(
+    "code, message",
+    [
+        # the source profile's own session expired: another MFA code would not help
+        ("ExpiredTokenException", "The security token included in the request is expired"),
+        # a wrong role_arn in the config
+        ("ValidationError", "1 validation error detected: Value 'x' at 'roleArn' failed to satisfy constraint"),
+    ],
+)
+def test_mfa_reports_any_other_error_at_once(mfa_layer, stubs, mfa_codes, code, message):
     codes, asked = mfa_codes
     codes.append("123456")
-    stub_assume_role_error(
-        stubs["sts"], "ExpiredTokenException", "The security token included in the request is expired"
-    )
+    stub_assume_role_error(stubs["sts"], code, message)
 
     with pytest.raises(ExitError, match="Error assuming role") as error:
         refresh_layer_credentials_mfa(mfa_layer)
@@ -623,5 +904,9 @@ def test_mfa_requires_the_mfa_profile(paths, stubs, mfa_codes):
     set_layer_profiles(paths, "var.profile")
     write_ini(paths.aws_config_file, {"profile bb-management-oaar": {"region": REGION}})
 
-    with pytest.raises(ExitError, match="Credentials for profile bb-account-devops have not been properly configured"):
+    with pytest.raises(
+        ExitError, match="Credentials for profile bb-account-devops have not been properly configured"
+    ) as error:
         refresh_layer_credentials_mfa(paths)
+
+    assert error.value.exit_code == 40
