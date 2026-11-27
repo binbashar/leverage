@@ -10,6 +10,9 @@
 * Describe why these changes were made (e.g. why do these commits fix the problem?)
 * Use bullet points to be concise and to the point.
 
+## Tests
+* Which tests cover the change, and at what level (unit, CLI, bats...). See [docs/testing.md](../docs/testing.md).
+
 ## References
 * Link to any supporting github issues or helpful documentation to add some context (e.g. stackoverflow). 
 * Use `closes #123`, if this PR closes a GitHub issue `#123`

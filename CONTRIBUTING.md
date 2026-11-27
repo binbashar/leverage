@@ -7,14 +7,18 @@ Please note we have a code of conduct, please follow it in all your interactions
 
 ## Pull Request Process
 
-1. Ensure any install or build dependencies are removed before the end of the layer when doing a
-   build.
-2. Update the README.md with details of changes to the interface, this includes new environment
-   variables, exposed ports, useful file locations and container parameters.
-3. Increase the version numbers in any examples files and the README.md to the new version that this
-   Pull Request would represent. The versioning scheme we use is [SemVer](http://semver.org/).
-4. You may merge the Pull Request in once you have the sign-off of two other developers, or if you
-   do not have permission to do that, you may request the second reviewer to merge it for you.
+1. Start the PR title with a prefix: `Fix |`, `Feature |`, `Enhancement |`, `Docs |` or `Chore |`. It sets the PR's
+   labels and the version bump of the next release; see "Release Process" in the README. Don't change version numbers
+   by hand: the release draft computes the next one.
+2. Add or update tests for the change, at the cheapest level that catches its bug. [docs/testing.md](docs/testing.md)
+   explains each suite and where a new test goes.
+3. The required checks have to pass: `lint` (black, ruff), `unit_tests` on every supported Python version (with mypy
+   and the coverage floor) and `integration_tests` (bats).
+4. A change that touches credentials, tokens, logging or the processes the CLI runs goes through the checklist in
+   [docs/threat-model.md](docs/threat-model.md).
+5. Update the README when the change affects how the CLI is installed, configured or developed, and the
+   [user documentation](https://github.com/binbashar/le-ref-architecture-doc) when it changes a command's behavior.
+6. The PR can be merged once a maintainer approves it.
 
 
 ### Collaborate on fixes for security vulnerabilities in private forks
